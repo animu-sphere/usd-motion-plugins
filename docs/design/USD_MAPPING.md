@@ -1,0 +1,166 @@
+# USD mapping
+
+> Status: **proposed**, 2026-09-17. Not implemented in this repository.
+> `usd-vrm-plugins` authors two stages of this shape today — the `.vrma`
+> importer's and the capture recorder's semantic clip — and bakes retargeted
+> animation onto avatars; the stage reading and writing behind them
+> (`motion_retarget`'s `StageIo`) arrives here as `motion-usd`
+> ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
+>
+> This document owns how motion becomes OpenUSD and back: the standalone
+> motion stage, joint tokens, time codes, metadata, and how a motion meets an
+> avatar on a stage. On that area it wins over [DESIGN_POLICY.md](DESIGN_POLICY.md)
+> §16–§18. Section numbers are stable; open questions are `USD-O<n>`.
+
+---
+
+## 1. Principles
+
+- Standard `UsdSkel` first: `UsdSkelSkeleton`, `UsdSkelAnimation`,
+  `UsdSkelBindingAPI` (design policy §4.3). No project schema until a concept
+  fails that test.
+- `motion-usd` converts; it is not a file-format plugin (design policy §16). A
+  format plugin that authors a motion stage calls it.
+- A **source motion asset** and a **target-specific derivative** are separate
+  assets, related by composition (§6).
+- A live runtime never rewrites a stage per frame; USD is authored on bake,
+  record or publish.
+
+## 2. The standalone motion stage
+
+```text
+/Animation            Scope, the default prim; customData.motion (§5)
+  /Skeleton           UsdSkelSkeleton — the canonical semantic skeleton
+  /Body               UsdSkelAnimation — body motion, bound to /Animation/Skeleton
+  /Channels           non-joint channels (§4.3)
+```
+
+Stage metadata: `upAxis = "Y"`, `metersPerUnit = 1`, and `timeCodesPerSecond`
+per §4.1.
+
+`usd-vrm-plugins`' `.vrma` stage uses `/Animation/HumanoidSkeleton` and
+`/Animation/BodyAnimation`, with expressions under `/Animation/Expressions`.
+That stage is VRMA's and stays in that repository; whether this repository
+adopts its prim names or the design policy's is USD-O1, and until it is
+settled neither is frozen here.
+
+## 3. The skeleton
+
+- **Joint tokens are semantic paths** built from the joint vocabulary
+  (MOTION_CONTRACT §2): `hips`, `hips/spine`, `hips/spine/chest`, …, over the
+  joints present, each parented to its nearest present ancestor. They are
+  ASCII by construction.
+- Order: the vocabulary's order, restricted to present joints, so a parent
+  always precedes its child.
+- **Rest transforms are identity except the hips translation** for a clip
+  whose rotations are relative to the canonical rest (a capture, a VRMA).
+  The hips rest translation is the first observed root position for a
+  capture, so root motion arrives downstream as a delta from where the
+  session started. A producer whose rest is not identity (a BVH export)
+  authors its rest.
+- A target skeleton's **source joint names** — Japanese included — are never
+  tokens here: they are preserved beside a deterministic safe identifier, per
+  design policy §17.3, by whichever repository authors that skeleton.
+
+## 4. Animation
+
+### 4.1 Time
+
+- A sample at `t` seconds is authored at time code `t × timeCodesPerSecond`.
+- `usd-vrm-plugins` authors 30 time codes per second for every semantic clip,
+  including captures sampled at other rates; `usd-mmd-plugins` authors VMD
+  time at 30 so frames equal time codes. The design policy asks for the source
+  rate "when meaningful, otherwise a documented default" — which default, and
+  whether a 60 Hz capture authors at 60, is USD-O2.
+- Sample times are authoritative; a time code is their encoding, never their
+  meaning.
+
+### 4.2 Transforms — `scales` is mandatory
+
+`Body` authors `rotations` for every joint and `translations` for the joints
+that carry them (the hips), and **always a constant identity `scales` array**.
+`UsdSkel` resolves translations, rotations and scales as a unit, and `scales`
+has no schema fallback: an animation without it binds correctly and then
+resolves **no joint transforms at all**, while every query still succeeds and
+returns full-length arrays. Only value comparison catches it (measured, and
+the reason every semantic clip in `usd-vrm-plugins` authors the array). Scale
+is never animated.
+
+Root motion rides in the hips translation of `Body`, and the stage says which
+producer channel it came from in metadata (§5). A separate root prim is not
+authored; whether a stage should carry `RootMotion`'s orientation and
+velocities explicitly is USD-O3.
+
+### 4.3 Channels
+
+`MotionChannelSet` entries become one prim per channel under `Channels`,
+carrying the namespaced semantic verbatim and a time-sampled value.
+`usd-vrm-plugins` authors VRMA expressions as
+`/Animation/Expressions/<name>` with `vrm:expressionName`,
+`vrm:expressionType` and a time-sampled `vrm:expressionWeight`, and keeps the
+name attribute — not the prim path — as the key, because a sanitized path can
+differ from the name. The generic attribute names are USD-O4.
+
+## 5. Metadata
+
+`/Animation.customData.motion` (a dictionary; USD expands colon-separated keys
+into one):
+
+| Key | Content |
+| --- | --- |
+| `contractVersion` | the version of this mapping (§8) |
+| `jointVocabularyVersion` | `HumanJoint`'s version (MOTION_CONTRACT §2) |
+| `sourceFormat` | `vrma`, `bvh`, `vmd`, `capture`, … |
+| `sourceProvider` | from `SourceMetadata`, when known |
+| `rootMotionSource` | which producer channel became the hips translation |
+| `duration`, `sampleCount`, `nominalFrameRate` | descriptive |
+
+Format-specific provenance stays in its own namespace beside it
+(`customData.vrma`, `customData.mmd`). Runtime-only state is never authored.
+
+## 6. Motion on an avatar
+
+```text
+/World
+  /Character            references the avatar asset
+  /Motions/Walk         references the motion asset (/Animation)
+  /Bindings/CharacterWalk
+      target = </World/Character>, source = </World/Motions/Walk>, retarget policy
+```
+
+- Source and avatar compose **by reference**, never by sublayering one over
+  the other (design policy §18).
+- A **baked** retarget is a `UsdSkelAnimation` in the target skeleton's joint
+  order, bound with `skel:animationSource` on an **override** of the
+  referenced skeleton, so the avatar keeps owning its rig; it authors identity
+  `scales` for §4.2's reason. It is a derivative, never written into the
+  source motion asset.
+- The shape of a `Bindings` prim — typeless with namespaced relationships, or
+  a schema — is USD-O5.
+
+## 7. Reading USD back
+
+`UsdSkelAnimation` → `MotionClip` is `motion-usd`'s too: a skeleton whose
+joint tokens are semantic paths reads directly; any other skeleton needs a
+`RetargetMap` in reverse and is a retarget, not a read. In `usd-vrm-plugins`
+the reading lives only in a CLI, where an OpenExec bundle cannot call it, so
+the bundle carries a second copy; one library home ends that (its OpenExec
+sampling finding). Both copies also drop `RootMotion::worldOrientation`,
+which a reader here must carry.
+
+## 8. Versioning
+
+The mapping carries `contractVersion`, starting at 1 with the first release
+that authors a stage. A change that alters how an existing consumer interprets
+a stage bumps it; adding an optional prim or key does not.
+
+## 9. Open questions
+
+| Id | Question | Resolve by |
+| --- | --- | --- |
+| USD-O1 | Prim names: the design policy's `Skeleton` / `Body` / `Channels`, or `usd-vrm-plugins`' shipped `HumanoidSkeleton` / `BodyAnimation` / `Expressions` | the first stage `motion-usd` authors |
+| USD-O2 | `timeCodesPerSecond`: always 30, or the source rate when it is uniform | the first non-30 Hz source authored here |
+| USD-O3 | Whether root orientation and velocities are authored explicitly, or only the hips translation | a consumer that reads them back |
+| USD-O4 | Generic channel attribute names under `/Animation/Channels` | the first channel `motion-usd` authors |
+| USD-O5 | The `Bindings` prim: typeless with namespaced properties, or a schema that passes design policy §4.3 | `usd-avatar-runtime`'s first composed scene |
+| USD-O6 | Whether `MOT-O2` in `usd-mmd-plugins` — a directly opened `.vmd` — can use this stage at all, since a VMD without a model has control-rig tracks, not body motion | that repository, with this mapping |
