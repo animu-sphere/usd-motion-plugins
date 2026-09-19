@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "motionRuntime/LiveCaptureSource.h"
+#include "motionRecording/LiveCaptureSource.h"
 
 #include <string>
 #include <vector>
 
-namespace motionCaptureTool
+namespace motionRecordTool
 {
 
 struct Options
@@ -15,11 +15,11 @@ struct Options
     // adapter (motion policy §8.2) becomes a second flag, not a second tool.
     std::string tracePath;
 
-    // Semantic humanoid clip to author. Empty with --normalize or --dry-run.
+    // Motion stage to author. Empty with --normalize or --dry-run.
     std::string outputPath;
 
     // Rewrite the trace in canonical form and exit. Used to normalise a
-    // hand-written fixture into what motionRuntime's writer emits.
+    // hand-written fixture into what motionRecording's writer emits.
     std::string normalizePath;
 
     // Evaluation tick rate. Zero means "the trace's own nominal rate".
@@ -31,10 +31,7 @@ struct Options
     // transport falls behind.
     double deliveryLag = 0.0;
 
-    motion::LiveCaptureConfig capture;
-
-    // Prim name for the authored UsdSkelAnimation.
-    std::string clipName = "BodyAnimation";
+    openstrata::motion::LiveCaptureConfig capture;
 
     bool report = false;
     bool dryRun = false;
@@ -48,4 +45,4 @@ bool ParseOptions(const std::vector<std::string>& arguments, Options* options, b
 
 const char* GetUsage();
 
-} // namespace motionCaptureTool
+} // namespace motionRecordTool

@@ -7,14 +7,14 @@
 #include <stdexcept>
 #include <string>
 
-namespace motionCaptureTool
+namespace motionRecordTool
 {
 namespace
 {
 
 // Upper bounds exist so that a fat-fingered flag fails with a message instead of
 // running the machine out of memory or looping past the heat death of the
-// universe: a HumanoidPose is roughly 1.3 KB, and the tick loop runs
+// universe: a MotionPose is roughly 1.3 KB, and the tick loop runs
 // `duration * rate` times.
 constexpr double kMaxBufferCapacity = 100000.0; // ~130 MB of pose history
 constexpr double kMaxEvaluationRate = 10000.0;  // Hz; real rigs run 30-1000
@@ -72,21 +72,20 @@ TakeDouble(const std::vector<std::string>& arguments, std::size_t* index, const 
 const char*
 GetUsage()
 {
-    return "motion_capture - replay a recorded capture session into a semantic "
-           "humanoid clip\n"
+    return "motion_record - replay a recorded capture session into a motion stage\n"
            "\n"
-           "Motion Phase D. The trace is pushed frame by frame into a generic\n"
-           "LiveCaptureSource, evaluated on a fixed tick, and recorded back into a\n"
-           "clip in exactly the form usdVrmaFileFormat produces - so motion_retarget\n"
-           "bakes a live session onto an avatar with no changes at all.\n"
+           "The trace is pushed frame by frame into a LiveCaptureSource, evaluated\n"
+           "on a fixed tick, recorded back into a clip, and authored as the\n"
+           "standalone motion stage (USD_MAPPING.md), the same stage motion_convert\n"
+           "authors from a recorded file.\n"
            "\n"
            "Usage:\n"
-           "  motion_capture --trace <in.trace> --output <clip.usda> [options]\n"
-           "  motion_capture --trace <in.trace> --normalize <out.trace>\n"
+           "  motion_record --trace <in.trace> --output <clip.usda> [options]\n"
+           "  motion_record --trace <in.trace> --normalize <out.trace>\n"
            "\n"
            "Required:\n"
            "  --trace PATH           Recorded capture trace to replay.\n"
-           "  --output PATH          Semantic clip (.usda/.usdc) to author.\n"
+           "  --output PATH          Motion stage (.usda/.usdc) to author.\n"
            "\n"
            "Timing:\n"
            "  --rate HZ              Evaluation tick rate (default: the trace's\n"
@@ -102,15 +101,13 @@ GetUsage()
            "  --buffer-capacity N    Pose history depth, 1-100000 (default 120).\n"
            "\n"
            "Intake:\n"
-           "  --confidence-floor F   Gate bones reporting less than F in [0, 1].\n"
+           "  --confidence-floor F   Gate joints reporting less than F in [0, 1].\n"
            "                         Frames carrying no confidence are never gated.\n"
-           "  --missing-bones MODE   hold (default) | unbound.\n"
+           "  --missing-joints MODE  hold (default) | unbound.\n"
            "  --root-motion MODE     derive (default) | passthrough | ignore.\n"
            "  --smoothing HZ         Filter cutoff; 0 (default) disables it.\n"
            "\n"
            "Output:\n"
-           "  --clip-name NAME       Prim name for the UsdSkelAnimation\n"
-           "                         (default BodyAnimation).\n"
            "  --normalize PATH       Rewrite the trace canonically and exit. Runs\n"
            "                         no session, so it takes none of --output,\n"
            "                         --dry-run or --report.\n"
@@ -150,13 +147,6 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
         else if (argument == "--normalize")
         {
             if (!TakeValue(arguments, &i, argument, &options->normalizePath, error))
-            {
-                return false;
-            }
-        }
-        else if (argument == "--clip-name")
-        {
-            if (!TakeValue(arguments, &i, argument, &options->clipName, error))
             {
                 return false;
             }
@@ -258,7 +248,7 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
             }
             options->capture.smoothingCutoffHz = static_cast<float>(cutoff);
         }
-        else if (argument == "--missing-bones")
+        else if (argument == "--missing-joints")
         {
             std::string mode;
             if (!TakeValue(arguments, &i, argument, &mode, error))
@@ -267,15 +257,16 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
             }
             if (mode == "hold")
             {
-                options->capture.missingBones = motion::MissingBonePolicy::HoldLast;
+                options->capture.missingJoints = openstrata::motion::MissingJointPolicy::HoldLast;
             }
             else if (mode == "unbound")
             {
-                options->capture.missingBones = motion::MissingBonePolicy::LeaveUnbound;
+                options->capture.missingJoints =
+                    openstrata::motion::MissingJointPolicy::LeaveUnbound;
             }
             else
             {
-                *error = "--missing-bones expects hold or unbound, got '" + mode + "'";
+                *error = "--missing-joints expects hold or unbound, got '" + mode + "'";
                 return false;
             }
         }
@@ -288,15 +279,15 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
             }
             if (mode == "derive")
             {
-                options->capture.rootMotion = motion::RootMotionIntake::DeriveVelocity;
+                options->capture.rootMotion = openstrata::motion::RootMotionIntake::DeriveVelocity;
             }
             else if (mode == "passthrough")
             {
-                options->capture.rootMotion = motion::RootMotionIntake::Passthrough;
+                options->capture.rootMotion = openstrata::motion::RootMotionIntake::Passthrough;
             }
             else if (mode == "ignore")
             {
-                options->capture.rootMotion = motion::RootMotionIntake::Ignore;
+                options->capture.rootMotion = openstrata::motion::RootMotionIntake::Ignore;
             }
             else
             {
@@ -363,4 +354,4 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
     return true;
 }
 
-} // namespace motionCaptureTool
+} // namespace motionRecordTool

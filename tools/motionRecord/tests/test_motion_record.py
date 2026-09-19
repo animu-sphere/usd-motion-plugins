@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""End-to-end check for the Motion Phase D replay tool.
+"""End-to-end check for motion_record, the replay tool.
 
-The milestone's claim is that a live capture feeds *the same* retarget core a
-`.vrma` clip does. This test is what makes that claim falsifiable: it replays a
-recorded session into a semantic humanoid clip, then bakes that clip onto a real
-avatar using the **unchanged Phase C tool**, and resolves the result through a
-`UsdSkelSkeletonQuery`. If the live path produced anything the offline path
-could not consume, the second step fails; if it produced a clip that binds but
-animates nothing, the query step fails.
+It replays recorded sessions into motion stages and reads them back through
+OpenUSD: the stage's shape and provenance, the intake policies, a transport
+that falls behind, and the two root-motion cases the tool has regressed on
+before. It finishes by resolving the stage through a `UsdSkelSkeletonQuery`,
+because a clip that binds and animates nothing passes every other check.
+
+In usd-vrm-plugins, where this tool was `motion_capture`, the last step baked
+the clip onto a VRM avatar with `motion_retarget` first. That leg is a consumer
+of this repository and stays there; what travels is the claim it rested on,
+that the stage resolves and moves.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ import subprocess
 import sys
 import tempfile
 
-from pxr import Gf, Usd, UsdSkel
+from pxr import Gf, Sdf, Usd, UsdSkel
 
 TOLERANCE = 1e-5
 
@@ -95,12 +98,23 @@ def capture(tool: str, trace: pathlib.Path, output: pathlib.Path,
 
 
 def check_clip_shape(clip: pathlib.Path, failures: Failures) -> None:
-    """The authored clip must be avatar-independent and semantically named."""
+    """The authored stage must be the motion stage (USD_MAPPING.md §2-§5)."""
     stage = Usd.Stage.Open(str(clip))
     if not failures.check(stage is not None, f"could not open {clip}"):
         return
 
+    failures.check(
+        stage.GetDefaultPrim().GetPath() == Sdf.Path("/Animation"),
+        f"{clip.name}'s default prim is {stage.GetDefaultPrim().GetPath()}")
+    failures.check(
+        stage.GetTimeCodesPerSecond() == 30.0,
+        f"{clip.name} authors {stage.GetTimeCodesPerSecond()} time codes per "
+        f"second, not the mapping's 30")
+
     animation = find_animation(stage)
+    failures.check(
+        animation.GetPrim().GetPath() == Sdf.Path("/Animation/Body"),
+        f"the animation is {animation.GetPrim().GetPath()}, not /Animation/Body")
     joints = list(animation.GetJointsAttr().Get() or [])
     failures.check(bool(joints), f"{clip.name} has no joints")
 
@@ -115,7 +129,8 @@ def check_clip_shape(clip: pathlib.Path, failures: Failures) -> None:
 
     # scales must be authored: UsdSkel fetches translations, rotations and
     # scales as a unit, and a clip missing scales binds cleanly and then holds
-    # every joint at rest (the v0.4.0 regression, issue #64).
+    # every joint at rest (usd-vrm-plugins' v0.4.0 regression,
+    # animu-sphere/usd-vrm-plugins#64).
     scales = animation.GetScalesAttr().Get()
     failures.check(
         scales is not None and len(scales) == len(joints),
@@ -135,18 +150,21 @@ def check_clip_shape(clip: pathlib.Path, failures: Failures) -> None:
         targets == [animation.GetPrim().GetPath()],
         f"{clip.name} skel:animationSource is {targets}")
 
-    # Provenance survived the whole path: the clip says it came from a live
-    # capture, from which source, and under which intake settings. The keys are
-    # nested under `capture`, as `vrma:*` is on an imported clip, so they are
-    # read by key path rather than out of the top-level dictionary.
+    # Provenance survived the whole path: the stage says it came from a
+    # capture, from which source, and under which intake settings. The session's
+    # fields are the `source` dictionary and the motion's are `motion`
+    # (USD_MAPPING.md §5), so they are read by key path.
     root = stage.GetDefaultPrim()
     failures.check(
-        root.GetCustomDataByKey("capture:kind") == "liveCapture",
-        f"{clip.name} does not record capture:kind=liveCapture")
-    failures.check(bool(root.GetCustomDataByKey("capture:sourceId")),
-                   f"{clip.name} does not record capture:sourceId")
+        root.GetCustomDataByKey("motion:sourceFormat") == "capture",
+        f"{clip.name} does not record motion:sourceFormat=capture")
     failures.check(
-        root.GetCustomDataByKey("capture:missingBones") is not None,
+        root.GetCustomDataByKey("source:kind") == "liveCapture",
+        f"{clip.name} does not record source:kind=liveCapture")
+    failures.check(bool(root.GetCustomDataByKey("source:sourceId")),
+                   f"{clip.name} does not record source:sourceId")
+    failures.check(
+        root.GetCustomDataByKey("source:missingJoints") is not None,
         f"{clip.name} does not record the intake policy")
 
     # The clip has to actually move; a bound clip that holds one pose would
@@ -158,7 +176,7 @@ def check_clip_shape(clip: pathlib.Path, failures: Failures) -> None:
                    f"sample")
 
 
-def check_missing_bone_policies(tool: str, corpus: pathlib.Path,
+def check_missing_joint_policies(tool: str, corpus: pathlib.Path,
                                 directory: pathlib.Path,
                                 failures: Failures) -> None:
     """`hold` and `unbound` must produce visibly different clips.
@@ -175,10 +193,10 @@ def check_missing_bone_policies(tool: str, corpus: pathlib.Path,
     held = directory / "dropout_held.usda"
     unbound = directory / "dropout_unbound.usda"
     for output, mode in ((held, "hold"), (unbound, "unbound")):
-        result = capture(tool, trace, output, "--missing-bones", mode)
+        result = capture(tool, trace, output, "--missing-joints", mode)
         if not failures.check(
                 result.returncode == 0,
-                f"motion_capture --missing-bones {mode} failed: "
+                f"motion_record --missing-joints {mode} failed: "
                 f"{result.stderr.strip()}"):
             return
 
@@ -207,7 +225,7 @@ def check_missing_bone_policies(tool: str, corpus: pathlib.Path,
             unbound_animation.GetRotationsAttr().Get(time)[hand]))
     failures.check(
         differing > 0,
-        "hold and unbound produced identical leftHand tracks; the missing-bone "
+        "hold and unbound produced identical leftHand tracks; the missing-joint "
         "policy never ran")
 
 
@@ -224,7 +242,7 @@ def check_lagged_delivery_still_resolves(tool: str, corpus: pathlib.Path,
     output = directory / "lagged.usda"
     result = capture(tool, trace, output, "--delivery-lag", "0.1", "--report")
     if not failures.check(result.returncode == 0,
-                          f"motion_capture --delivery-lag failed: "
+                          f"motion_record --delivery-lag failed: "
                           f"{result.stderr.strip()}"):
         return
 
@@ -282,7 +300,7 @@ def check_root_motion_survives_without_a_hips_rotation(
     result = capture(tool, trace, output)
     if not failures.check(
             result.returncode == 0,
-            f"motion_capture rejected a hips-less rig: {result.stderr.strip()}"):
+            f"motion_record rejected a hips-less rig: {result.stderr.strip()}"):
         return
 
     stage = Usd.Stage.Open(str(output))
@@ -313,13 +331,13 @@ def check_a_frame_without_a_root_holds_the_placement(
     does: a single rootless frame between two that travelled teleported the body
     to wherever the session began and back, in one frame.
 
-    A missing root is not a missing bone. The rest rotation is neutral, so
-    authoring it for an unobserved bone states an absence; the rest translation
+    A missing root is not a missing joint. The rest rotation is neutral, so
+    authoring it for an unobserved joint states an absence; the rest translation
     is a *place*, so authoring it states a trip that never happened.
 
-    Reachable from either live adapter: a VMC frame closes with bones and no
-    `/VMC/Ext/Root/Pos`, and a mocopi frame whose hips record did not arrive
-    composes no position.
+    Reachable from a live connector: a protocol frame can close with joint
+    rotations and no root position, and a device frame whose hips record did not
+    arrive composes none.
     """
     trace = directory / "root_gap.trace"
     lines = ["!motion-capture-trace 1", "provider example.test",
@@ -337,7 +355,7 @@ def check_a_frame_without_a_root_holds_the_placement(
     result = capture(tool, trace, output)
     if not failures.check(
             result.returncode == 0,
-            f"motion_capture rejected a trace with a root gap: "
+            f"motion_record rejected a trace with a root gap: "
             f"{result.stderr.strip()}"):
         return
 
@@ -374,43 +392,60 @@ def check_malformed_trace_is_rejected(tool: str, directory: pathlib.Path,
                    encoding="utf-8", newline="\n")
     result = capture(tool, bad, directory / "never.usda")
     failures.check(result.returncode != 0,
-                   "motion_capture accepted a trace naming an unknown bone")
+                   "motion_record accepted a trace naming an unknown joint")
     failures.check("elbow" in result.stderr,
-                   f"the rejection does not name the offending bone: "
+                   f"the rejection does not name the offending joint: "
                    f"{result.stderr.strip()}")
 
 
-def check_retarget_chain(retarget_tool: str, clip: pathlib.Path,
-                         avatar: pathlib.Path, humanoid_map: pathlib.Path,
-                         directory: pathlib.Path, failures: Failures) -> None:
-    """The Phase D claim: the unchanged Phase C tool bakes a live session."""
-    baked = directory / "baked.usda"
-    result = run_tool(retarget_tool,
-                      "--avatar", str(avatar),
-                      "--animation", str(clip),
-                      "--output", str(baked),
-                      "--humanoid-map", str(humanoid_map),
-                      "--root-motion", "hips")
-    if not failures.check(
-            result.returncode == 0,
-            f"motion_retarget could not consume the captured clip: "
-            f"{result.stderr.strip()}"):
-        return
+def check_unauthored_channels_are_reported(tool: str, corpus: pathlib.Path,
+                                           directory: pathlib.Path,
+                                           failures: Failures) -> None:
+    """Channels the stage cannot hold yet are named, not dropped in silence.
 
+    The motion stage has no `Channels` prim until USD-O4 is decided, so a
+    session that carried expression weights loses them on the way to disk.
+    That is acceptable while it is said; a clean exit with nothing on stderr
+    would let a caller believe the face was recorded.
+    """
+    trace = corpus / "expressions-30hz.trace"
+    if not failures.check(trace.is_file(), f"missing fixture {trace}"):
+        return
+    result = capture(tool, trace, directory / "expressions.usda")
+    if not failures.check(result.returncode == 0,
+                          f"motion_record failed on {trace.name}: "
+                          f"{result.stderr.strip()}"):
+        return
+    failures.check(
+        "channel(s) were not authored" in result.stderr,
+        f"{trace.name} carries channels, and motion_record did not say it "
+        f"dropped them: {result.stderr.strip()!r}")
+
+    quiet = capture(tool, corpus / "walk-clean-30hz.trace",
+                    directory / "no_channels.usda")
+    failures.check(
+        "channel(s)" not in quiet.stderr,
+        f"a session without channels warned about them: "
+        f"{quiet.stderr.strip()!r}")
+
+
+def check_stage_resolves_and_moves(clip: pathlib.Path,
+                                   failures: Failures) -> None:
+    """The stage resolves through UsdSkel, and the skeleton it drives moves."""
     # Both stay in locals: the query holds no strong reference back, so a
     # temporary would be released out from under it.
-    stage = Usd.Stage.Open(str(baked))
+    stage = Usd.Stage.Open(str(clip))
     skeleton = find_skeleton(stage)
     cache = UsdSkel.Cache()
     query = cache.GetSkelQuery(skeleton)
     if not failures.check(bool(query),
-                          f"{baked.name} yields no UsdSkel skeleton query"):
+                          f"{clip.name} yields no UsdSkel skeleton query"):
         return
 
     animation = find_animation(stage)
     times = animation.GetRotationsAttr().GetTimeSamples()
     if not failures.check(len(times) > 1,
-                          f"{baked.name} has {len(times)} time sample(s)"):
+                          f"{clip.name} has {len(times)} time sample(s)"):
         return
 
     def rotations_at(time) -> list[Gf.Quatf]:
@@ -428,13 +463,14 @@ def check_retarget_chain(retarget_tool: str, clip: pathlib.Path,
     reference = rotations_at(times[0])
     if not failures.check(
             len(reference) > 0,
-            f"UsdSkel resolved no joint transforms from {baked.name}: the "
+            f"UsdSkel resolved no joint transforms from {clip.name}: the "
             f"animation is bound but does not drive the rig"):
         return
 
     # The rig must actually move over the session. A clip that binds and then
-    # holds the rest pose resolves fine and animates nothing -- exactly the
-    # v0.4.0 regression (#64), and the only check that catches it. Sampled
+    # holds the rest pose resolves fine and animates nothing -- exactly
+    # usd-vrm-plugins' v0.4.0 regression (animu-sphere/usd-vrm-plugins#64),
+    # and the only check that catches it. Sampled
     # across the whole timeline, not endpoint to endpoint: the walk fixtures
     # span whole gait cycles and legitimately return to their opening pose.
     moved = any(
@@ -443,17 +479,14 @@ def check_retarget_chain(retarget_tool: str, clip: pathlib.Path,
         for time in times[1:])
     failures.check(
         moved,
-        f"UsdSkel resolves {baked.name} to the same pose at every time: the "
-        f"captured session bound to the avatar but did not animate it")
+        f"UsdSkel resolves {clip.name} to the same pose at every time: the "
+        f"recorded session binds but does not animate the skeleton")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tool", required=True)
     parser.add_argument("--corpus", required=True)
-    parser.add_argument("--retarget-tool")
-    parser.add_argument("--avatar")
-    parser.add_argument("--humanoid-map")
     options = parser.parse_args()
 
     corpus = pathlib.Path(options.corpus).resolve()
@@ -470,11 +503,11 @@ def main() -> int:
                          "--report")
         if not failures.check(
                 result.returncode == 0,
-                f"motion_capture failed: {result.stderr.strip()}"):
+                f"motion_record failed: {result.stderr.strip()}"):
             return failures.report()
 
         check_clip_shape(clip, failures)
-        check_missing_bone_policies(options.tool, corpus, directory, failures)
+        check_missing_joint_policies(options.tool, corpus, directory, failures)
         check_lagged_delivery_still_resolves(options.tool, corpus, directory,
                                              failures)
         check_normalize_is_idempotent(options.tool, corpus, directory, failures)
@@ -483,21 +516,9 @@ def main() -> int:
         check_a_frame_without_a_root_holds_the_placement(
             options.tool, directory, failures)
         check_malformed_trace_is_rejected(options.tool, directory, failures)
-
-        if options.retarget_tool:
-            if not (options.avatar and options.humanoid_map):
-                failures.check(
-                    False,
-                    "--retarget-tool needs --avatar and --humanoid-map")
-            else:
-                check_retarget_chain(
-                    options.retarget_tool, clip,
-                    pathlib.Path(options.avatar).resolve(),
-                    pathlib.Path(options.humanoid_map).resolve(),
-                    directory, failures)
-        else:
-            print("note: motion_retarget was not provided; the "
-                  "capture->retarget leg was skipped")
+        check_unauthored_channels_are_reported(options.tool, corpus,
+                                               directory, failures)
+        check_stage_resolves_and_moves(clip, failures)
 
     return failures.report()
 

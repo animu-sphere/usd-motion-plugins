@@ -22,4 +22,5 @@ members = [
     "libs/motionBvh",
     "tools/motionBvhInspect",
     "tools/motionConvert",
+    "tools/motionRecord",
 ]

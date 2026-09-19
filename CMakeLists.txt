@@ -82,6 +82,7 @@ add_subdirectory("libs/motionSource")
 add_subdirectory("libs/motionBvh")
 add_subdirectory("tools/motionBvhInspect")
 add_subdirectory("tools/motionConvert")
+add_subdirectory("tools/motionRecord")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
