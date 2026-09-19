@@ -292,23 +292,33 @@ Default interpolation is the design policy's §8: linear translation,
 shortest-path normalized quaternion interpolation, linear scalar channels,
 held discrete values.
 
-**API owed from the OpenExec evidence.** `usd-vrm-plugins`' OpenExec nodes
+**API from the OpenExec evidence.** `usd-vrm-plugins`' OpenExec nodes
 wrapped these libraries and found where a wrapper could not reach
 ([its boundary consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/boundary-consolidation.md)).
-They are fixed when the code arrives, not after:
+All four were fixed after the move, in a change of their own. Each is a pure
+function, and the streaming class beside it calls it, so the rule has one
+implementation:
 
-- `SampleClip(clip, t) -> PoseSampleResult` as a free function, with the
-  ordering precondition written on it, so a pure computation need not copy a
-  clip into a source object to get the status; one bracket-and-hold search,
-  not two.
-- A filter's **stateless step**, `Step(prior, pose, options)`, that returns
-  the state beside the result — composing one from two streaming calls drops
-  the dropout history (measured: 45.0° against 23.8° streamed).
-- An N-way blend that can say *there is nothing to blend*, with finite weights
-  and one shared instant as preconditions, and its order dependence stated
-  (measured: 4.247° between three sources and their reverse).
-- Root intake as a free function, `ConditionRootMotion(prior, pose, intake)`,
-  instead of a private method of a capture session.
+- `SampleClip(clip, t) -> PoseSampleResult` answers from a clip held by
+  reference, with the status. The precondition is written on it: timestamps
+  are finite and never decrease. `ClipSource::Sample`, `SampleAnimation` and
+  `PoseBuffer::Sample` share its one bracket-and-hold search.
+- `PoseFilter::Step(state, pose, options)` returns the smoothed pose and, beside
+  it, the **state**. The state is richer than the pose, because a joint that
+  drops out keeps its history only there. A caller that carries the state
+  reproduces the stream exactly. A caller that carries the pose loses the
+  history (measured: 45.0° against 23.8° streamed). `PoseFilter::Apply` is
+  `Step` over the object's own state.
+- The N-way `BlendPoses` answers `std::optional<MotionPose>`. Nullopt means
+  *nothing to blend*: an empty list, or no weight above zero. A NaN weight
+  counts as no weight. Finite weights and one shared instant are preconditions.
+  The result is stamped at the first weighted pose's instant, never at an
+  interpolated one. Its header states the order dependence (measured: 4.247°
+  between three sources and their reverse).
+- `ConditionRootMotion(prior, pose, intake) -> RootMotion` is the root intake
+  rule of §9. `LiveCaptureSource` calls it for every frame it accepts. Its
+  `prior` is a value: with no previous pose, a caller passes the pose itself,
+  and nothing is derived.
 
 ## 9. `MotionStream` intake
 

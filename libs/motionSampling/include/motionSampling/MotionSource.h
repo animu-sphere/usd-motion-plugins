@@ -90,6 +90,26 @@ struct PoseSampleResult
 MOTIONSAMPLING_API bool operator==(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
 MOTIONSAMPLING_API bool operator!=(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
 
+// What `clip` states at `timestamp`, with the status the motion contract says
+// is part of the answer (MOTION_CONTRACT.md §8) -- the question
+// `IMotionSource::Sample` asks, answered from a clip held by reference, so a
+// pure computation need not copy the clip into a `ClipSource` to get it.
+// `ClipSource::Sample` is this function on the source's own clock.
+//
+// - An empty clip is `Unavailable`, with no pose and a lag of zero.
+// - Inside the sampled range (to within `PoseSampleTimeTolerance`) the
+//   bracketing samples are interpolated by `LerpPose`: `Sampled`.
+// - Outside it the nearer boundary pose is held unchanged: `Held`. A clip is
+//   finished, so nothing is ever `Extrapolated`.
+// - The pose is stamped at `timestamp`, whether or not the clip reached it,
+//   and `lag` is `timestamp` minus the last sample's time.
+//
+// Precondition: the samples' timestamps are finite and never decrease. The
+// search is binary and does not check; a clip out of order answers with a
+// bracket nobody measured. Repeated timestamps are allowed, and every answer is
+// still a sample or an interpolation between neighbours.
+MOTIONSAMPLING_API PoseSampleResult SampleClip(const MotionClip& clip, double timestamp);
+
 class MOTIONSAMPLING_API IMotionSource
 {
   public:
@@ -144,6 +164,8 @@ class MOTIONSAMPLING_API ClipSource final : public IMotionSource
         return _startOffset;
     }
 
+    // `SampleClip` at `evaluationTime - startOffset`, restamped on the
+    // consumer's clock.
     PoseSampleResult Sample(double evaluationTime) override;
     SourceMetadata GetSourceMetadata() const override;
     bool GetTimeRange(double* startTime, double* endTime) const override;

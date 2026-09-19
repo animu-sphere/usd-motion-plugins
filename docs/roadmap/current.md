@@ -78,8 +78,13 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   identity `scales` and the `motion:timeCodesPerSecond` rate included
   ([EXEC_CONTRACT.md §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)),
   and open it through OpenUSD in a test.
-- ⬜ Fix the sampling findings in their own change
-  ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling)).
+- ✅ Fix the sampling findings in their own change
+  ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling))
+  — 2026-09-19. `SampleClip`, `PoseFilter::Step`, an N-way blend that answers
+  nullopt when there is nothing to blend, and `ConditionRootMotion`. The
+  streaming classes call these functions, so each rule has one
+  implementation. `usd-vrm-plugins`' `execMotion` can drop its wrapper code
+  when it switches to these packages.
 - ⬜ Reproduce the parity evidence named by `usd-vrm-plugins`' MIG-0 against
   this repository's packages, so that repository can delete its copies.
 - ⬜ `usd-mmd-plugins`' `mmdMotionAdapter` configures against the installed

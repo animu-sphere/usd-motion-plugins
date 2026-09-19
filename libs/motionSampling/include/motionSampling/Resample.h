@@ -20,9 +20,10 @@ namespace openstrata::motion
 // through unchanged so provenance survives a resample.
 MOTIONSAMPLING_API MotionClip Resample(const MotionClip& animation, double frameRate);
 
-// Samples an animation at an arbitrary time using the same hold-at-the-edges
-// rule as PoseBuffer::Sample. Returns a default-constructed pose when the
-// animation has no samples.
+// The pose `SampleClip` answers, without the status: a default-constructed
+// pose when the animation has no samples. Same search, same precondition
+// (timestamps finite and never decreasing); a caller that needs to tell a held
+// pose from a sampled one asks `SampleClip` (motionSampling/MotionSource.h).
 MOTIONSAMPLING_API MotionPose SampleAnimation(const MotionClip& animation,
                                                double timestamp);
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionSampling/PoseBuffer.h"
 
-#include "motionSampling/Interpolation.h"
+#include "Bracket.h"
 
 #include <algorithm>
 
@@ -68,37 +68,9 @@ PoseBuffer::GetTimeRange(double* startTime, double* endTime) const
 std::optional<MotionPose>
 PoseBuffer::Sample(double timestamp) const
 {
-    if (_samples.empty())
-    {
-        return std::nullopt;
-    }
-    if (timestamp <= _samples.front().timestamp)
-    {
-        return _samples.front();
-    }
-    if (timestamp >= _samples.back().timestamp)
-    {
-        return _samples.back();
-    }
-
-    // Timestamps are strictly increasing (Push enforces it), so the first
-    // sample at or after `timestamp` is the upper bracket.
-    const auto upper = std::lower_bound(_samples.begin(), _samples.end(), timestamp,
-                                        [](const MotionPose& sample, double time)
-                                        { return sample.timestamp < time; });
-    if (upper == _samples.begin())
-    {
-        return _samples.front();
-    }
-    const auto lower = std::prev(upper);
-
-    const double span = upper->timestamp - lower->timestamp;
-    if (span <= 0.0)
-    {
-        return *lower;
-    }
-    const float alpha = static_cast<float>((timestamp - lower->timestamp) / span);
-    return LerpPose(*lower, *upper, alpha);
+    // Push keeps the timestamps strictly increasing, which is stronger than the
+    // search's precondition.
+    return detail::SampleBracketed(_samples.begin(), _samples.end(), timestamp);
 }
 
 std::optional<MotionPose>

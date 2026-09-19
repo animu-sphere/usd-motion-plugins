@@ -24,15 +24,15 @@ arrival ([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-
 | --- | --- |
 | `motionSampling/PoseBuffer.h` | `PoseBuffer` — bounded, strictly ordered pose history with bracketed sampling and capped position extrapolation |
 | `motionSampling/Interpolation.h` | `SlerpShortest`, `LerpRootMotion`, `LerpPose` |
-| `motionSampling/Resample.h` | `Resample`, `SampleAnimation` |
-| `motionSampling/Filter.h` | `PoseFilter` — frame-rate independent exponential smoothing |
-| `motionSampling/Blend.h` | `BlendPoses` (two-pose and weighted N-pose) |
-| `motionSampling/MotionSource.h` | `IMotionSource`, `PoseSampleResult` / `PoseSampleStatus` (with an exact `operator==`, so OpenExec can register the result), `ClipSource` |
+| `motionSampling/Resample.h` | `Resample`, `SampleAnimation` (the pose `SampleClip` answers, without the status) |
+| `motionSampling/Filter.h` | `PoseFilter` — frame-rate independent exponential smoothing; `PoseFilter::Step`, the same step as a pure function that returns the state beside the pose |
+| `motionSampling/Blend.h` | `BlendPoses`: two-pose, and weighted N-pose, which answers nullopt when there is nothing to blend |
+| `motionSampling/MotionSource.h` | `IMotionSource`, `PoseSampleResult` / `PoseSampleStatus` (with an exact `operator==`, so OpenExec can register the result), `SampleClip`, `ClipSource` |
 
 The API findings `usd-vrm-plugins`' OpenExec layer measured against this code
-— a status-carrying `SampleClip`, a stateless filter step, an N-way blend that
-can answer *nothing to blend* — are fixed in a change of their own after the
-move (MOTION_CONTRACT.md §8).
+were fixed in a change of their own after the move (MOTION_CONTRACT.md §8).
+Each fix is a pure function, and the streaming class beside it calls it:
+`SampleClip`, `PoseFilter::Step` and the N-way blend's *nothing to blend*.
 
 ## Two rules the whole library obeys
 

@@ -27,24 +27,23 @@ SmoothingAlpha(float cutoffHz, double dt)
 
 } // namespace
 
-MotionPose
-PoseFilter::Apply(const MotionPose& pose)
+PoseFilter::StepResult
+PoseFilter::Step(const MotionPose* state, const MotionPose& pose, const Options& options)
 {
-    if (_options.cutoffHz <= 0.0f || !_state)
+    if (options.cutoffHz <= 0.0f || !state)
     {
-        _state = pose;
-        return pose;
+        return StepResult{pose, pose};
     }
 
-    const double dt = pose.timestamp - _state->timestamp;
+    const double dt = pose.timestamp - state->timestamp;
     if (dt <= 0.0)
     {
-        _state = pose;
-        return pose;
+        return StepResult{pose, pose};
     }
 
-    const float alpha = SmoothingAlpha(_options.cutoffHz, dt);
-    MotionPose result = pose;
+    const float alpha = SmoothingAlpha(options.cutoffHz, dt);
+    StepResult step{pose, MotionPose()};
+    MotionPose& result = step.pose;
 
     for (std::size_t i = 0; i < HumanJointCount; ++i)
     {
@@ -55,38 +54,45 @@ PoseFilter::Apply(const MotionPose& pose)
             // restarting when the joint comes back.
             continue;
         }
-        if (!_state->validRotations.test(i))
+        if (!state->validRotations.test(i))
         {
             continue;
         }
         result.localRotations[i] =
-            SlerpShortest(_state->localRotations[i], pose.localRotations[i], alpha);
+            SlerpShortest(state->localRotations[i], pose.localRotations[i], alpha);
     }
 
-    if (_options.filterRootPosition && pose.root.hasPosition && _state->root.hasPosition)
+    if (options.filterRootPosition && pose.root.hasPosition && state->root.hasPosition)
     {
-        result.root.worldPosition = _state->root.worldPosition +
-                                    (pose.root.worldPosition - _state->root.worldPosition) * alpha;
+        result.root.worldPosition = state->root.worldPosition +
+                                    (pose.root.worldPosition - state->root.worldPosition) * alpha;
     }
-    if (_options.filterRootOrientation && pose.root.hasOrientation && _state->root.hasOrientation)
+    if (options.filterRootOrientation && pose.root.hasOrientation && state->root.hasOrientation)
     {
         result.root.worldOrientation =
-            SlerpShortest(_state->root.worldOrientation, pose.root.worldOrientation, alpha);
+            SlerpShortest(state->root.worldOrientation, pose.root.worldOrientation, alpha);
     }
 
     // Carry forward the joints this pose did not report so their history
     // survives the dropout.
-    MotionPose nextState = result;
+    step.state = result;
     for (std::size_t i = 0; i < HumanJointCount; ++i)
     {
-        if (!pose.validRotations.test(i) && _state->validRotations.test(i))
+        if (!pose.validRotations.test(i) && state->validRotations.test(i))
         {
-            nextState.localRotations[i] = _state->localRotations[i];
-            nextState.validRotations.set(i);
+            step.state.localRotations[i] = state->localRotations[i];
+            step.state.validRotations.set(i);
         }
     }
-    _state = std::move(nextState);
-    return result;
+    return step;
+}
+
+MotionPose
+PoseFilter::Apply(const MotionPose& pose)
+{
+    StepResult step = Step(_state ? &*_state : nullptr, pose, _options);
+    _state = std::move(step.state);
+    return std::move(step.pose);
 }
 
 } // namespace openstrata::motion

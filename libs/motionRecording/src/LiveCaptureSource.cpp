@@ -19,6 +19,34 @@ CarriesAnything(const MotionPose& pose)
 
 } // namespace
 
+RootMotion
+ConditionRootMotion(const MotionPose& prior, const MotionPose& pose, RootMotionIntake intake)
+{
+    switch (intake)
+    {
+    case RootMotionIntake::Ignore:
+        return RootMotion();
+    case RootMotionIntake::Passthrough:
+        return pose.root;
+    case RootMotionIntake::DeriveVelocity:
+        break;
+    }
+
+    RootMotion root = pose.root;
+    if (!root.hasPosition || root.hasLinearVelocity || !prior.root.hasPosition)
+    {
+        return root;
+    }
+    const double delta = pose.timestamp - prior.timestamp;
+    if (delta > 0.0)
+    {
+        root.linearVelocity =
+            (root.worldPosition - prior.root.worldPosition) / static_cast<float>(delta);
+        root.hasLinearVelocity = true;
+    }
+    return root;
+}
+
 LiveCaptureSource::LiveCaptureSource(const LiveCaptureConfig& config)
     : _buffer(config.bufferCapacity)
 {
@@ -106,32 +134,16 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
     }
 
     // 4. Root motion.
-    switch (_config.rootMotion)
+    if (_config.rootMotion != RootMotionIntake::Ignore && conditioned.root.hasPosition)
     {
-    case RootMotionIntake::Ignore:
-        conditioned.root = RootMotion();
-        break;
-    case RootMotionIntake::Passthrough:
-    case RootMotionIntake::DeriveVelocity:
-        if (conditioned.root.hasPosition)
-        {
-            ++_stats.rootSamplesObserved;
-        }
-        if (_config.rootMotion == RootMotionIntake::DeriveVelocity &&
-            conditioned.root.hasPosition && !conditioned.root.hasLinearVelocity && _lastAccepted &&
-            _lastAccepted->root.hasPosition)
-        {
-            const double delta = conditioned.timestamp - _lastAccepted->timestamp;
-            if (delta > 0.0)
-            {
-                conditioned.root.linearVelocity =
-                    (conditioned.root.worldPosition - _lastAccepted->root.worldPosition) /
-                    static_cast<float>(delta);
-                conditioned.root.hasLinearVelocity = true;
-                ++_stats.rootVelocitiesDerived;
-            }
-        }
-        break;
+        ++_stats.rootSamplesObserved;
+    }
+    const bool reportedVelocity = conditioned.root.hasLinearVelocity;
+    conditioned.root = ConditionRootMotion(_lastAccepted ? *_lastAccepted : conditioned,
+                                           conditioned, _config.rootMotion);
+    if (!reportedVelocity && conditioned.root.hasLinearVelocity)
+    {
+        ++_stats.rootVelocitiesDerived;
     }
 
     // 5. Provenance is stamped on every buffered pose, so a pose that outlives

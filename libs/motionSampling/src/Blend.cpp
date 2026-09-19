@@ -3,8 +3,6 @@
 
 #include "motionSampling/Interpolation.h"
 
-#include <algorithm>
-
 namespace openstrata::motion
 {
 
@@ -14,32 +12,35 @@ BlendPoses(const MotionPose& a, const MotionPose& b, float weight)
     return LerpPose(a, b, weight);
 }
 
-MotionPose
+std::optional<MotionPose>
 BlendPoses(const std::vector<WeightedPose>& poses)
 {
-    MotionPose result;
+    std::optional<MotionPose> result;
     double accumulated = 0.0;
-    bool seeded = false;
 
     for (const WeightedPose& entry : poses)
     {
-        const double weight = std::max(entry.weight, 0.0f);
-        if (weight <= 0.0)
+        // Written so a NaN fails it too: no weight, like a negative one.
+        if (!(entry.weight > 0.0f))
         {
             continue;
         }
-        if (!seeded)
+        const double weight = entry.weight;
+        if (!result)
         {
             result = entry.pose;
             accumulated = weight;
-            seeded = true;
             continue;
         }
         // Fold each pose in at its share of the running total. Successive
         // pairwise slerps keep every intermediate a unit quaternion, which a
-        // component-wise weighted sum would not.
+        // component-wise weighted sum would not. The instant is the first
+        // weighted pose's: `LerpPose` interpolates timestamps, and sources
+        // combined at one instant are not two samples in time.
         accumulated += weight;
-        result = LerpPose(result, entry.pose, static_cast<float>(weight / accumulated));
+        const double instant = result->timestamp;
+        result = LerpPose(*result, entry.pose, static_cast<float>(weight / accumulated));
+        result->timestamp = instant;
     }
 
     return result;

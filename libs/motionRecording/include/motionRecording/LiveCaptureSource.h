@@ -64,6 +64,24 @@ enum class RootMotionIntake : std::uint8_t
     DeriveVelocity,
 };
 
+// The root `pose` states under `intake`, given the pose accepted before it --
+// the intake rule as a pure function, so a caller that is not a capture session
+// (an OpenExec computation, whose driver carries the previous answer) applies
+// the same rule rather than a copy. `LiveCaptureSource` calls it for every
+// frame it accepts.
+//
+// - `Ignore`: a default-constructed `RootMotion`, every presence flag clear.
+// - `Passthrough`: `pose.root` unchanged.
+// - `DeriveVelocity`: `Passthrough`, plus a linear velocity where the pose
+//   carries a position and no velocity, `prior` carries a position, and
+//   `pose` is later than `prior`: the distance between the two positions over
+//   the seconds between them. Otherwise nothing is invented.
+//
+// `prior` is a value, not an optional: with no previous pose, pass `pose`
+// itself, and no time has passed, so nothing is derived.
+MOTIONRECORDING_API RootMotion ConditionRootMotion(const MotionPose& prior, const MotionPose& pose,
+                                                   RootMotionIntake intake);
+
 struct LiveCaptureConfig
 {
     std::size_t bufferCapacity = PoseBuffer::DefaultCapacity;
