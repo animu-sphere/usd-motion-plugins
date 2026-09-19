@@ -60,7 +60,9 @@ consumer tells them apart by `customData.motion`, not by guessing from names.
   The hips rest translation is the first observed root position for a
   capture, so root motion arrives downstream as a delta from where the
   session started. A producer whose rest is not identity (a BVH export)
-  authors its rest.
+  authors its rest. `motionUsd` takes it as `MotionStageOptions::rest`. The
+  producer's rig is then the joint set, every joint holds its rest
+  translation, and an unturned joint keeps its rest rotation.
 - A target skeleton's **source joint names** — Japanese included — are never
   tokens here: they are preserved beside a deterministic safe identifier, per
   design policy §17.3, by whichever repository authors that skeleton.
@@ -131,7 +133,12 @@ into one):
 | `duration`, `sampleCount`, `nominalFrameRate` | descriptive |
 
 Format-specific provenance stays in its own namespace beside it
-(`customData.vrma`, `customData.mmd`). Runtime-only state is never authored.
+(`customData.vrma`, `customData.mmd`). A recorded source's provenance is
+`customData.source`, a dictionary of strings: the profile id, the producer and
+its version, and what the conversion composed or dropped. These are the fields
+`SourceMetadata` narrows away (MOTION_CONTRACT.md §7.1). `motion_convert`
+authors it, and nothing reads it to decide anything. Runtime-only state is
+never authored.
 
 ## 6. Motion on an avatar
 

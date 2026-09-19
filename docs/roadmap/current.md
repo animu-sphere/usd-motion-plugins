@@ -96,6 +96,17 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
 - ⬜ `usd-mmd-plugins`' `mmdMotionAdapter` configures against the installed
   `motionCore` — the first consumer that has never heard of VRM.
 
+### Arrived ahead of its release: v0.4.0's recorded sources ✅ (2026-09-19)
+
+`motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect` and the
+producer profiles were imported with their history (`usd-vrm-plugins`' MIG-3)
+before v0.2.0 and v0.3.0, by the user's call. They depend only on
+`motionCore` and `motionUsd`, and importing early shortens the time
+`usd-vrm-plugins` holds a second copy. They still ship as the v0.4.0 scope
+([README](README.md#status-at-a-glance)). DIAG-O1 was decided with them
+(design policy §42.8). `motion_convert` authors through `motionUsd`, which is
+why `motionUsd` takes a producer's rest.
+
 ## Completion criteria
 
 v0.1.0 is done when `MotionPose`, `MotionClip`, `HumanJoint`, sampling with

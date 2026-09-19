@@ -99,6 +99,29 @@ separate from the package version
   attributes. `motionCore` gains `HumanJointVocabularyVersion`. The package is
   `SameMinorVersion`, and it is the installed-consumer lane's fourth row.
 
+- **The recorded-source layer, imported from `usd-vrm-plugins` with its
+  history (vrm MIG-3)**, ahead of the v0.4.0 release that carries it. This
+  was the user's call on 2026-09-19. It depends only on `motionCore` and
+  `motionUsd`, both of which have arrived. 55 commits came through
+  `git filter-repo`: `motionSource`, `motionBvh` with its corpus, the BVH
+  tools, the two producer profiles, and the profile check with its invented
+  rig. The tools were split in a move of their own, and the rename followed:
+  - `motionSource` is in `openstrata::motion` and `motionBvh` in
+    `openstrata::motion::bvh` (§23's subnamespaces: a format stays out of the
+    core namespace).
+  - `motion_bvh_convert` is `motion_convert`, and
+    `USDVRM_MOTION_PROFILE_PATH` is `USDMOTION_PROFILE_PATH`.
+  - The profiles install to `share/usd-motion-plugins/profiles/motion/`.
+  - DIAG-O1 is decided: codes are named, and `VRM_BVH_*` is `MOTION_BVH_*`
+    (design policy §42.8, eleven codes in DIAGNOSTICS.md).
+  - `bone` stays `bone` in the profile format, where a joint is the source's
+    and a bone is the canonical slot it binds to.
+- **`motion_convert` authors through `motionUsd`**, which gained the
+  producer's rest (`MotionStageOptions::rest`) and a recorded source's
+  provenance (`customData.source`). Its stage is the mapping's: `/Animation`,
+  30 time codes per second, and `customData.motion`. `--clip-name` is gone,
+  because the mapping names the prim `Body`.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are

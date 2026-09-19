@@ -4,6 +4,8 @@
     {"name": "motionCore", "header": "motionCore/MotionPose.h"},
     {"name": "motionSampling", "header": "motionSampling/MotionSource.h"},
     {"name": "motionRecording", "header": "motionRecording/MotionRecorder.h"},
-    {"name": "motionUsd", "header": "motionUsd/ClipWriter.h"}
+    {"name": "motionUsd", "header": "motionUsd/ClipWriter.h"},
+    {"name": "motionSource", "header": "motionSource/SourceProfile.h"},
+    {"name": "motionBvh", "header": "motionBvh/BvhDocument.h"}
   ]
 }
