@@ -16,4 +16,5 @@ members = [
     "libs/motionCore",
     "libs/motionSampling",
     "libs/motionRecording",
+    "libs/motionUsd",
 ]

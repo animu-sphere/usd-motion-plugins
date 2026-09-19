@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "ClipWriter.h"
+#include "motionUsd/ClipWriter.h"
 
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/vec3d.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec3h.h"
-#include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/array.h"
+#include "pxr/base/vt/dictionary.h"
 #include "pxr/base/vt/value.h"
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
-#include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/scope.h"
 #include "pxr/usd/usdSkel/animation.h"
@@ -20,123 +21,170 @@
 #include "pxr/usd/usdSkel/skeleton.h"
 
 #include <bitset>
-#include <cstddef>
-#include <vector>
+#include <cmath>
+#include <set>
 
-namespace motionCaptureTool
+namespace openstrata::motion
 {
+namespace
+{
+
+constexpr double kFrameSnap = 1e-6;
+
+// Where a time in seconds is written. Sample times are authoritative and a time
+// code is only their encoding (USD_MAPPING.md §4.1), so the snap never moves a
+// time by more than a microsecond of a frame; it removes the representation
+// error of `k / rate * 30`, which a reader comparing time codes would otherwise
+// see as a frame that is not quite a frame.
+double
+TimeCodeFor(double seconds)
+{
+    const double timeCode = seconds * MotionStageTimeCodesPerSecond;
+    const double frame = std::round(timeCode);
+    return std::fabs(timeCode - frame) <= kFrameSnap ? frame : timeCode;
+}
+
+} // namespace
 
 bool
-WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation& animation,
-                  const std::string& clipName, const std::map<std::string, std::string>& provenance,
+AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
+                  const MotionStageOptions& options, MotionStageReport* report,
                   std::string* error)
 {
-    if (animation.samples.empty())
+    if (!stage)
     {
-        *error = "the recorded session produced no frames";
+        *error = "no stage to author into";
         return false;
     }
-    // Checked before any work: a bad prim name is an argument error, and
-    // discovering it after authoring the joint set only obscures that.
-    if (!pxr::TfIsValidIdentifier(clipName))
+    if (clip.samples.empty())
     {
-        *error = "'" + clipName + "' is not a valid prim name";
+        *error = "the clip has no sample";
         return false;
     }
 
-    // A joint exists in the clip when any frame observed it. A bone the rig
-    // never solved is simply absent -- it is not authored at rest, because a
-    // joint that is present and unmoving means something different downstream
-    // from a joint that was never captured.
-    std::bitset<motion::HumanBoneCount> present;
+    // Every check before any authoring, so a refusal leaves the stage as it was.
+    std::vector<double> timeCodes;
+    timeCodes.reserve(clip.samples.size());
+    for (const MotionPose& pose : clip.samples)
+    {
+        if (!std::isfinite(pose.timestamp))
+        {
+            *error = "a sample's timestamp is not finite";
+            return false;
+        }
+        const double timeCode = TimeCodeFor(pose.timestamp);
+        if (!timeCodes.empty() && timeCode <= timeCodes.back())
+        {
+            // Two samples on one time code would leave only the second, without
+            // a word; a clip out of order would be authored as another clip.
+            *error = "sample timestamps do not increase";
+            return false;
+        }
+        timeCodes.push_back(timeCode);
+    }
+
+    // A joint exists in the clip when any sample observed it. A joint the
+    // producer never solved is simply absent -- it is not authored at rest,
+    // because a joint that is present and unmoving means something different
+    // downstream from a joint that was never observed.
+    std::bitset<HumanJointCount> present;
     bool observedRoot = false;
-    for (const motion::HumanoidPose& pose : animation.samples)
+    std::set<std::string> channels;
+    std::size_t lookAtTargets = 0;
+    for (const MotionPose& pose : clip.samples)
     {
         present |= pose.validRotations;
         observedRoot = observedRoot || pose.root.hasPosition;
+        for (const MotionChannel& channel : pose.channels.entries)
+        {
+            channels.insert(channel.name);
+        }
+        lookAtTargets += pose.lookAtTarget ? 1 : 0;
     }
 
-    // The one bone that is not purely a rotation question. Root translation is
-    // authored onto the Hips joint and nowhere else, so a rig that reports a
+    // The one joint that is not purely a rotation question. Root translation is
+    // authored onto the hips and nowhere else, so a producer that reports a
     // root position while never solving a hips *rotation* would otherwise drop
-    // its whole root motion here without a word. Hips joins the joint set on
-    // the strength of the root observation; its rotation track falls back to
-    // identity below, exactly as any unobserved bone's does.
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
-    if (observedRoot && !present.test(hips))
+    // its whole root motion here without a word. The hips join the joint set
+    // on the strength of the root observation; their rotation track falls back
+    // to identity below, exactly as any unobserved joint's does.
+    const auto hips = static_cast<std::size_t>(HumanJoint::Hips);
+    if (observedRoot)
     {
         present.set(hips);
     }
-
     if (!present.any())
     {
-        *error = "the recorded session observed no humanoid bone";
+        *error = "the clip observes no joint and no root";
         return false;
     }
 
-    std::vector<motion::HumanBone> bones;
-    pxr::VtTokenArray joints;
-    for (std::size_t index = 0; index < motion::HumanBoneCount; ++index)
+    std::vector<HumanJoint> joints;
+    pxr::VtTokenArray jointTokens;
+    for (std::size_t index = 0; index < HumanJointCount; ++index)
     {
         if (!present.test(index))
         {
             continue;
         }
-        const auto bone = static_cast<motion::HumanBone>(index);
-        bones.push_back(bone);
-        joints.push_back(pxr::TfToken(motion::HumanBoneJointPath(bone, present)));
+        const auto joint = static_cast<HumanJoint>(index);
+        joints.push_back(joint);
+        jointTokens.push_back(pxr::TfToken(HumanJointPath(joint, present)));
     }
 
-    const double frameRate = animation.nominalFrameRate > 0.0 ? animation.nominalFrameRate : 30.0;
+    // The span the clip declares, or the samples' own when it declares none --
+    // the rule `Resample` applies to a clip whose interval was left at its
+    // default.
+    double start = clip.startTime;
+    double end = clip.endTime;
+    if (!(end > start))
+    {
+        start = clip.samples.front().timestamp;
+        end = clip.samples.back().timestamp;
+    }
 
-    // Re-running a session over a previous output is the normal case, so clear
-    // an existing layer instead of failing the way UsdStage::CreateNew would.
-    // Unlike motion_retarget there is no input stage to guard against here:
-    // this tool's input is a text trace, not a USD layer.
-    pxr::SdfLayerRefPtr layer = pxr::SdfLayer::FindOrOpen(outputPath);
-    if (layer)
-    {
-        layer->Clear();
-    }
-    else
-    {
-        layer = pxr::SdfLayer::CreateNew(outputPath);
-    }
-    if (!layer)
-    {
-        *error = "could not create output layer: " + outputPath;
-        return false;
-    }
-    const pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(layer);
-    if (!stage)
-    {
-        *error = "could not open output layer as a stage: " + outputPath;
-        return false;
-    }
     pxr::UsdGeomSetStageUpAxis(stage, pxr::UsdGeomTokens->y);
     pxr::UsdGeomSetStageMetersPerUnit(stage, 1.0);
-    stage->SetTimeCodesPerSecond(frameRate);
-    stage->SetFramesPerSecond(frameRate);
-    stage->SetStartTimeCode(animation.startTime * frameRate);
-    stage->SetEndTimeCode(animation.endTime * frameRate);
+    stage->SetTimeCodesPerSecond(MotionStageTimeCodesPerSecond);
+    stage->SetFramesPerSecond(MotionStageTimeCodesPerSecond);
+    stage->SetStartTimeCode(TimeCodeFor(start));
+    stage->SetEndTimeCode(TimeCodeFor(end));
 
-    const pxr::SdfPath rootPath("/Capture");
+    const pxr::SdfPath rootPath("/Animation");
     const pxr::UsdPrim root = pxr::UsdGeomScope::Define(stage, rootPath).GetPrim();
     stage->SetDefaultPrim(root);
-    for (const auto& entry : provenance)
-    {
-        root.SetCustomDataByKey(pxr::TfToken("capture:" + entry.first), pxr::VtValue(entry.second));
-    }
 
-    // The trace carries no rest pose -- a capture stream reports rotations
-    // relative to the humanoid rest, not the rest itself. Authoring identity
-    // rests makes the retargeter's rest-pose correction a no-op, which is the
-    // honest reading. The one exception is the hips translation: it is seeded
-    // with the session's first observed root position, so root motion arrives
-    // downstream as a delta from where the capture started rather than as an
-    // absolute height (see MOTION_CONTRACT.md).
+    // USD_MAPPING.md §5. One dictionary rather than colon-separated keys, which
+    // USD would expand into the same thing.
+    pxr::VtDictionary metadata;
+    metadata["contractVersion"] = pxr::VtValue(MotionStageContractVersion);
+    metadata["jointVocabularyVersion"] = pxr::VtValue(HumanJointVocabularyVersion);
+    if (!options.sourceFormat.empty())
+    {
+        metadata["sourceFormat"] = pxr::VtValue(options.sourceFormat);
+    }
+    if (!clip.source.provider.empty())
+    {
+        metadata["sourceProvider"] = pxr::VtValue(clip.source.provider);
+    }
+    if (!options.rootMotionSource.empty())
+    {
+        metadata["rootMotionSource"] = pxr::VtValue(options.rootMotionSource);
+    }
+    metadata["duration"] = pxr::VtValue(end - start);
+    metadata["sampleCount"] = pxr::VtValue(static_cast<int>(clip.samples.size()));
+    metadata["nominalFrameRate"] = pxr::VtValue(clip.nominalFrameRate);
+    root.SetCustomDataByKey(pxr::TfToken("motion"), pxr::VtValue(metadata));
+
+    // A clip carries no rest pose -- its rotations are relative to the
+    // canonical rest, not the rest itself. Authoring identity rests makes a
+    // retargeter's rest-pose correction a no-op, which is the honest reading.
+    // The one exception is the hips translation: it is seeded with the first
+    // observed root position, so root motion arrives downstream as a delta from
+    // where the motion started rather than as an absolute height
+    // (USD_MAPPING.md §3).
     pxr::GfVec3f hipsRest(0.0f);
-    for (const motion::HumanoidPose& pose : animation.samples)
+    for (const MotionPose& pose : clip.samples)
     {
         if (pose.root.hasPosition)
         {
@@ -145,97 +193,131 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
         }
     }
 
-    const pxr::SdfPath skeletonPath = rootPath.AppendChild(pxr::TfToken("HumanoidSkeleton"));
+    const pxr::SdfPath skeletonPath = rootPath.AppendChild(pxr::TfToken("Skeleton"));
     const pxr::UsdSkelSkeleton skeleton = pxr::UsdSkelSkeleton::Define(stage, skeletonPath);
     pxr::VtMatrix4dArray restTransforms;
-    restTransforms.reserve(bones.size());
-    for (const motion::HumanBone bone : bones)
+    restTransforms.reserve(joints.size());
+    for (const HumanJoint joint : joints)
     {
         pxr::GfMatrix4d rest(1.0);
-        if (bone == motion::HumanBone::Hips)
+        if (joint == HumanJoint::Hips)
         {
             rest.SetTranslate(pxr::GfVec3d(hipsRest[0], hipsRest[1], hipsRest[2]));
         }
         restTransforms.push_back(rest);
     }
-    skeleton.CreateJointsAttr(pxr::VtValue(joints));
+    skeleton.CreateJointsAttr(pxr::VtValue(jointTokens));
     skeleton.CreateRestTransformsAttr(pxr::VtValue(restTransforms));
 
-    const pxr::SdfPath clipPath = rootPath.AppendChild(pxr::TfToken(clipName));
-    const pxr::UsdSkelAnimation clip = pxr::UsdSkelAnimation::Define(stage, clipPath);
-    clip.CreateJointsAttr(pxr::VtValue(joints));
-    pxr::UsdAttribute translations = clip.CreateTranslationsAttr();
-    pxr::UsdAttribute rotations = clip.CreateRotationsAttr();
+    const pxr::SdfPath bodyPath = rootPath.AppendChild(pxr::TfToken("Body"));
+    const pxr::UsdSkelAnimation body = pxr::UsdSkelAnimation::Define(stage, bodyPath);
+    body.CreateJointsAttr(pxr::VtValue(jointTokens));
+    pxr::UsdAttribute translations = body.CreateTranslationsAttr();
+    pxr::UsdAttribute rotations = body.CreateRotationsAttr();
     // UsdSkel fetches translations, rotations and scales as a unit, and
     // `scales` has no schema fallback: omitting it does not mean "this clip
     // animates no scale", it silently drops the whole animation and leaves the
     // skeleton at its rest pose. Scale stays un-animated -- this constant
     // identity array exists only so the clip evaluates.
-    const pxr::VtVec3hArray identityScales(bones.size(), pxr::GfVec3h(1.0f));
-    clip.CreateScalesAttr(pxr::VtValue(identityScales));
+    const pxr::VtVec3hArray identityScales(joints.size(), pxr::GfVec3h(1.0f));
+    body.CreateScalesAttr(pxr::VtValue(identityScales));
+    // The rate again, from the same number as the stage metadata, because an
+    // OpenExec computation cannot read stage metadata (EXEC_CONTRACT.md §5.1).
+    body.GetPrim()
+        .CreateAttribute(pxr::TfToken("motion:timeCodesPerSecond"), pxr::SdfValueTypeNames->Double,
+                         /* custom */ true, pxr::SdfVariabilityUniform)
+        .Set(MotionStageTimeCodesPerSecond);
 
-    // The last placement this clip authored, so a frame that reports none does
-    // not send the body somewhere. It starts at the rest, which is where a clip
-    // whose *first* frames report no root has to begin.
+    // The last placement this clip authored, so a sample that reports none
+    // does not send the body somewhere. It starts at the rest, which is where a
+    // clip whose *first* samples report no root has to begin.
     //
-    // A missing root is not a missing bone and the fallbacks are not
+    // A missing root is not a missing joint and the fallbacks are not
     // symmetric, which is why this is held where the rotation below is not. An
-    // unobserved bone has a neutral value -- the rest rotation says "this joint
-    // is not turned" -- so authoring it states an absence. A root position has
-    // no neutral value: the rest is *a place*, and authoring it for one frame
-    // between two that reported their own teleports the body to wherever the
-    // session started and back. Holding states the same absence without
-    // inventing the trip.
-    //
-    // Reachable from any adapter whose frame can carry bones and no root, which
-    // is both of them -- `VmcFrameAssembler` emits a frame that closed with
-    // bones and no `/VMC/Ext/Root/Pos`, and since the root/hips record
-    // `MocopiFrameAssembler` composes no position for a frame whose hips record
-    // did not arrive. It was invisible while no live path composed a root at
-    // all: `hipsRest` stayed at the origin and every frame authored it.
+    // unobserved joint has a neutral value -- the rest rotation says "this
+    // joint is not turned" -- so authoring it states an absence. A root
+    // position has no neutral value: the rest is *a place*, and authoring it
+    // for one sample between two that reported their own teleports the body to
+    // wherever the motion started and back. Holding states the same absence
+    // without inventing the trip.
     pxr::GfVec3f hipsHeld = hipsRest;
-    for (const motion::HumanoidPose& pose : animation.samples)
+    for (std::size_t sample = 0; sample < clip.samples.size(); ++sample)
     {
+        const MotionPose& pose = clip.samples[sample];
         pxr::VtVec3fArray valuesT;
         pxr::VtQuatfArray valuesR;
-        valuesT.reserve(bones.size());
-        valuesR.reserve(bones.size());
+        valuesT.reserve(joints.size());
+        valuesR.reserve(joints.size());
         if (pose.root.hasPosition)
         {
             hipsHeld = pose.root.worldPosition;
         }
-        for (const motion::HumanBone bone : bones)
+        for (const HumanJoint joint : joints)
         {
-            const auto slot = static_cast<std::size_t>(bone);
-            pxr::GfVec3f translation(0.0f);
-            if (bone == motion::HumanBone::Hips)
-            {
-                translation = hipsHeld;
-            }
-            valuesT.push_back(translation);
-            // A frame that did not observe a bone authors the rest rotation
-            // rather than the previous frame's: holding is an intake policy
-            // (LiveCaptureConfig::missingBones), and re-deciding it here would
-            // hide which policy actually ran.
+            const auto slot = static_cast<std::size_t>(joint);
+            valuesT.push_back(joint == HumanJoint::Hips ? hipsHeld : pxr::GfVec3f(0.0f));
+            // A sample that did not observe a joint authors the rest rotation
+            // rather than the previous sample's: holding is an intake policy
+            // (MissingJointPolicy), and re-deciding it here would hide which
+            // policy actually ran.
             valuesR.push_back(pose.validRotations.test(slot)
                                   ? pose.localRotations[slot]
                                   : pxr::GfQuatf(1.0f, pxr::GfVec3f(0.0f)));
         }
-        const double timeCode = pose.timestamp * frameRate;
-        translations.Set(valuesT, timeCode);
-        rotations.Set(valuesR, timeCode);
+        translations.Set(valuesT, timeCodes[sample]);
+        rotations.Set(valuesR, timeCodes[sample]);
     }
 
-    pxr::UsdSkelBindingAPI::Apply(skeleton.GetPrim())
-        .CreateAnimationSourceRel()
-        .SetTargets({clipPath});
+    pxr::UsdSkelBindingAPI::Apply(skeleton.GetPrim()).CreateAnimationSourceRel().SetTargets({bodyPath});
 
-    if (!stage->GetRootLayer()->Save())
+    if (report)
     {
-        *error = "could not save output layer: " + outputPath;
+        report->jointCount = joints.size();
+        report->sampleCount = clip.samples.size();
+        report->unauthoredChannels.assign(channels.begin(), channels.end());
+        report->unauthoredLookAtTargets = lookAtTargets;
+    }
+    return true;
+}
+
+bool
+WriteMotionStage(const std::string& path, const MotionClip& clip,
+                 const MotionStageOptions& options, MotionStageReport* report,
+                 std::string* error)
+{
+    // Re-running a conversion over a previous output is the normal case, so an
+    // existing layer is cleared instead of failing the way UsdStage::CreateNew
+    // would.
+    pxr::SdfLayerRefPtr layer = pxr::SdfLayer::FindOrOpen(path);
+    if (layer)
+    {
+        layer->Clear();
+    }
+    else
+    {
+        layer = pxr::SdfLayer::CreateNew(path);
+    }
+    if (!layer)
+    {
+        *error = "could not create output layer: " + path;
+        return false;
+    }
+    const pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(layer);
+    if (!stage)
+    {
+        *error = "could not open output layer as a stage: " + path;
+        return false;
+    }
+    if (!AuthorMotionStage(stage, clip, options, report, error))
+    {
+        return false;
+    }
+    if (!layer->Save())
+    {
+        *error = "could not save output layer: " + path;
         return false;
     }
     return true;
 }
 
-} // namespace motionCaptureTool
+} // namespace openstrata::motion

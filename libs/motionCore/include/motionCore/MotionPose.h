@@ -96,6 +96,11 @@ enum class HumanJoint : std::uint8_t
 
 inline constexpr std::size_t HumanJointCount = static_cast<std::size_t>(HumanJoint::Count);
 
+// The vocabulary's version (MOTION_CONTRACT.md §2.1), which a stage records as
+// `customData.motion.jointVocabularyVersion` (USD_MAPPING.md §5). Bumped with
+// the enum, never on its own.
+inline constexpr int HumanJointVocabularyVersion = 1;
+
 MOTIONCORE_API bool IsValidHumanJoint(HumanJoint joint) noexcept;
 MOTIONCORE_API std::string_view HumanJointName(HumanJoint joint) noexcept;
 MOTIONCORE_API std::optional<HumanJoint> FindHumanJoint(std::string_view name) noexcept;
