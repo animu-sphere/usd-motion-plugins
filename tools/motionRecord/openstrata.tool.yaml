@@ -1,0 +1,24 @@
+# OpenStrata workspace-tool descriptor for motion_record: a recorded trace
+# becomes a motion stage (WORKSPACE.md §1.2).
+#
+# It requires motionRecording, which replays and records the session,
+# motionSampling **by name**, whose sampling tolerance sizes the tick loop, and
+# motionUsd, which authors the stage. The descriptor states the edges the tool
+# actually has, instead of leaving one to a transitive dependency that could
+# stop being transitive.
+schema: openstrata.tool/v1alpha1
+tool:
+  id: motion_record
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+  license: Apache-2.0
+executables: [motion_record]
+directories: [bin]
+requires:
+  libraries:
+    - id: motionRecording
+      version: ">=0.1,<0.2"
+    - id: motionSampling
+      version: ">=0.1,<0.2"
+    - id: motionUsd
+      version: ">=0.1,<0.2"

@@ -148,6 +148,22 @@ separate from the package version
   - RT-O1 is decided: the published root-motion vocabulary is the imported
     `Hips` / `RootJoint` / `Ignore`.
 
+- **`motion_record`, imported from `usd-vrm-plugins`' `motion_capture` with
+  its history** (vrm MIG-4, its first item), ahead of the v0.3.0 release that
+  carries it. 17 commits came through `git filter-repo`, without the clip
+  writer, which had already arrived as `motionUsd`. A move-only commit into
+  `tools/motionRecord/` and the rename followed:
+  - It authors through `motionUsd`: the mapping's `/Animation` stage, with the
+    capture rest, `customData.motion.sourceFormat` `capture`, and the session's
+    provenance and intake settings as `customData.source`. Its own writer and
+    `--clip-name` are gone.
+  - `--missing-bones` is `--missing-joints`.
+  - A session whose channels or look-at targets the stage cannot hold yet
+    (USD-O4) says so on stderr.
+  - `motion_record_replay` replays `motionRecording`'s corpus. The leg that
+    baked the result onto a VRM avatar stays in `usd-vrm-plugins`; here the
+    stage is resolved through a `UsdSkelSkeletonQuery` instead.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are

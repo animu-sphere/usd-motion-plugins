@@ -130,6 +130,27 @@ scope, with `motionUsd`'s reading half.
   before it deletes its copy (its MIG-0 table). That waits on its consuming
   change, which waits on `ost` (its report 41).
 
+### Arrived ahead of its release: v0.3.0's `motion_record` ✅ (2026-09-19)
+
+`usd-vrm-plugins`' `motion_capture` was imported with its history as
+`motion_record` (that repository's MIG-4, its first item). 17 commits arrived
+through `git filter-repo`, without the clip writer, which had arrived as
+`motionUsd` already; a move-only commit and the rename followed. It depends
+only on `motionRecording`, `motionSampling` and `motionUsd`, all of which have
+arrived, and importing it now shortens the time `usd-vrm-plugins` holds a
+second copy. It still ships as v0.3.0's scope, with the published
+`MotionStream` shape (MC-O5) and the processor interface.
+
+- ✅ It authors through `motionUsd`, as `motion_convert` does: the mapping's
+  stage with the capture rest, and the session's provenance as
+  `customData.source`. Its own writer and `--clip-name` are gone.
+- ✅ `motion_record_replay` travels (that repository's MIG-0 table). Its last
+  leg baked the recorded clip onto a VRM avatar with `motion_retarget`, a
+  consumer of this repository, so that leg stays there; here the stage is
+  resolved through a `UsdSkelSkeletonQuery`, the claim the leg rested on.
+- ⬜ `usd-vrm-plugins` deletes `tools/motionCapture` in its consuming change,
+  which waits on `ost` (its report 41).
+
 ## Completion criteria
 
 v0.1.0 is done when `MotionPose`, `MotionClip`, `HumanJoint`, sampling with
