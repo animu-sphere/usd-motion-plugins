@@ -40,8 +40,8 @@ A realtime caller builds the descriptor, the map and the rest correction
   (and bind) transforms.
 - Built by the format repository or by `motionUsd` from a `UsdSkelSkeleton`.
   Building one from joint tokens and **rest matrices** is a library function
-  here — decomposing a matrix into rest rotation and translation, dropping
-  scale and shear with a stated rule — because today both a CLI and an
+  here — decomposing a matrix into rest rotation, translation and scale, with
+  shear leaking into the scale as §6.1 states — because today both a CLI and an
   OpenExec bundle in `usd-vrm-plugins` carry their own copy of that
   decomposition (its OpenExec humanoid finding).
 - Equality is exact and defined: a cached descriptor is compared, not trusted.
@@ -69,8 +69,42 @@ A realtime caller builds the descriptor, the map and the rest correction
   value the policy names: rest by default.
 - Which joints a target *requires* is the map's statement, not the
   vocabulary's: every `HumanJoint` is optional in a pose.
-- The seven partial-skeleton cases `usd-vrm-plugins` has listed and not yet
-  decided (its OpenExec plan's P1-3) are RT-O2.
+- The seven partial-skeleton cases are §4.1. That was RT-O2, carried from
+  `usd-vrm-plugins`' v0.9.0 decision.
+
+### 4.1 Partial skeletons (carried from `usd-vrm-plugins` v0.9.0)
+
+A clip and a rig rarely name the same joints, and retargeting across the
+difference is legal and useful, so **none of these cases refuses a retarget**.
+What each one costs is stated and, where it can be, reported under a §7 code.
+`usd-vrm-plugins` decided this on 2026-09-17 (its OpenExec plan's P1-3), with a
+named test holding every row
+([its MOTION_CONTRACT.md, "Partial skeleton policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#partial-skeleton-policy-v090)).
+Those tests arrive with `motionRetarget`.
+
+| # | Case | What the retarget does | Reported |
+| --- | --- | --- | --- |
+| 1 | a joint the clip drives and the rig does not bind | its motion reaches nothing | unbound driven joint, once per clip, including a joint first driven after the first sample |
+| 2 | a joint the rig has and the clip does not drive | it stays at its **rest**, with rotation, translation and rest scale; never identity | nothing |
+| 3 | a joint the map requires that the rig does not bind, or binds to an index the rig lacks | the retarget proceeds without it. For `hips` under `Hips` root motion, root motion is dropped | missing required joint, from `DiagnoseRig` before any clip; for `hips` the detail says the root was dropped |
+| 4 | an optional joint missing (eyes, jaw, toes, shoulders, `upperChest`, fingers) | a rig binding every required joint and none of these is complete | nothing, unless a clip drives one, which is case 1 |
+| 5 | two joints bound to one target | offline, joints are written in vocabulary order, so of the joints a sample drives the **later** one wins; the OpenExec map node **refuses** the map | duplicate target, on the target |
+| 6 | the chains disagree: an intermediate joint exists on one side only, or the rig is out of parent-before-child order | each bound joint carries its motion **relative to its own parent** on each side. A missing intermediate's motion is dropped (case 1), **not folded into its child** | the dropped joint as unbound; an out-of-order rig as an invalid hierarchy |
+| 7 | a parent whose rest is not identity, on either side | the correction reads each side's **accumulated** parent rest, every ancestor included, so the world delta survives | nothing |
+
+**Where the two implementations part.** Rows 5 and 3 (for a binding to a
+joint the rig lacks) are decided when the map is built, and there the OpenExec
+node is stricter: a computation cannot bake a warning beside a value, so it
+refuses a map the offline tool would warn about and use.
+
+**Not promised.** Folding an unbound intermediate joint's rotation into its
+child would change every bake of a clip with `upperChest` onto a rig without
+one. That would be a contract change with its own parity evidence, not a fix.
+
+Which joints are *required* is the caller's statement (§3, §4). In
+`usd-vrm-plugins` it is VRM 1.0's required-bone set, and on arrival the
+retargeter takes the set from its caller (that repository's WORKSPACE.md §9.5,
+finding 1).
 
 ## 5. Rest-pose correction
 
@@ -123,6 +157,28 @@ root's yaw; `preserveVerticalMotion` and `preserveYaw` are not implemented.
 Which vocabulary the published API uses is RT-O1. A `RootJoint` request with
 no valid joint degrades to `Ignore` and says so.
 
+### 6.1 Scale (carried from `usd-vrm-plugins` v0.9.0)
+
+RT-O3, carried from `usd-vrm-plugins`' decision of 2026-09-17 (its OpenExec
+plan's P1-2;
+[its MOTION_CONTRACT.md, "Scale policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#scale-policy-v090)):
+
+1. **A bake states each joint's rest scale, constant over the clip.** UsdSkel
+   takes an animated joint's local transform from the animation whole, so the
+   `scales` a bake authors *are* the rig's scales. Identity would replace a
+   scaled rest, not keep it. Measured: a fixture arm rested at 2 baked at 1,
+   and a published avatar's seven scaled secondary joints, at most 0.14% off
+   unit, baked unscaled. The value is `half`, UsdSkel's type.
+2. **Scale is not retargeted.** A pose carries no scale, and a clip's rest
+   scale does not enter the rest correction (§5).
+3. **A clip that animates scale is reported, never applied and never dropped
+   silently**: once, on the animation, naming the first joint and instant. It
+   is a caller's code, because the library never receives a clip's scale.
+4. **A rig whose rest is scaled is not refused.** A shear leaks into the
+   decomposed scale as each basis row's length. A UsdSkel rest carries none.
+
+`SkeletonDescriptor` therefore carries a rest scale per joint (§2).
+
 ## 7. Diagnostics
 
 A diagnostic is a **value**: a code, a subject (a joint name, a joint index, a
@@ -167,9 +223,49 @@ with avatar-format-neutral APIs.
 
 ## 9. Open questions
 
+RT-O2 (§4.1) and RT-O3 (§6.1) were carried from `usd-vrm-plugins`' v0.9.0
+decisions on 2026-09-19.
+
 | Id | Question | Resolve by |
 | --- | --- | --- |
 | RT-O1 | Root-motion vocabulary: the imported `Hips` / `RootJoint` / `Ignore` plus two flags, or the design policy's five modes with `preserveVerticalMotion` and `preserveYaw` | the import of `vrmRetarget`'s generic half |
-| RT-O2 | Partial skeletons: the seven cases `usd-vrm-plugins` listed (its P1-3) as a contract | that task, then carried here |
-| RT-O3 | A rig whose rest is scaled: carry the rest scale, refuse the rig, or keep identity and state the cost (measured on one model: seven non-humanoid joints, at most 0.14% off unit) | `usd-vrm-plugins`' P1-2 decision, then carried here |
 | RT-O4 | Whether `SkeletonDescriptor` carries bind transforms separately from rest, or bind is `motionUsd`'s concern only | the first consumer that needs bind in a retarget |
+
+## 10. API owed from the OpenExec evidence
+
+`usd-vrm-plugins`' `execVrm` wrapped the retargeter node by node and found
+where a wrapper could not reach
+([its boundary-consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/boundary-consolidation.md#findings-from-the-exec-layer-as-they-land)).
+Each is fixed on arrival, in its own change after the move
+([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in), rule 4):
+
+- **A `SkeletonDescriptor` from joint tokens and rest matrices** (§2). The
+  arithmetic half, `DecomposeRestTransform`, is shared since that
+  repository's v0.9.0. Reading the tokens and matrices off a skeleton is still
+  written twice, once in a CLI and once in a bundle (its humanoid report §7).
+  That half is `motionUsd`'s.
+- **A source rest pose from a semantic skeleton's tokens and decomposed rests**:
+  which joint fills which vocabulary slot, by joint leaf, and which is its
+  parent. It exists only in a CLI and is copied line for line into the bundle
+  (its rest-correction report §7).
+- **A retarget that takes the rest correction as an input.** Today the
+  retargeter computes the correction in its constructor and accepts none, so a
+  node recomputes per evaluation what it caches per rig edit. Measured on a
+  55-joint humanoid: 21.2 µs per evaluation, 17.7 µs of it the correction,
+  against 1.9 µs for the retarget alone (its retarget report §2).
+- **A per-pose diagnosis without the retarget**: the counterpart of
+  `DiagnoseRig`, which `Retarget` itself calls, so the rule has one
+  implementation. Without it, the diagnostics node repeats the retarget, 23 µs
+  a frame on a 23-joint rig and 50–60 µs on a 128-joint avatar, and a driver's
+  override of the retarget is not diagnosed (its diagnostics report §6).
+- **The bake authored from the library's `JointLocalTransforms`, at the time
+  code it read.** Rebuilding a time code from seconds bakes frame 62 at
+  `62.00000000000001` at 30 fps (its joint-transforms report §8, §10). That is
+  `motionUsd`'s, and it makes "offline and OpenExec behave identically" one
+  statement.
+- **Which prim a stage means**: the rig, the clip and its animation are chosen
+  by rules written only in a CLI, and restated by the parity harness. They are
+  either stated once, in `motionUsd`, or the stage names every one of them by
+  relationship, which is the direction the evaluation's relationships already
+  point ([EXEC_CONTRACT.md §5.5](EXEC_CONTRACT.md#55-which-clip-drives-which-rig-and-where-its-root-lands);
+  its parity report §6, §8).

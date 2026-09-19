@@ -227,6 +227,31 @@ Provenance is recorded and **never a branch condition** (design policy §4.1).
 A consumer that cannot tell a tracker-driven pose from a clip-driven one is
 reading the value correctly.
 
+### 7.1 A recorded source's provenance is a neighbour, not a superset
+
+A recorded file carries its own provenance: the format, the file's identity,
+the producer label and version, and the profile it was read under.
+`usd-vrm-plugins` settled how that relates to `SourceMetadata` before a
+converter set its first field
+([its MOTION_CONTRACT.md, "Recorded-source provenance"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#recorded-source-provenance-v070)),
+and `motionSource` arrives with it:
+
+| Recorded-source provenance | `SourceMetadata` |
+| --- | --- |
+| — | `kind` = `Clip`, always: a file **is** a clip by the time it is read |
+| producer | `provider` |
+| format | `protocol`: how the values arrived |
+| source id | `sourceId` |
+| producer version | *dropped* |
+| profile id | *dropped* |
+
+The derivation runs one way and deliberately narrows. `SourceMetadata` rides
+on every pose and every trace line, and the two dropped fields cannot vary
+within a clip. They survive **beside** the motion, in the stage's metadata
+([USD_MAPPING.md §5](USD_MAPPING.md#5-metadata)). A test pins the narrowing:
+two provenances that differ only in producer version and profile convert to
+the same `SourceMetadata`. **A profile id is never a branch condition.**
+
 ## 8. `MotionClip` and sampling
 
 A clip is samples, a time range, a descriptive `nominalFrameRate` and
@@ -311,6 +336,24 @@ downstream knows which one it was.
 | a tracker source (`motion-connectors`) | its own observation type, then a solve that produces a sparse `MotionPose` | **a tracker observation is not a pose** and gets no type here; a hips tracker follows §5.3 |
 | a generator | `MotionClip` or a pose stream, behind a generator interface | — (design policy §35, "Later") |
 | a format repository (`usd-vrm-plugins`, `usd-mmd-plugins`) | `MotionClip` of **body** motion | evaluating its own control rig first when it has one — MMD's IK and append transforms (design policy §42.4) |
+
+### 11.1 A tracker observation gets no type here
+
+A tracker source observes numbered devices, not joints: a position and an
+orientation in the receiving application's space, under an index into whatever
+the wearer strapped on. `usd-vrm-plugins` decided it gets **no type in
+`motionCore`**
+([its MOTION_CONTRACT.md, "Tracker observations"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#tracker-observations-and-where-they-are-not-v080)).
+Every reader of this contract takes a pose: the retargeter, the trace format,
+the comparison and the OpenExec nodes. A tracker sample here would have no
+reader and three standing obligations: equality, comparison and a place in the
+trace format (§10). **`motionCore` begins at the canonical pose.**
+
+The observation type, the region vocabulary, the operator's assignment and the
+solve belong together in `motion-connectors`' tracking library, which depends
+on this repository and never the reverse. A solve inside an adapter would be a
+second motion pipeline. A tracker-driven pose is an ordinary `MotionPose`,
+sparse by construction, and its hips follow §5.3, not a second rule.
 
 ## 12. Constraints
 

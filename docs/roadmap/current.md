@@ -51,10 +51,19 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
 - ⬜ Fix the pose's shape to the contract's after the move: `source` becomes
   the non-optional `metadata` (§5.1), and `SourceMetadata` gains
   `sourceTimestamp` and `sequenceNumber` (§7).
+- ✅ Receive the evidence `usd-vrm-plugins`' MIG-0 hands over — 2026-09-19.
+  The OpenExec driver contract and the producer conventions are
+  [EXEC_CONTRACT.md](../design/EXEC_CONTRACT.md) (proposed); the v0.9.0 scale
+  and partial-skeleton decisions and the retarget's exec findings are
+  [RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md) §4.1, §6.1 and §10;
+  recorded-source provenance and the tracker boundary are
+  [MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md) §7.1 and §11.1.
 - ⬜ Import `motionRuntime` as `motionSampling` and `motionRecording`.
 - ⬜ `motionUsd`: author the motion stage of
   [USD_MAPPING.md §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage),
-  identity `scales` included, and open it through OpenUSD in a test.
+  identity `scales` and the `motion:timeCodesPerSecond` rate included
+  ([EXEC_CONTRACT.md §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)),
+  and open it through OpenUSD in a test.
 - ⬜ Fix the sampling findings in their own change
   ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling)).
 - ⬜ Reproduce the parity evidence named by `usd-vrm-plugins`' MIG-0 against

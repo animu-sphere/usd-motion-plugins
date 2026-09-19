@@ -50,6 +50,21 @@ separate from the package version
   case (a channel's value is a `float`). The boundary check refuses product,
   device and avatar-format names in code. The package is `SameMinorVersion`,
   and it is the installed-consumer lane's first row.
+- **The evidence `usd-vrm-plugins` handed over (its MIG-0)**, as proposed
+  contract text that cites the measurement rather than restating it:
+  - `EXEC_CONTRACT.md`, a fourth focused contract. It holds the OpenExec driver
+    contract (ten rules and three codes), the one-joint fallback, and the
+    producer conventions with a proposed author for each. Only
+    `motion:timeCodesPerSecond` is a motion writer's to author, as a shim until
+    OpenUSD delivers stage metadata to a computation. The filter,
+    root-intake, placement, blend and retarget-policy attributes belong to the
+    composed scene.
+  - `RETARGETING_POLICY.md` gains the v0.9.0 partial-skeleton (§4.1) and
+    scale (§6.1) decisions, which closes RT-O2 and RT-O3, and the six
+    retarget-side findings from the OpenExec evidence (§10).
+  - `MOTION_CONTRACT.md` gains the recorded-source provenance narrowing (§7.1)
+    and the tracker boundary (§11.1); `USD_MAPPING.md` §4.1 gains the rate
+    attribute.
 - **The rendered CI workflow**, `ost-source-ci.yml`, with a graph cell ahead
   of the three workspace cells. It could not be rendered for an empty
   workspace under `ost` 0.22.10.
