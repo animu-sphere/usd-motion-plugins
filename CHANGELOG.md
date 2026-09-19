@@ -85,6 +85,20 @@ separate from the package version
     refuses a workspace graph with no member
     ([roadmap](docs/roadmap/current.md)).
 
+- **`motionUsd`, authoring the motion stage** (USD_MAPPING.md §2–§5). The
+  writer arrived from `usd-vrm-plugins`' `motion_capture` with its history,
+  in a move of its own. It was then adapted to the mapping:
+  - `/Animation`, `/Animation/Skeleton` and `/Animation/Body`
+  - always 30 time codes per second, with times snapped to whole frames
+  - identity `scales`, and `motion:timeCodesPerSecond` on `Body`
+  - `customData.motion`
+
+  `AuthorMotionStage` fills a stage a caller holds, and `WriteMotionStage`
+  writes a file. Channels and look-at targets are reported in
+  `MotionStageReport` and not authored, until USD-O4 names the channel
+  attributes. `motionCore` gains `HumanJointVocabularyVersion`. The package is
+  `SameMinorVersion`, and it is the installed-consumer lane's fourth row.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are

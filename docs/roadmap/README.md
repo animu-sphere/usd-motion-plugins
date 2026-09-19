@@ -29,7 +29,7 @@ and `usd-mmd-plugins` as its Phase 9.
 
 | Release | Scope | Imports | Migration Phase | Status |
 | --- | --- | --- | --- | --- |
-| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, the authoring half of `StageIo` (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
+| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
 | v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half, the reading half of `StageIo` (vrm MIG-2) | C | ⬜ |
 | v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) | E | ⬜ |
 | v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 | C | ⬜ |

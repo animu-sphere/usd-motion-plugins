@@ -1,10 +1,12 @@
 # USD mapping
 
-> Status: **proposed**, 2026-09-17. Not implemented in this repository.
-> `usd-vrm-plugins` authors two stages of this shape today — the `.vrma`
-> importer's and the capture recorder's semantic clip — and bakes retargeted
-> animation onto avatars; the stage reading and writing behind them
-> (`motion_retarget`'s `StageIo`) arrives here as `motionUsd`
+> Status: **proposed**, 2026-09-17. **§2–§5 are authored** by `motionUsd`
+> since 2026-09-19, except the `Channels` prim (USD-O4). §6–§7 are not
+> implemented here. `usd-vrm-plugins` authors two stages of this family: the
+> `.vrma` importer's and the capture recorder's semantic clip. It also bakes
+> retargeted animation onto avatars. `motionUsd`'s writer arrived from that
+> capture recorder, and the reading half (`motion_retarget`'s `StageIo`)
+> arrives with v0.2.0
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
 >
 > This document owns how motion becomes OpenUSD and back: the standalone
@@ -110,7 +112,9 @@ carrying the namespaced semantic verbatim and a time-sampled value.
 `/Animation/Expressions/<name>` with `vrm:expressionName`,
 `vrm:expressionType` and a time-sampled `vrm:expressionWeight`, and keeps the
 name attribute — not the prim path — as the key, because a sanitized path can
-differ from the name. The generic attribute names are USD-O4.
+differ from the name. The generic attribute names are USD-O4. Until it is
+decided, `motionUsd` authors no `Channels` prim and reports the channel names
+it did not author (`MotionStageReport::unauthoredChannels`).
 
 ## 5. Metadata
 
