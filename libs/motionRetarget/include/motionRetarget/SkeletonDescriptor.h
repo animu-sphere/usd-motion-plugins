@@ -15,6 +15,8 @@
 #include "pxr/base/gf/vec3f.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -125,5 +127,44 @@ MOTIONRETARGET_API bool operator==(const SkeletonJoint& a, const SkeletonJoint& 
 MOTIONRETARGET_API bool operator!=(const SkeletonJoint& a, const SkeletonJoint& b) noexcept;
 MOTIONRETARGET_API bool operator==(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept;
 MOTIONRETARGET_API bool operator!=(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept;
+
+// Why joint tokens and rest transforms describe no skeleton.
+enum class SkeletonDescriptorError : std::uint8_t
+{
+    None,
+    // The rest transforms do not pair one-to-one with a token list that names
+    // at least one joint. A rest pose cannot be computed for such a skeleton,
+    // and inventing identity for the missing ones would be numbers nobody can
+    // tell from measured ones.
+    RestTransformCount,
+    // A token is empty. It names no joint path, and no UsdSkelSkeleton has
+    // one.
+    EmptyJointToken,
+};
+
+struct SkeletonDescriptorResult
+{
+    // Set exactly when `error` is None.
+    std::optional<SkeletonDescriptor> skeleton;
+    SkeletonDescriptorError error = SkeletonDescriptorError::None;
+};
+
+// A skeleton from what a UsdSkelSkeleton states: its joint tokens and one rest
+// transform per token (RETARGETING_POLICY.md §2). Each rest is decomposed by
+// DecomposeRestTransform, and each parent is derived from the tokens by
+// ResolveParentsFromTokens, the "a/b/c" rule.
+//
+// No tokens is the empty skeleton, whatever `restTransforms` holds: with no
+// joint for a rest transform to belong to, none can become a number. That is
+// an answer, not a refusal -- an empty skeleton says exactly what was stated,
+// and a map built against it binds nothing.
+//
+// It takes values, not a skeleton prim, so a caller that reads them off a
+// stage (motionUsd, a format repository, an OpenExec node) and one that has no
+// stage share one rule. usd-vrm-plugins carried two copies of it, one in a CLI
+// and one in an exec bundle; this is where they meet.
+MOTIONRETARGET_API SkeletonDescriptorResult
+BuildSkeletonDescriptor(const std::vector<std::string>& jointTokens,
+                        const std::vector<pxr::GfMatrix4d>& restTransforms);
 
 } // namespace openstrata::motion

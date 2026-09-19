@@ -5,6 +5,7 @@
 #include "pxr/base/gf/vec3d.h"
 
 #include <unordered_map>
+#include <utility>
 
 namespace openstrata::motion
 {
@@ -105,6 +106,47 @@ DecomposeRestTransform(const pxr::GfMatrix4d& matrix, SkeletonJoint* joint)
     joint->restScale = pxr::GfVec3f(static_cast<float>(matrix.GetRow3(0).GetLength()),
                                     static_cast<float>(matrix.GetRow3(1).GetLength()),
                                     static_cast<float>(matrix.GetRow3(2).GetLength()));
+}
+
+SkeletonDescriptorResult
+BuildSkeletonDescriptor(const std::vector<std::string>& jointTokens,
+                        const std::vector<pxr::GfMatrix4d>& restTransforms)
+{
+    SkeletonDescriptorResult result;
+    // An empty token first: it is refused even beside a rest count that
+    // matches, because it names no joint whatever the rests say.
+    for (const std::string& token : jointTokens)
+    {
+        if (token.empty())
+        {
+            result.error = SkeletonDescriptorError::EmptyJointToken;
+            return result;
+        }
+    }
+    if (jointTokens.empty())
+    {
+        result.skeleton = SkeletonDescriptor();
+        return result;
+    }
+    if (restTransforms.size() != jointTokens.size())
+    {
+        result.error = SkeletonDescriptorError::RestTransformCount;
+        return result;
+    }
+
+    std::vector<SkeletonJoint> joints;
+    joints.reserve(jointTokens.size());
+    for (std::size_t i = 0; i < jointTokens.size(); ++i)
+    {
+        SkeletonJoint joint;
+        joint.token = jointTokens[i];
+        DecomposeRestTransform(restTransforms[i], &joint);
+        joints.push_back(std::move(joint));
+    }
+    SkeletonDescriptor skeleton(std::move(joints));
+    skeleton.ResolveParentsFromTokens();
+    result.skeleton = std::move(skeleton);
+    return result;
 }
 
 bool

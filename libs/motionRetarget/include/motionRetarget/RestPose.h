@@ -13,6 +13,11 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace openstrata::motion
 {
@@ -47,6 +52,48 @@ struct SourceRestPose
     // itself a root.
     MOTIONRETARGET_API pxr::GfQuatf GetWorldRestRotation(openstrata::motion::HumanJoint bone) const;
 };
+
+// Why a skeleton could not be read as a clip's rest pose.
+enum class SourceRestPoseError : std::uint8_t
+{
+    None,
+    // No joint's leaf is a bone of the vocabulary. The skeleton is not a
+    // semantic one, and the rest pose read off it would be the default -- every
+    // bone at identity -- which is numbers nobody can tell from a measured rest.
+    NoHumanBone,
+    // Two joints' leaves name the same bone, and which of the two rests the
+    // clip meant cannot be known.
+    DuplicateBone,
+};
+
+struct SourceRestPoseResult
+{
+    // Set exactly when `error` is None.
+    std::optional<SourceRestPose> rest;
+    SourceRestPoseError error = SourceRestPoseError::None;
+
+    // For DuplicateBone: every joint token that named a bone another joint also
+    // named, beside that bone -- the first naming once, then each later one.
+    std::vector<std::pair<openstrata::motion::HumanJoint, std::string>> offending;
+};
+
+// A clip's rest pose, per bone, read off its semantic skeleton
+// (RETARGETING_POLICY.md §10).
+//
+// On a semantic skeleton a joint's leaf *is* its bone: that is what the motion
+// contract says a canonical clip's skeleton is, not a name heuristic, and it is
+// never applied to a target rig, whose bones are the caller's bindings. For
+// each joint whose leaf is a vocabulary name, its decomposed rest rotation and
+// translation fill that bone's slot, and its semantic parent is the bone named
+// by the leaf of its parent *path* -- the path, whether or not a joint of the
+// skeleton resolves it. A joint whose leaf is no bone contributes nothing, and
+// a bone whose parent path's leaf is no bone is a root, so a non-bone joint
+// between two bones drops out of the chain: SourceRestPose has one slot per
+// bone and no other.
+//
+// usd-vrm-plugins read it this way in a CLI and copied it line for line into
+// an exec bundle; this is where the two meet.
+MOTIONRETARGET_API SourceRestPoseResult BuildSourceRestPose(const SkeletonDescriptor& semanticSkeleton);
 
 // Per-bone correction carrying a rest-relative rotation from the source rig
 // onto a target whose rest pose differs.

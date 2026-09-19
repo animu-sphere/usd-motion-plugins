@@ -6,6 +6,7 @@
 #include "motionRetarget/SkeletonDescriptor.h"
 
 #include "pxr/base/gf/quatd.h"
+#include "pxr/base/gf/rotation.h"
 
 #include <algorithm>
 #include <cassert>
@@ -1188,6 +1189,122 @@ TestAJointsWorldTransformComposesItsWholeChain()
     assert(NearlyEqual(position, pxr::GfVec3f(0.0f, 1.0f, 1.0f)));
 }
 
+// RETARGETING_POLICY.md §2: a skeleton from tokens and rest matrices, the rule
+// usd-vrm-plugins wrote twice. The decomposition and the parents are the
+// library's own; what is new is the two refusals and the empty answer.
+void
+TestASkeletonIsBuiltFromTokensAndRestMatrices()
+{
+    using Error = openstrata::motion::SkeletonDescriptorError;
+    pxr::GfMatrix4d pelvis(1.0);
+    pelvis.SetTranslateOnly(pxr::GfVec3d(0.0, 1.0, 0.0));
+    pxr::GfMatrix4d spine(1.0);
+    spine.SetRotate(pxr::GfRotation(pxr::GfVec3d(0.0, 1.0, 0.0), 90.0));
+    spine.SetTranslateOnly(pxr::GfVec3d(0.0, 0.5, 0.0));
+    const std::vector<std::string> tokens = {"Root", "Root/Pelvis", "Root/Pelvis/SpineA"};
+    const std::vector<pxr::GfMatrix4d> rests = {pxr::GfMatrix4d(1.0), pelvis, spine};
+
+    const openstrata::motion::SkeletonDescriptorResult built =
+        openstrata::motion::BuildSkeletonDescriptor(tokens, rests);
+    assert(built.error == Error::None && built.skeleton);
+    const std::vector<openstrata::motion::SkeletonJoint>& joints = built.skeleton->GetJoints();
+    assert(joints.size() == 3);
+    assert(joints[0].parent == openstrata::motion::SkeletonDescriptor::kNoParent);
+    assert(joints[1].parent == 0 && joints[2].parent == 1);
+    assert(NearlyEqual(joints[1].restTranslation, pxr::GfVec3f(0.0f, 1.0f, 0.0f)));
+    assert(SameOrientation(joints[2].restRotation, Rotation(kAxisY, 90.0f)));
+    // The same values the two library calls give by hand.
+    openstrata::motion::SkeletonDescriptor byHand;
+    for (std::size_t i = 0; i < tokens.size(); ++i)
+    {
+        openstrata::motion::SkeletonJoint joint;
+        joint.token = tokens[i];
+        openstrata::motion::DecomposeRestTransform(rests[i], &joint);
+        byHand.AddJoint(joint);
+    }
+    byHand.ResolveParentsFromTokens();
+    assert(*built.skeleton == byHand);
+
+    // No tokens is the empty skeleton, even beside one stray rest.
+    const auto empty = openstrata::motion::BuildSkeletonDescriptor({}, {pxr::GfMatrix4d(1.0)});
+    assert(empty.error == Error::None && empty.skeleton && empty.skeleton->IsEmpty());
+
+    const auto short_ = openstrata::motion::BuildSkeletonDescriptor(tokens, {pelvis});
+    assert(short_.error == Error::RestTransformCount && !short_.skeleton);
+
+    const auto blank = openstrata::motion::BuildSkeletonDescriptor({"Root", ""}, {pelvis, pelvis});
+    assert(blank.error == Error::EmptyJointToken && !blank.skeleton);
+}
+
+// RETARGETING_POLICY.md §10: a clip's rest pose read off its semantic
+// skeleton. A leaf is a bone, a parent is the bone its parent path's leaf
+// names, and a joint that is no bone drops out of the chain.
+void
+TestASourceRestIsReadOffASemanticSkeleton()
+{
+    using J = openstrata::motion::HumanJoint;
+    using Error = openstrata::motion::SourceRestPoseError;
+    const auto slot = [](J bone) { return static_cast<std::size_t>(bone); };
+    const std::size_t root = openstrata::motion::SourceRestPose::kNoParent;
+
+    openstrata::motion::SkeletonDescriptor skeleton;
+    const auto add = [&](const char* token, const pxr::GfQuatf& rotation, const pxr::GfVec3f& at) {
+        openstrata::motion::SkeletonJoint joint;
+        joint.token = token;
+        joint.restRotation = rotation;
+        joint.restTranslation = at;
+        skeleton.AddJoint(joint);
+    };
+    const pxr::GfQuatf identity(1.0f);
+    add("Root", Rotation(kAxisY, 45.0f), pxr::GfVec3f(0.0f));
+    add("Root/hips", identity, pxr::GfVec3f(0.0f, 1.0f, 0.0f));
+    add("Root/hips/spine", Rotation(kAxisX, 10.0f), pxr::GfVec3f(0.0f, 0.2f, 0.0f));
+    add("Root/hips/spine/Twist", Rotation(kAxisZ, 30.0f), pxr::GfVec3f(0.0f));
+    add("Root/hips/spine/Twist/chest", identity, pxr::GfVec3f(0.0f, 0.3f, 0.0f));
+    // A parent path no joint resolves still parents the bone by its leaf.
+    add("Elsewhere/neck", identity, pxr::GfVec3f(0.0f, 0.1f, 0.0f));
+    skeleton.ResolveParentsFromTokens();
+
+    const openstrata::motion::SourceRestPoseResult read =
+        openstrata::motion::BuildSourceRestPose(skeleton);
+    assert(read.error == Error::None && read.rest && read.offending.empty());
+    const openstrata::motion::SourceRestPose& rest = *read.rest;
+    assert(NearlyEqual(rest.localTranslations[slot(J::Hips)], pxr::GfVec3f(0.0f, 1.0f, 0.0f)));
+    assert(SameOrientation(rest.localRotations[slot(J::Spine)], Rotation(kAxisX, 10.0f)));
+    // `Root` is no bone, so the hips are a root and its turn is not theirs.
+    assert(rest.parents[slot(J::Hips)] == root);
+    assert(rest.parents[slot(J::Spine)] == slot(J::Hips));
+    // `Twist` is no bone: chest has no semantic parent, and the twist's turn
+    // is in nobody's slot.
+    assert(rest.parents[slot(J::Chest)] == root);
+    assert(SameOrientation(rest.GetWorldRestRotation(J::Chest), identity));
+    assert(rest.parents[slot(J::Neck)] == root);
+    assert(NearlyEqual(rest.localTranslations[slot(J::Neck)], pxr::GfVec3f(0.0f, 0.1f, 0.0f)));
+    // Nothing named the head: it keeps the default.
+    assert(SameOrientation(rest.localRotations[slot(J::Head)], identity));
+
+    openstrata::motion::SkeletonDescriptor twice = skeleton;
+    openstrata::motion::SkeletonJoint again;
+    again.token = "Other/spine";
+    twice.AddJoint(again);
+    openstrata::motion::SkeletonJoint third;
+    third.token = "Third/spine";
+    twice.AddJoint(third);
+    const auto duplicate = openstrata::motion::BuildSourceRestPose(twice);
+    assert(duplicate.error == Error::DuplicateBone && !duplicate.rest);
+    assert((duplicate.offending ==
+            std::vector<std::pair<J, std::string>>{{J::Spine, "Root/hips/spine"},
+                                                   {J::Spine, "Other/spine"},
+                                                   {J::Spine, "Third/spine"}}));
+
+    openstrata::motion::SkeletonDescriptor rig;
+    openstrata::motion::SkeletonJoint pelvis;
+    pelvis.token = "Root/Pelvis";
+    rig.AddJoint(pelvis);
+    const auto notSemantic = openstrata::motion::BuildSourceRestPose(rig);
+    assert(notSemantic.error == Error::NoHumanBone && !notSemantic.rest);
+}
+
 } // namespace
 
 int
@@ -1218,6 +1335,8 @@ main()
     TestABoneDrivenOnlyLaterIsStillReported();
     TestHipsBoundOutsideTheRigAreReportedWithTheDroppedRoot();
     TestAJointsWorldTransformComposesItsWholeChain();
+    TestASkeletonIsBuiltFromTokensAndRestMatrices();
+    TestASourceRestIsReadOffASemanticSkeleton();
     std::puts("motionRetarget unit tests passed");
     return 0;
 }

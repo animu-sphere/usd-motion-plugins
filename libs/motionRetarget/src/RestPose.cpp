@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionRetarget/RestPose.h"
 
+#include <algorithm>
 #include <cmath>
+#include <string_view>
 
 namespace openstrata::motion
 {
@@ -21,6 +23,15 @@ IsIdentityRotation(const pxr::GfQuatf& q)
 {
     const pxr::GfQuatf n = q.GetNormalized();
     return std::fabs(std::fabs(n.GetReal()) - 1.0f) <= 1e-6f;
+}
+
+// The bone a semantic joint path's leaf names, if it names one.
+std::optional<openstrata::motion::HumanJoint>
+BoneForLeaf(std::string_view jointPath)
+{
+    const std::size_t separator = jointPath.rfind('/');
+    return openstrata::motion::FindHumanJoint(
+        separator == std::string_view::npos ? jointPath : jointPath.substr(separator + 1));
 }
 
 } // namespace
@@ -145,6 +156,68 @@ ComputeRestPoseCorrection(const SourceRestPose& source, const SkeletonDescriptor
     }
 
     return correction;
+}
+
+SourceRestPoseResult
+BuildSourceRestPose(const SkeletonDescriptor& semanticSkeleton)
+{
+    SourceRestPoseResult result;
+    SourceRestPose rest;
+
+    // Which joint first named each bone, so a second naming can report both.
+    std::array<const std::string*, openstrata::motion::HumanJointCount> namedBy{};
+    std::size_t recognized = 0;
+
+    for (const SkeletonJoint& joint : semanticSkeleton.GetJoints())
+    {
+        const std::optional<openstrata::motion::HumanJoint> bone = BoneForLeaf(joint.token);
+        if (!bone)
+        {
+            continue;
+        }
+        const auto slot = static_cast<std::size_t>(*bone);
+        if (namedBy[slot])
+        {
+            // Report the first naming once, then every later one.
+            const bool firstReported =
+                std::any_of(result.offending.begin(), result.offending.end(),
+                            [&](const auto& named) { return named.first == *bone; });
+            if (!firstReported)
+            {
+                result.offending.emplace_back(*bone, *namedBy[slot]);
+            }
+            result.offending.emplace_back(*bone, joint.token);
+            continue;
+        }
+        namedBy[slot] = &joint.token;
+        ++recognized;
+
+        rest.localRotations[slot] = joint.restRotation;
+        rest.localTranslations[slot] = joint.restTranslation;
+        const std::size_t separator = joint.token.rfind('/');
+        if (separator == std::string::npos)
+        {
+            continue;
+        }
+        if (const std::optional<openstrata::motion::HumanJoint> parent =
+                BoneForLeaf(std::string_view(joint.token).substr(0, separator)))
+        {
+            rest.SetParent(*bone, *parent);
+        }
+    }
+
+    if (!result.offending.empty())
+    {
+        result.error = SourceRestPoseError::DuplicateBone;
+        return result;
+    }
+    if (recognized == 0)
+    {
+        result.error = SourceRestPoseError::NoHumanBone;
+        return result;
+    }
+    result.rest = std::move(rest);
+    return result;
 }
 
 } // namespace openstrata::motion
