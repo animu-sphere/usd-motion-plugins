@@ -7,9 +7,9 @@ them and to the rest of the ecosystem, and the invariants every change keeps.
 first, in its own pull request** — never through a README, a roadmap entry or
 code.
 
-Status (2026-09-19): **contract adopted; three components imported.**
-`motionCore`, `motionSampling` and `motionRecording` arrived from
-`usd-vrm-plugins` with their history. Every other
+Status (2026-09-19): **contract adopted; seven libraries and two tools
+imported.** Each row below says when its identity arrived from
+`usd-vrm-plugins`, with its history. Every other
 identity below is *reserved* until the change that creates it lands, and its
 row then says so. The shape follows the design
 policy's §22 and the workspace discipline `usd-vrm-plugins` and
@@ -25,7 +25,7 @@ beside each component, and two build modes, `ost` and plain CMake.
 | `motionCore` | `libs/motionCore/` | `HumanJoint`, `MotionPose`, `RootMotion`, `MotionChannelSet`, `SourceMetadata`, `MotionClip`, constraints ([MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md)) | `usd-vrm-plugins` `motionCore`, renamed | **imported** 2026-09-19, with history |
 | `motionSampling` | `libs/motionSampling/` | sampling with status, interpolation, resample, filter, blend, the pose buffer | `usd-vrm-plugins` `motionRuntime` (its sampling half) | **imported** 2026-09-19, with history |
 | `motionRecording` | `libs/motionRecording/` | stream intake, `MotionRecorder`, the `motion-capture-trace` format, replay | `usd-vrm-plugins` `motionRuntime` (its capture half) | **imported** 2026-09-19, with history |
-| `motionRetarget` | `libs/motionRetarget/` | `SkeletonDescriptor`, `RetargetMap`, rest correction, root-motion policy, retarget diagnostics ([RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md)) | `usd-vrm-plugins` `vrmRetarget`, its generic half | reserved |
+| `motionRetarget` | `libs/motionRetarget/` | `SkeletonDescriptor`, `RetargetMap`, rest correction, root-motion policy, retarget diagnostics ([RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md)) | `usd-vrm-plugins` `vrmRetarget`, its generic half | **imported** 2026-09-19, with history (release v0.2.0) |
 | `motionUsd` | `libs/motionUsd/` | `MotionClip` ↔ `UsdSkelAnimation`, `SkeletonDescriptor` ↔ `UsdSkelSkeleton`, time codes, metadata ([USD_MAPPING.md](../design/USD_MAPPING.md)) | `usd-vrm-plugins`: `motion_capture`'s clip writer (authoring); `motion_retarget`'s `StageIo` (reading, v0.2.0) | **authoring imported** 2026-09-19, with history |
 | `motionSource` | `libs/motionSource/` | the format-neutral recorded-source layer: source skeleton and animation, the producer-profile contract, conversion into `MotionClip` | `usd-vrm-plugins` `motionSource` | **imported** 2026-09-19, with history (release v0.4.0) |
 | `motionBvh` | `libs/motionBvh/` | BVH syntax and extraction only (design policy §27) | `usd-vrm-plugins` `motionBvh` | **imported** 2026-09-19, with history (release v0.4.0) |
@@ -89,8 +89,10 @@ tools/* ─────────→ the libraries they name (motion_convert: 
 ```
 
 This is the design policy's §24 with the recorded-source pair added.
-`usd-vrm-plugins`' `vrmRetarget` also depends on its runtime library today;
-whether `motionRetarget` keeps that edge or loses it is WS-O2.
+`motionRetarget` depends on `motionCore` alone (WS-O2, decided 2026-09-19).
+`usd-vrm-plugins`' `vrmRetarget` also depended on its runtime library, for one
+resample option; the option was removed on arrival, and a caller that wants a
+uniform timeline resamples before it retargets.
 
 ### 2.2 Forbidden
 
@@ -179,5 +181,5 @@ WS-O1, the names, was decided on 2026-09-19 (§1.2).
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
-| WS-O2 | Whether `motionRetarget` depends on `motionSampling`, as `vrmRetarget` depends on its runtime library today, or on `motionCore` alone as design policy §24 says | the import of `vrmRetarget`'s generic half |
+| ~~WS-O2~~ | **Decided 2026-09-19: `motionCore` alone**, as design policy §24 draws it (§2.1). Was: whether `motionRetarget` depends on `motionSampling`, as `vrmRetarget` depended on its runtime library for one resample option | the import of `vrmRetarget`'s generic half |
 | WS-O3 | Design policy §26 sketches `plugins/motion-bvh/`; the imported BVH reader is a plain library and registers nothing. A BVH `SdfFileFormat` would be a separate, thin bundle, created only if opening `.bvh` directly is wanted | a consumer that wants it |

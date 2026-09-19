@@ -1,8 +1,9 @@
 # Diagnostics
 
 The catalog of diagnostic codes this repository raises. Status (2026-09-19):
-the eleven `MOTION_BVH_*` codes, which arrived with `motionBvh`. A code is
-added here in the change that first raises it.
+the eleven `MOTION_BVH_*` codes, which arrived with `motionBvh`, and the eight
+`MOTION_RETARGET_*` codes, which arrived with `motionRetarget`. A code is added
+here in the change that first raises it.
 
 ## 1. The record
 
@@ -21,6 +22,8 @@ its own code when it passes through; this repository's codes are never
 re-coded by a consumer, and a consumer's never by this repository.
 
 ## 2. Catalog
+
+### 2.1 BVH
 
 The first five are syntax, and the parser raises them. The other six are about
 a file meeting a profile, and only a caller holding both raises them. The
@@ -41,6 +44,30 @@ extractor is granted `MOTION_BVH_INVALID_ROTATION_ORDER` alone
 | `MOTION_BVH_REQUIRED_JOINT_MISSING` | error | no | `motion_convert` | the profile requires a joint the file does not carry |
 | `MOTION_BVH_INVALID_ROTATION_ORDER` | error | no | `motionBvh` extractor; `motion_convert` | a joint's rotation channels form no Euler order |
 | `MOTION_BVH_INVALID_ROOT_POLICY` | error | no | `motion_convert` | the profile's root policy cannot be applied to this file |
+
+### 2.2 Retarget
+
+The set splits at the layer boundary
+([RETARGETING_POLICY.md §7](../design/RETARGETING_POLICY.md#7-diagnostics)).
+`motionRetarget` raises the first five from plain values; the other three say
+what a stage or a file system added, and only a caller holding one raises
+them. `libs/motionRetarget/tests/check_boundaries.py` refuses those three
+anywhere in the library but the table that defines them,
+`libs/motionRetarget/include/motionRetarget/Diagnostics.h`. The event names
+kept `_BONE` on arrival: here a bone is the canonical slot and a joint is the
+rig's. Every code but the last is recoverable, because retargeting onto a
+partial rig is legal and useful.
+
+| Code | Severity | Recoverable | Raised by | Meaning |
+| --- | --- | --- | --- | --- |
+| `MOTION_RETARGET_MISSING_REQUIRED_BONE` | warning | yes | `motionRetarget` | a bone the caller requires (and the hips under `Hips` root motion) has no joint on this rig |
+| `MOTION_RETARGET_UNBOUND_DRIVEN_BONE` | warning | yes | `motionRetarget` | the clip drives a bone the rig binds no joint for |
+| `MOTION_RETARGET_DUPLICATE_TARGET` | warning | yes | `motionRetarget` | two bones are bound to one joint; the later in the vocabulary wins |
+| `MOTION_RETARGET_INVALID_HIERARCHY` | warning | yes | `motionRetarget` | the rig's joints are not in parent-before-child order |
+| `MOTION_RETARGET_INVALID_ROOT_JOINT` | warning | yes | `motionRetarget` | root motion names a joint the rig does not have, so no root translation was authored |
+| `MOTION_RETARGET_NON_UNIT_SCALE` | warning | yes | a caller reading the clip's `scales` | the clip animates scale, which the retarget does not carry |
+| `MOTION_RETARGET_TIME_RANGE_DERIVED` | info | yes | a caller holding a stage | the clip states no time samples, so the stage chose the time |
+| `MOTION_RETARGET_OUTPUT_COLLIDES_WITH_INPUT` | error | no | a caller writing a file | the output names a layer the retarget read |
 
 ## 3. Open questions
 

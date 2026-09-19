@@ -1,12 +1,15 @@
 # Retargeting policy
 
-> Status: **proposed**, 2026-09-17. Not implemented in this repository. The
-> generic half of `usd-vrm-plugins`' `vrmRetarget` — the pose retargeter, rest
-> correction and root-motion policy — implements §3, §5 and §6 today, with
-> hand-authored fixtures and OpenExec / offline parity, and arrives here as
-> `motionRetarget` ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
-> Its VRM half — the humanoid map read from `VrmHumanoidAPI`, expression and
-> look-at resolution — stays in `usd-vrm-plugins`.
+> Status: **proposed**, 2026-09-17; **implemented** by `motionRetarget` since
+> 2026-09-19. The generic half of `usd-vrm-plugins`' `vrmRetarget` — the pose
+> retargeter, rest correction and root-motion policy — arrived with its
+> history and its tests
+> ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
+> Its VRM half — the humanoid map read from `VrmHumanoidAPI`, VRM 1.0's
+> required-bone set, expression and look-at resolution — stayed in
+> `usd-vrm-plugins`. The §1 signature is still the target shape: the imported
+> API is a `PoseRetargeter` built once from the descriptor, the map, the
+> source rest and `RetargetOptions`, which is the same inputs held for reuse.
 >
 > This document owns skeleton descriptors, retarget maps, rest correction,
 > root-motion modes and retarget diagnostics. On that area it wins over
@@ -102,9 +105,11 @@ child would change every bake of a clip with `upperChest` onto a rig without
 one. That would be a contract change with its own parity evidence, not a fix.
 
 Which joints are *required* is the caller's statement (§3, §4). In
-`usd-vrm-plugins` it is VRM 1.0's required-bone set, and on arrival the
-retargeter takes the set from its caller (that repository's WORKSPACE.md §9.5,
-finding 1).
+`usd-vrm-plugins` it is VRM 1.0's required-bone set. Since the import the
+retargeter takes the set from its caller, as `RetargetOptions::requiredBones`,
+empty by default (that repository's WORKSPACE.md §9.5, finding 1). One bone
+is required by the options themselves: under `Hips` root motion the root
+lands on the hips, so a rig without them is reported whatever the set says.
 
 ## 5. Rest-pose correction
 
@@ -144,6 +149,11 @@ source's hip height. Two stated adjustments: a uniform `translationScale`, and
 `preserveTargetHeight`, which takes the horizontal delta only.
 
 The imported implementation has three modes; the design policy names five.
+**The published vocabulary is the imported one** (RT-O1, decided 2026-09-19):
+`Hips`, `RootJoint` and `Ignore`, with `translationScale` and
+`preserveTargetHeight`. It carries the OpenExec parity `usd-vrm-plugins`
+measured, and a name with no implementation behind it would be a promise the
+API cannot keep. The table maps the design policy's names onto it.
 
 | Imported (`usd-vrm-plugins`) | Design policy §13 | Meaning |
 | --- | --- | --- |
@@ -154,8 +164,9 @@ The imported implementation has three modes; the design policy names five.
 
 `Remove` and `InPlace` differ in the design policy only if one keeps the
 root's yaw; `preserveVerticalMotion` and `preserveYaw` are not implemented.
-Which vocabulary the published API uses is RT-O1. A `RootJoint` request with
-no valid joint degrades to `Ignore` and says so.
+Each arrives with the first consumer that needs it, as a new mode or flag
+beside these. A `RootJoint` request with no valid joint degrades to `Ignore`
+and says so.
 
 ### 6.1 Scale (carried from `usd-vrm-plugins` v0.9.0)
 
@@ -196,20 +207,21 @@ contract**; tests assert them, never prose.
   library raises only what plain values can show; codes about a stage, a file
   or an output path are raised by the caller that holds one.
 
-The imported events, with their `usd-vrm-plugins` codes. Their codes here
-follow [reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md) once DIAG-O1 is
-resolved:
+The events, with the codes they arrived under. Each imported
+`VRM_RETARGET_*` code took this repository's prefix on arrival, its event name
+unchanged (design policy §42.8), and the catalog is
+[reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md) §2.2:
 
-| Event | Imported code | Severity | Raised by |
+| Event | Code | Severity | Raised by |
 | --- | --- | --- | --- |
-| a required joint unmapped, or mapped to an index the skeleton lacks | `VRM_RETARGET_MISSING_REQUIRED_BONE` | warning | library |
-| a joint the pose drives and the map does not bind | `VRM_RETARGET_UNBOUND_DRIVEN_BONE` | warning | library |
-| two joints mapped to one target | `VRM_RETARGET_DUPLICATE_TARGET` | warning | library |
-| a parent that does not precede its child | `VRM_RETARGET_INVALID_HIERARCHY` | warning | library |
-| an invalid root joint for `RootJoint` | `VRM_RETARGET_INVALID_ROOT_JOINT` | warning | library |
-| a non-unit rest scale (scale policy undecided) | `VRM_RETARGET_NON_UNIT_SCALE` | warning | caller |
-| a one-pose clip placed at the stage start | `VRM_RETARGET_TIME_RANGE_DERIVED` | info | caller |
-| an output that would overwrite an input | `VRM_RETARGET_OUTPUT_COLLIDES_WITH_INPUT` | error | caller |
+| a required joint unmapped, or mapped to an index the skeleton lacks | `MOTION_RETARGET_MISSING_REQUIRED_BONE` | warning | library |
+| a joint the pose drives and the map does not bind | `MOTION_RETARGET_UNBOUND_DRIVEN_BONE` | warning | library |
+| two joints mapped to one target | `MOTION_RETARGET_DUPLICATE_TARGET` | warning | library |
+| a parent that does not precede its child | `MOTION_RETARGET_INVALID_HIERARCHY` | warning | library |
+| an invalid root joint for `RootJoint` | `MOTION_RETARGET_INVALID_ROOT_JOINT` | warning | library |
+| a clip that animates scale (§6.1) | `MOTION_RETARGET_NON_UNIT_SCALE` | warning | caller |
+| a one-pose clip placed at the stage start | `MOTION_RETARGET_TIME_RANGE_DERIVED` | info | caller |
+| an output that would overwrite an input | `MOTION_RETARGET_OUTPUT_COLLIDES_WITH_INPUT` | error | caller |
 
 Every one but the last is recoverable: retargeting onto a partial rig is legal
 and useful.
@@ -228,7 +240,7 @@ decisions on 2026-09-19.
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
-| RT-O1 | Root-motion vocabulary: the imported `Hips` / `RootJoint` / `Ignore` plus two flags, or the design policy's five modes with `preserveVerticalMotion` and `preserveYaw` | the import of `vrmRetarget`'s generic half |
+| ~~RT-O1~~ | **Decided 2026-09-19: the imported vocabulary** (§6). Was: root-motion vocabulary: the imported `Hips` / `RootJoint` / `Ignore` plus two flags, or the design policy's five modes with `preserveVerticalMotion` and `preserveYaw` | the import of `vrmRetarget`'s generic half |
 | RT-O4 | Whether `SkeletonDescriptor` carries bind transforms separately from rest, or bind is `motionUsd`'s concern only | the first consumer that needs bind in a retarget |
 
 ## 10. API owed from the OpenExec evidence
@@ -236,18 +248,19 @@ decisions on 2026-09-19.
 `usd-vrm-plugins`' `execVrm` wrapped the retargeter node by node and found
 where a wrapper could not reach
 ([its boundary-consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/boundary-consolidation.md#findings-from-the-exec-layer-as-they-land)).
-Each is fixed on arrival, in its own change after the move
+Each was fixed on arrival, in its own change after the move
 ([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in), rule 4):
 
-- **A `SkeletonDescriptor` from joint tokens and rest matrices** (§2). The
-  arithmetic half, `DecomposeRestTransform`, is shared since that
-  repository's v0.9.0. Reading the tokens and matrices off a skeleton is still
-  written twice, once in a CLI and once in a bundle (its humanoid report §7).
-  That half is `motionUsd`'s.
-- **A source rest pose from a semantic skeleton's tokens and decomposed rests**:
-  which joint fills which vocabulary slot, by joint leaf, and which is its
-  parent. It exists only in a CLI and is copied line for line into the bundle
-  (its rest-correction report §7).
+- ✅ **A `SkeletonDescriptor` from joint tokens and rest matrices** (§2):
+  `BuildSkeletonDescriptor`. The arithmetic half, `DecomposeRestTransform`,
+  was shared since that repository's v0.9.0; the builder adds the parents and
+  the two refusals its exec bundle made (a rest count that does not pair, an
+  empty token). Reading the tokens and matrices off a skeleton prim is
+  `motionUsd`'s reading half.
+- ✅ **A source rest pose from a semantic skeleton's tokens and decomposed
+  rests**: `BuildSourceRestPose`. Which joint fills which vocabulary slot, by
+  joint leaf, and which is its parent, with the bundle's two refusals (no
+  vocabulary bone, a bone named twice).
 - **A retarget that takes the rest correction as an input.** Today the
   retargeter computes the correction in its constructor and accepts none, so a
   node recomputes per evaluation what it caches per rig edit. Measured on a
