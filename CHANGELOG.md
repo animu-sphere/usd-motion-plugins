@@ -65,6 +65,19 @@ separate from the package version
   - `MOTION_CONTRACT.md` gains the recorded-source provenance narrowing (§7.1)
     and the tracker boundary (§11.1); `USD_MAPPING.md` §4.1 gains the rate
     attribute.
+- **`motionRuntime`, imported from `usd-vrm-plugins` with its history, as
+  `motionSampling` and `motionRecording`** (Migration Phase C). Its 28 commits
+  arrived through `git filter-repo`; a move-only commit then split its files
+  between the two libraries WORKSPACE.md §1.1 reserves, and the rename followed
+  in a commit of its own. `motionSampling` holds interpolation, resampling, the
+  filter, blending, the pose buffer and the status-carrying sampling interface;
+  `motionRecording` holds live intake, the `motion-capture-trace` format,
+  replay, the recorder — renamed `MotionRecorder` — and the seven-trace corpus
+  with its generator. The trace format is unchanged, and `.gitattributes` keeps
+  traces LF so a Windows checkout still round-trips them byte for byte. Each
+  library has its own package (`SameMinorVersion`), label and boundary check,
+  which also refuses an include across an undeclared edge and any transport
+  header.
 - **The rendered CI workflow**, `ost-source-ci.yml`, with a graph cell ahead
   of the three workspace cells. It could not be rendered for an empty
   workspace under `ost` 0.22.10.
