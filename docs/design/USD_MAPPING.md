@@ -4,7 +4,7 @@
 > `usd-vrm-plugins` authors two stages of this shape today — the `.vrma`
 > importer's and the capture recorder's semantic clip — and bakes retargeted
 > animation onto avatars; the stage reading and writing behind them
-> (`motion_retarget`'s `StageIo`) arrives here as `motion-usd`
+> (`motion_retarget`'s `StageIo`) arrives here as `motionUsd`
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
 >
 > This document owns how motion becomes OpenUSD and back: the standalone
@@ -19,7 +19,7 @@
 - Standard `UsdSkel` first: `UsdSkelSkeleton`, `UsdSkelAnimation`,
   `UsdSkelBindingAPI` (design policy §4.3). No project schema until a concept
   fails that test.
-- `motion-usd` converts; it is not a file-format plugin (design policy §16). A
+- `motionUsd` converts; it is not a file-format plugin (design policy §16). A
   format plugin that authors a motion stage calls it.
 - A **source motion asset** and a **target-specific derivative** are separate
   assets, related by composition (§6).
@@ -140,7 +140,7 @@ Format-specific provenance stays in its own namespace beside it
 
 ## 7. Reading USD back
 
-`UsdSkelAnimation` → `MotionClip` is `motion-usd`'s too: a skeleton whose
+`UsdSkelAnimation` → `MotionClip` is `motionUsd`'s too: a skeleton whose
 joint tokens are semantic paths reads directly; any other skeleton needs a
 `RetargetMap` in reverse and is a retarget, not a read. In `usd-vrm-plugins`
 the reading lives only in a CLI, where an OpenExec bundle cannot call it, so
@@ -158,9 +158,9 @@ a stage bumps it; adding an optional prim or key does not.
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
-| USD-O1 | Prim names: the design policy's `Skeleton` / `Body` / `Channels`, or `usd-vrm-plugins`' shipped `HumanoidSkeleton` / `BodyAnimation` / `Expressions` | the first stage `motion-usd` authors |
+| USD-O1 | Prim names: the design policy's `Skeleton` / `Body` / `Channels`, or `usd-vrm-plugins`' shipped `HumanoidSkeleton` / `BodyAnimation` / `Expressions` | the first stage `motionUsd` authors |
 | USD-O2 | `timeCodesPerSecond`: always 30, or the source rate when it is uniform | the first non-30 Hz source authored here |
 | USD-O3 | Whether root orientation and velocities are authored explicitly, or only the hips translation | a consumer that reads them back |
-| USD-O4 | Generic channel attribute names under `/Animation/Channels` | the first channel `motion-usd` authors |
+| USD-O4 | Generic channel attribute names under `/Animation/Channels` | the first channel `motionUsd` authors |
 | USD-O5 | The `Bindings` prim: typeless with namespaced properties, or a schema that passes design policy §4.3 | `usd-avatar-runtime`'s first composed scene |
 | USD-O6 | Whether `MOT-O2` in `usd-mmd-plugins` — a directly opened `.vmd` — can use this stage at all, since a VMD without a model has control-rig tracks, not body motion | that repository, with this mapping |

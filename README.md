@@ -4,11 +4,12 @@ Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
 of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
 bridge every avatar format and every motion source share.
 
-> **Status: documentation only.** The design policy is accepted and the
-> contracts are proposed. The implementation arrives from
+> **Status: documentation and an empty build scaffold.** The design policy is
+> accepted and the contracts are proposed. The implementation arrives from
 > [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), where
-> it is built and measured today, once that repository's v0.9.0 is out
-> ([roadmap](docs/roadmap/current.md)). The
+> it is built and measured today, one identity at a time
+> ([roadmap](docs/roadmap/current.md)); how to build the tree is in
+> [docs/guides/building.md](docs/guides/building.md). The
 > [capability matrix](docs/reference/CAPABILITY_MATRIX.md) is the only page
 > that says what is implemented here.
 
@@ -37,12 +38,12 @@ Every one of them depends on this repository, and it depends on none of them.
 
 | Component | Role | Release |
 | --- | --- | --- |
-| `motion-core` | `HumanJoint`, `MotionPose`, `RootMotion`, channels, provenance, `MotionClip` | v0.1.0 |
-| `motion-sampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
-| `motion-recording` | stream intake, recorder, the capture trace format | v0.1.0 |
-| `motion-usd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` | v0.1.0, v0.2.0 |
-| `motion-retarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy | v0.2.0 |
-| `motion-source`, `motion-bvh` | recorded sources through declarative producer profiles | v0.4.0 |
+| `motionCore` | `HumanJoint`, `MotionPose`, `RootMotion`, channels, provenance, `MotionClip` | v0.1.0 |
+| `motionSampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
+| `motionRecording` | stream intake, recorder, the capture trace format | v0.1.0 |
+| `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` | v0.1.0, v0.2.0 |
+| `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy | v0.2.0 |
+| `motionSource`, `motionBvh` | recorded sources through declarative producer profiles | v0.4.0 |
 | `execMotion` | optional OpenExec nodes over the same libraries | v0.5.0 |
 
 Identities and dependency directions are fixed in

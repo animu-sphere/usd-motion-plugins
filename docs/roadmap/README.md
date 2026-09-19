@@ -9,7 +9,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 | Document | Contents |
 | --- | --- |
-| [current.md](current.md) | The current milestone — the scaffold and the first import — and what it waits for. |
+| [current.md](current.md) | The current milestone, the first import, and what is left of the scaffold. |
 
 ## Two sequences
 
@@ -29,10 +29,10 @@ and `usd-mmd-plugins` as its Phase 9.
 
 | Release | Scope | Imports | Migration Phase | Status |
 | --- | --- | --- | --- | --- |
-| v0.1.0 — core contract | `motion-core`, `motion-sampling`, `motion-recording`; `motion-usd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, the authoring half of `StageIo` (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
-| v0.2.0 — retargeting | `motion-retarget`; `motion-usd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half, the reading half of `StageIo` (vrm MIG-2) | C | ⬜ |
-| v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion-record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) | E | ⬜ |
-| v0.4.0 — generic format integration | `motion-source`, `motion-bvh`, `motion-convert`, `motion-bvh-inspect`, producer profiles | vrm MIG-3 | C | ⬜ |
+| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, the authoring half of `StageIo` (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
+| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half, the reading half of `StageIo` (vrm MIG-2) | C | ⬜ |
+| v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) | E | ⬜ |
+| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 | C | ⬜ |
 | v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item | — | ⬜ |
 | later | generic NPZ payload contract, IK-assisted retarget, contacts, blending beyond the imported one, generator interfaces, Python | — | F follows the imports | ⬜ |
 
@@ -60,13 +60,12 @@ The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| WS-O1 | CMake target and package names | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | the scaffold |
 | DIAG-O1 | Diagnostic code style | [DIAGNOSTICS §3](../reference/DIAGNOSTICS.md#3-open-questions) | the first imported diagnostic |
 | MC-O1 | Joint vocabulary version 1 | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.1.0 |
 | USD-O1 | Motion stage prim names | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.1.0 |
 | USD-O2 | `timeCodesPerSecond` | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.1.0 |
 | MC-O4 | A channel's value type | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.1.0 |
-| WS-O2 | `motion-retarget`'s edge to `motion-sampling` | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | v0.2.0 |
+| WS-O2 | `motionRetarget`'s edge to `motionSampling` | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | v0.2.0 |
 | RT-O1 | Root-motion vocabulary | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
 | RT-O2 | Partial skeletons | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
 | RT-O3 | Scaled rest | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
