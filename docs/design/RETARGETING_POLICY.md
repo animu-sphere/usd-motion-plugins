@@ -4,7 +4,7 @@
 > generic half of `usd-vrm-plugins`' `vrmRetarget` — the pose retargeter, rest
 > correction and root-motion policy — implements §3, §5 and §6 today, with
 > hand-authored fixtures and OpenExec / offline parity, and arrives here as
-> `motion-retarget` ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
+> `motionRetarget` ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
 > Its VRM half — the humanoid map read from `VrmHumanoidAPI`, expression and
 > look-at resolution — stays in `usd-vrm-plugins`.
 >
@@ -38,7 +38,7 @@ A realtime caller builds the descriptor, the map and the rest correction
 - Joint names (source names kept verbatim, Unicode included — design policy
   §10), parent indices in which **every parent precedes its child**, and rest
   (and bind) transforms.
-- Built by the format repository or by `motion-usd` from a `UsdSkelSkeleton`.
+- Built by the format repository or by `motionUsd` from a `UsdSkelSkeleton`.
   Building one from joint tokens and **rest matrices** is a library function
   here — decomposing a matrix into rest rotation and translation, dropping
   scale and shear with a stated rule — because today both a CLI and an
@@ -172,4 +172,4 @@ with avatar-format-neutral APIs.
 | RT-O1 | Root-motion vocabulary: the imported `Hips` / `RootJoint` / `Ignore` plus two flags, or the design policy's five modes with `preserveVerticalMotion` and `preserveYaw` | the import of `vrmRetarget`'s generic half |
 | RT-O2 | Partial skeletons: the seven cases `usd-vrm-plugins` listed (its P1-3) as a contract | that task, then carried here |
 | RT-O3 | A rig whose rest is scaled: carry the rest scale, refuse the rig, or keep identity and state the cost (measured on one model: seven non-humanoid joints, at most 0.14% off unit) | `usd-vrm-plugins`' P1-2 decision, then carried here |
-| RT-O4 | Whether `SkeletonDescriptor` carries bind transforms separately from rest, or bind is `motion-usd`'s concern only | the first consumer that needs bind in a retarget |
+| RT-O4 | Whether `SkeletonDescriptor` carries bind transforms separately from rest, or bind is `motionUsd`'s concern only | the first consumer that needs bind in a retarget |

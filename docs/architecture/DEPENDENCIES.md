@@ -4,17 +4,18 @@ What `usd-motion-plugins` builds against and what it refuses. Edges between
 this repository's own components are
 [WORKSPACE.md §2](WORKSPACE.md#2-dependency-directions)'s.
 
-Status (2026-09-17): **planned.** Nothing builds yet; each value below is what
-the scaffold adopts, and is taken from the sibling repositories so that
-`usd-avatar-runtime` can compose all of them into one process.
+Status (2026-09-19): **adopted by the scaffold.** The OpenUSD pin and the
+toolchain below are what the root project enforces. The per-library rows apply
+as each library arrives. Every value is taken from the sibling repositories so
+that `usd-avatar-runtime` can compose all of them into one process.
 
 ## 1. OpenUSD
 
 | | |
 | --- | --- |
 | Pin | OpenUSD **26.08**, exactly — the release `usd-vrm-plugins` and `usd-mmd-plugins` pin. A plugin built against one OpenUSD release does not load in another, so a range would be a claim no artifact keeps |
-| `motion-core`, `motion-sampling`, `motion-recording`, `motion-retarget`, `motion-source`, `motion-bvh` | foundation value types only: `gf`, `tf`, `vt` |
-| `motion-usd`, tools | `usd`, `sdf`, `usdGeom`, `usdSkel` |
+| `motionCore`, `motionSampling`, `motionRecording`, `motionRetarget`, `motionSource`, `motionBvh` | foundation value types only: `gf`, `tf`, `vt` |
+| `motionUsd`, tools | `usd`, `sdf`, `usdGeom`, `usdSkel` |
 | `execMotion` | OpenExec, from the same release |
 | Pin changes | coordinated: a new OpenUSD release is adopted here, in `usd-vrm-plugins`, `usd-mmd-plugins` and `motion-connectors` together. Who releases first is open in `usd-vrm-plugins`' migration track |
 
@@ -25,7 +26,7 @@ the scaffold adopts, and is taken from the sibling repositories so that
 | Language | C++20 |
 | Build | CMake 3.22 or later; `CMakePresets.json` for plain CMake |
 | Compilers | MSVC on Windows, Clang on macOS arm64, GCC on Linux — the siblings' three lanes |
-| OpenStrata | `ost`, pinned in `openstrata.ci.yaml` to the version the siblings pin when the scaffold lands |
+| OpenStrata | `ost` 0.22.10, pinned in `openstrata.ci.yaml`: `usd-mmd-plugins`' pin, the newest a sibling runs (`usd-vrm-plugins` pins 0.22.8) |
 | Tests | as in the siblings: plain executables registered with CTest, checking with `assert()` compiled into Release builds, unless the scaffold records a reason to differ |
 | Python | the interpreter OpenUSD was built against, for stage tests and tooling; Python bindings are later (design policy §25) |
 

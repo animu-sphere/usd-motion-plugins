@@ -4,11 +4,11 @@ Documentation is organized by responsibility: each category answers one class
 of question. The layout is the one `usd-vrm-plugins`, `usd-mmd-plugins`,
 `open-strata` and `hydra-merlin` use, so the repositories read the same way.
 
-**The tree holds documentation only (2026-09-17).** The design policy is
-accepted, the focused contracts are proposed, and the code they describe
-arrives from `usd-vrm-plugins`, where it is implemented and measured today.
-[reference/](reference/) is the only place that says what is implemented
-here — so far, nothing.
+**The tree holds documentation and an empty build scaffold (2026-09-19).**
+The design policy is accepted, the focused contracts are proposed, and the code
+they describe arrives from `usd-vrm-plugins`, where it is implemented and
+measured today. [reference/](reference/) is the only place that says what is
+implemented here — so far, nothing.
 
 | Category | Answers | Start here |
 | --- | --- | --- |
@@ -16,11 +16,12 @@ here — so far, nothing.
 | [architecture/](architecture/) | Component identities, dependency directions inside and across repositories, external dependencies. | [WORKSPACE.md](architecture/WORKSPACE.md) · [DEPENDENCIES.md](architecture/DEPENDENCIES.md) |
 | [reference/](reference/) | Facts about the current tree: what is implemented, which diagnostics exist. | [CAPABILITY_MATRIX.md](reference/CAPABILITY_MATRIX.md) · [DIAGNOSTICS.md](reference/DIAGNOSTICS.md) |
 | [roadmap/](roadmap/) | What is planned next (incomplete work only), and which release carries it. | [README.md](roadmap/README.md) · [current.md](roadmap/current.md) |
+| [guides/](guides/) | How to build and test the tree. | [building.md](guides/building.md) |
 | [contributing/](contributing/) | How to maintain these documents. | [documentation.md](contributing/documentation.md) |
 
-`guides/`, `releases/` and `reports/` are created with their first real
-content: the first build guide with the scaffold, the first release record
-with the first tag, the first report with the first dated run.
+`releases/` and `reports/` are created with their first real content: the
+first release record with the first tag, the first report with the first dated
+run.
 
 ## Canonical documents
 

@@ -20,3 +20,24 @@ separate from the package version
   the capability matrix and diagnostics catalog, both empty; the roadmap,
   mapping releases v0.1.0–v0.5.0 onto the imports and Migration Phase A–F.
   No code.
+- **The scaffold, with no component in it.**
+  - WS-O1 is decided: lower-camel identities that are also each library's
+    directory, CMake package and exported target (`motionCore::motionCore`),
+    and snake_case CLI commands. That is the siblings' discipline, recorded as
+    design policy §42.7 and swept through every document.
+  - The root project reads `VERSION` (0.1.0) and builds as C++20.
+    `cmake/UsdMotionOpenUsd.cmake` refuses any OpenUSD but 26.08.
+    `CMakePresets.json` covers plain CMake on all three platforms, and
+    `openstrata.toml` and `openstrata.ci.yaml` carry the siblings' three
+    runtime digests and `ost` 0.22.10.
+  - `scripts/check_docs.py` checks links, anchors and every version and pin
+    mirror, both in CTest and in the hand-written `docs-check` workflow.
+  - `workspace_installed_consumer` installs the tree into a clean prefix,
+    scans it for build paths, and builds a consumer copied outside the
+    repository against every package in
+    `tests/installed_consumer/packages.json`. The list is empty until the first
+    import, and the lane already runs.
+  - The community files, and a building guide.
+  - The rendered `ost` workflow is **not** included, because `ost` 0.22.10
+    refuses a workspace graph with no member
+    ([roadmap](docs/roadmap/current.md)).

@@ -1864,8 +1864,9 @@ Initial implementation:
 
 ## 42. Decisions recorded since adoption
 
-Taken on 2026-09-17, while `usd-mmd-plugins` and `usd-vrm-plugins` aligned
-their documentation with this policy. Each is recorded where it is binding;
+§42.1–§42.6 were taken on 2026-09-17, while `usd-mmd-plugins` and
+`usd-vrm-plugins` aligned their documentation with this policy. §42.7 was taken
+on 2026-09-19, with the scaffold. Each is recorded where it is binding, and
 this section is the index.
 
 ### 42.1 The core is imported from `usd-vrm-plugins`, not rewritten
@@ -1923,3 +1924,18 @@ the hips-as-root record, the rest-pose path rule, the retarget formula, the
 it. They are proposals only where this policy and that evidence disagree, and
 each disagreement is an open question in the focused document, not a silent
 choice.
+
+### 42.7 Identities are lower-camel, as in the siblings
+
+§22 draws the tree with kebab-case directories (`libs/motion-core/`), and §23's
+namespace does not say what the CMake names are. The scaffold follows the
+workspace discipline `usd-vrm-plugins` and `usd-mmd-plugins` already share
+instead. A library's identity is lower-camel (`motionCore`), and that one name
+is its directory, its CMake package and its exported target
+(`motionCore::motionCore`). A CLI's command is snake_case (`motion_convert`).
+So the libraries §22 lists are `motionCore`, `motionSampling`,
+`motionRetarget`, `motionRecording` and `motionUsd`, and its tools are
+`motion_inspect`, `motion_convert` and `motion_record`. The code arrives under
+the names it already builds with, and `usd-avatar-runtime` composes packages
+that all follow one rule. Binding in
+[WORKSPACE.md §1.2](../architecture/WORKSPACE.md#12-bundles-tools-and-data).

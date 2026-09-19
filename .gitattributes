@@ -1,0 +1,13 @@
+# Normalize text to LF in the repository; each checkout converts as it likes.
+* text=auto
+
+# USDA goldens and fixtures check out with LF everywhere. A CRLF smudge changes
+# the *content* of a multi-line (triple-quoted) string -- the \r becomes part of
+# the parsed value -- so a Windows checkout would flatten to different bytes
+# than the committed golden (usd-vrm-plugins, PR #42).
+*.usda text eol=lf
+
+# Recorded motion and packet captures are compared byte for byte.
+*.bvh binary
+*.vrma binary
+*.npz binary
