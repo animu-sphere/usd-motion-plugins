@@ -19,12 +19,17 @@
 #include <string_view>
 #include <vector>
 
-namespace motion
+namespace openstrata::motion
 {
 
-// The VRM 1.0 humanoid vocabulary. Values are stable array indices; append new
-// vocabulary only before Count with an explicit contract review.
-enum class HumanBone : std::uint8_t
+// The joint vocabulary, version 1: the 55-joint humanoid
+// (docs/design/MOTION_CONTRACT.md §2). Values are stable array indices; a joint
+// is appended only before Count, with a contract version bump.
+//
+// The list and its hierarchy follow the VRM 1.0 humanoid, which is where every
+// producer this arrived with already mapped onto. That is its origin and not its
+// meaning: the vocabulary carries no required-joint rule and no format binding.
+enum class HumanJoint : std::uint8_t
 {
     Hips,
     Spine,
@@ -89,33 +94,33 @@ enum class HumanBone : std::uint8_t
     Count,
 };
 
-inline constexpr std::size_t HumanBoneCount = static_cast<std::size_t>(HumanBone::Count);
+inline constexpr std::size_t HumanJointCount = static_cast<std::size_t>(HumanJoint::Count);
 
-MOTIONCORE_API bool IsValidHumanBone(HumanBone bone) noexcept;
-MOTIONCORE_API std::string_view HumanBoneName(HumanBone bone) noexcept;
-MOTIONCORE_API std::optional<HumanBone> FindHumanBone(std::string_view name) noexcept;
+MOTIONCORE_API bool IsValidHumanJoint(HumanJoint joint) noexcept;
+MOTIONCORE_API std::string_view HumanJointName(HumanJoint joint) noexcept;
+MOTIONCORE_API std::optional<HumanJoint> FindHumanJoint(std::string_view name) noexcept;
 
-// The canonical VRM 1.0 humanoid hierarchy. Nullopt for Hips, which is the
-// root, and for Count.
+// The canonical joint hierarchy. Nullopt for Hips, which is the root, and for
+// Count.
 //
 // This lives here rather than in each consumer because a second copy of the
-// humanoid taxonomy is a defect waiting to happen: the `.vrma` reader and the
-// live-capture path author the same semantic skeleton, and two tables that can
-// disagree would produce two skeletons that look alike and do not compose.
-MOTIONCORE_API std::optional<HumanBone> HumanBoneParent(HumanBone bone) noexcept;
+// taxonomy is a defect waiting to happen: a file reader and a live-capture path
+// author the same semantic skeleton, and two tables that can disagree would
+// produce two skeletons that look alike and do not compose.
+MOTIONCORE_API std::optional<HumanJoint> HumanJointParent(HumanJoint joint) noexcept;
 
-// The nearest ancestor of `bone` that `present` carries, skipping bones the
+// The nearest ancestor of `joint` that `present` carries, skipping joints the
 // rig does not solve -- a capture rig with no `upperChest` still parents its
 // shoulders somewhere. Nullopt when no ancestor is present.
-MOTIONCORE_API std::optional<HumanBone>
-NearestPresentAncestor(HumanBone bone, const std::bitset<HumanBoneCount>& present) noexcept;
+MOTIONCORE_API std::optional<HumanJoint>
+NearestPresentAncestor(HumanJoint joint, const std::bitset<HumanJointCount>& present) noexcept;
 
-// The semantic joint path for `bone` within a rig carrying `present`, e.g.
+// The semantic joint path for `joint` within a rig carrying `present`, e.g.
 // "hips/spine/chest/neck/head". This is the token a `UsdSkelSkeleton` built
 // from humanoid semantics carries; the string is plain text, and authoring it
 // onto a stage stays with the consumer.
-MOTIONCORE_API std::string HumanBoneJointPath(HumanBone bone,
-                                              const std::bitset<HumanBoneCount>& present);
+MOTIONCORE_API std::string HumanJointPath(HumanJoint joint,
+                                              const std::bitset<HumanJointCount>& present);
 
 enum class MotionSourceKind : std::uint8_t
 {
@@ -126,7 +131,7 @@ enum class MotionSourceKind : std::uint8_t
     Simulated,
 };
 
-struct MotionSourceMetadata
+struct SourceMetadata
 {
     MotionSourceKind kind = MotionSourceKind::Clip;
     std::string provider;
@@ -142,10 +147,10 @@ struct MotionSourceMetadata
 // carry. The declarative `MotionConstraintSet` types are deliberately left
 // without one: nothing compares them yet, and an operator no caller exercises
 // is untested surface.
-MOTIONCORE_API bool operator==(const MotionSourceMetadata& a,
-                               const MotionSourceMetadata& b) noexcept;
-MOTIONCORE_API bool operator!=(const MotionSourceMetadata& a,
-                               const MotionSourceMetadata& b) noexcept;
+MOTIONCORE_API bool operator==(const SourceMetadata& a,
+                               const SourceMetadata& b) noexcept;
+MOTIONCORE_API bool operator!=(const SourceMetadata& a,
+                               const SourceMetadata& b) noexcept;
 
 // All positions and orientations are expressed independently of the hips local
 // transform. Booleans distinguish a missing root sample from a zero-valued one.
@@ -181,50 +186,55 @@ struct ContactState
 MOTIONCORE_API bool operator==(const ContactState& a, const ContactState& b) noexcept;
 MOTIONCORE_API bool operator!=(const ContactState& a, const ContactState& b) noexcept;
 
-// One expression weight, under the name its producer used.
+// One channel value, under the name its producer used
+// (docs/design/MOTION_CONTRACT.md §6).
 //
-// The humanoid vocabulary is closed, so it is an enum. The expression
-// vocabulary is not: VRM 1.0 defines preset names and then lets an author add
-// their own, and a VMC sender's blend-shape names are whatever its model
-// carries. So a name is carried verbatim. Deciding that one producer's "Joy"
-// is a particular rig's `happy` is a resolve step in the consumer -- it needs
-// the rig, which this layer does not have, and a table here would be a guess
-// applied to every producer at once (Motion Phase G).
-struct ExpressionWeight
+// The joint vocabulary is closed, so it is an enum. The channel vocabulary is
+// not: an avatar format defines preset expression names and then lets an author
+// add their own, and a live sender's blend-shape names are whatever its model
+// carries. So a name is carried verbatim. Deciding that one producer's "Joy" is
+// a particular rig's `happy` is a resolve step in the consumer -- it needs the
+// rig, which this layer does not have, and a table here would be a guess
+// applied to every producer at once.
+//
+// The value is a scalar, because every channel measured so far is a weight.
+// Whether a later non-scalar channel makes it a closed variant or a `VtValue`
+// is MC-O4, decided when that channel arrives and not before.
+struct MotionChannel
 {
     std::string name;
 
-    // Conventionally in [0, 1] and deliberately not clamped: a sender that
-    // said 1.5 said 1.5, and a value type that quietly corrected it would hide
-    // the sender from the operator judging the session.
-    float weight = 0.0f;
+    // A weight is conventionally in [0, 1] and deliberately not clamped: a
+    // sender that said 1.5 said 1.5, and a value type that quietly corrected it
+    // would hide the sender from the operator judging the session.
+    float value = 0.0f;
 };
 
-MOTIONCORE_API bool operator==(const ExpressionWeight& a, const ExpressionWeight& b) noexcept;
-MOTIONCORE_API bool operator!=(const ExpressionWeight& a, const ExpressionWeight& b) noexcept;
+MOTIONCORE_API bool operator==(const MotionChannel& a, const MotionChannel& b) noexcept;
+MOTIONCORE_API bool operator!=(const MotionChannel& a, const MotionChannel& b) noexcept;
 
-// The expression weights one sample reported.
+// The channel values one sample reported.
 //
 // Sorted by name, each name once -- an invariant rather than a convention, and
-// `Set` is what maintains it. Two producers that reported the same weights in a
+// `Set` is what maintains it. Two producers that reported the same values in a
 // different order are the same motion, so they must be the same value; and a
 // trace written from either has to round-trip to the same bytes. Neither holds
 // for a list in arrival order, and both are load-bearing here.
 //
-// An absent name is not a zero weight. A name this set does not carry was not
-// reported, exactly as a bone outside `validRotations` was not reported. `Find`
+// An absent name is not a zero value. A name this set does not carry was not
+// reported, exactly as a joint outside `validRotations` was not reported. `Find`
 // answers with a pointer rather than a value so the two cannot be confused.
-struct ExpressionWeights
+struct MotionChannelSet
 {
-    std::vector<ExpressionWeight> entries;
+    std::vector<MotionChannel> entries;
 
-    // Sets `name` to `weight`, keeping `entries` sorted. Returns false when
-    // `name` was already present: the new weight replaces the old one, and the
+    // Sets `name` to `value`, keeping `entries` sorted. Returns false when
+    // `name` was already present: the new value replaces the old one, and the
     // caller is told, because only the caller knows whether a repeat is a
     // duplicate delivery to count or an update to accept.
-    MOTIONCORE_API bool Set(std::string_view name, float weight);
+    MOTIONCORE_API bool Set(std::string_view name, float value);
 
-    // The weight reported for `name`, or null when it was not reported.
+    // The value reported for `name`, or null when it was not reported.
     MOTIONCORE_API const float* Find(std::string_view name) const noexcept;
 
     bool
@@ -234,52 +244,56 @@ struct ExpressionWeights
     }
 };
 
-MOTIONCORE_API bool operator==(const ExpressionWeights& a, const ExpressionWeights& b) noexcept;
-MOTIONCORE_API bool operator!=(const ExpressionWeights& a, const ExpressionWeights& b) noexcept;
+MOTIONCORE_API bool operator==(const MotionChannelSet& a, const MotionChannelSet& b) noexcept;
+MOTIONCORE_API bool operator!=(const MotionChannelSet& a, const MotionChannelSet& b) noexcept;
 
-struct HumanoidPose
+struct MotionPose
 {
-    MOTIONCORE_API HumanoidPose();
+    MOTIONCORE_API MotionPose();
 
     // Seconds, never integer frame numbers.
     double timestamp = 0.0;
     RootMotion root;
 
-    // Rotations are local to the semantic humanoid parent. `validRotations`
-    // allows sparse capture data and clips that intentionally omit a bone.
-    std::array<pxr::GfQuatf, HumanBoneCount> localRotations;
-    std::bitset<HumanBoneCount> validRotations;
+    // Rotations are local to the semantic parent joint. `validRotations`
+    // allows sparse capture data and clips that intentionally omit a joint.
+    std::array<pxr::GfQuatf, HumanJointCount> localRotations;
+    std::bitset<HumanJointCount> validRotations;
 
-    std::optional<std::array<float, HumanBoneCount>> confidence;
+    std::optional<std::array<float, HumanJointCount>> confidence;
     std::optional<ContactState> contacts;
 
-    // What this sample said about the character's face, on the same timeline as
-    // its body. Empty means the sample reported no weights, and there is no
+    // What this sample said beyond its joints -- so far, the character's face --
+    // on the same timeline as its body. Empty means it reported none, and there is no
     // separate absent state because there is nothing it would mean that "the
     // producer reported none" does not -- an `optional` here would make two
     // values differ over a distinction neither carries.
     //
     // This is on the pose rather than in a track of its own, and that was the
-    // decision (MOTION_CONTRACT.md). Both producers put expressions on the
-    // pose's instants already: a VMC datagram carries bones and blend values
-    // under one `/VMC/Ext/T`, and the `.vrma` reader already evaluates every
-    // channel at the union of their key times. A parallel track would have
-    // needed a second buffer, a second intake policy and a second resampler in
-    // `motionRuntime` to carry data that arrives at the same instants anyway.
-    ExpressionWeights expressions;
+    // decision (docs/design/MOTION_CONTRACT.md §6). The producers measured put
+    // expressions on the pose's instants already: a live pose sender carries
+    // joints and blend values in one message, and an animation-file reader
+    // evaluates every channel at the union of their key times. A parallel track
+    // would have needed a second buffer, a second intake policy and a second
+    // resampler to carry data that arrives at the same instants anyway.
+    MotionChannelSet channels;
 
     // Where this sample says the character is looking: a target *point*, in the
     // same space as `root.worldPosition`, and never a direction.
     //
     // A direction is only meaningful next to a head, and which head -- where it
     // sits, how far the eyes are from it -- is a property of a rig this layer
-    // does not have. So the point the producer named is carried and
-    // `LookAtEvaluate` (Motion Phase G) turns it into eye rotations or
-    // expression weights against one avatar's own look-at configuration. This
-    // is the same division the expression weights above are under, for the same
-    // reason.
+    // does not have. So the point the producer named is carried, and a format
+    // repository turns it into eye rotations or expression weights against one
+    // avatar's own look-at configuration. This is the same division the
+    // channels above are under, for the same reason.
     //
-    // The offset from the head bone that the *source* rig measured is a
+    // It is a pose field and not a channel because a channel's value is a
+    // scalar (MC-O4). Moving gaze into the channel set is that decision's, and
+    // the import deliberately did not take it (usd-vrm-plugins' WORKSPACE.md
+    // §9.5, finding 2).
+    //
+    // The offset from the head joint that the *source* rig measured is a
     // constant of that rig rather than of a sample, so it travels beside the
     // clip and not here.
     //
@@ -288,23 +302,23 @@ struct HumanoidPose
     // value of the target.
     std::optional<pxr::GfVec3f> lookAtTarget;
 
-    std::optional<MotionSourceMetadata> source;
+    std::optional<SourceMetadata> source;
 };
 
-MOTIONCORE_API bool operator==(const HumanoidPose& a, const HumanoidPose& b) noexcept;
-MOTIONCORE_API bool operator!=(const HumanoidPose& a, const HumanoidPose& b) noexcept;
+MOTIONCORE_API bool operator==(const MotionPose& a, const MotionPose& b) noexcept;
+MOTIONCORE_API bool operator!=(const MotionPose& a, const MotionPose& b) noexcept;
 
-struct HumanoidAnimation
+struct MotionClip
 {
-    std::vector<HumanoidPose> samples;
+    std::vector<MotionPose> samples;
     double startTime = 0.0;
     double endTime = 0.0;
     double nominalFrameRate = 30.0;
-    MotionSourceMetadata source;
+    SourceMetadata source;
 };
 
-MOTIONCORE_API bool operator==(const HumanoidAnimation& a, const HumanoidAnimation& b) noexcept;
-MOTIONCORE_API bool operator!=(const HumanoidAnimation& a, const HumanoidAnimation& b) noexcept;
+MOTIONCORE_API bool operator==(const MotionClip& a, const MotionClip& b) noexcept;
+MOTIONCORE_API bool operator!=(const MotionClip& a, const MotionClip& b) noexcept;
 
 // Coordinate-space identifiers are values, not USD schema names. Stage
 // authoring and conversion live in the consuming file-format/retarget layers.
@@ -319,13 +333,13 @@ enum class CoordinateSpace : std::uint8_t
 struct ConstraintCommon
 {
     double targetTime = 0.0;
-    std::optional<HumanBone> joint;
+    std::optional<HumanJoint> joint;
     CoordinateSpace coordinateSpace = CoordinateSpace::Character;
     float weight = 1.0f;
     bool hard = false;
     std::optional<double> validFrom;
     std::optional<double> validUntil;
-    MotionSourceMetadata source;
+    SourceMetadata source;
 };
 
 struct RootWaypoint
@@ -344,7 +358,7 @@ struct RootTrajectorySample
 struct FullBodyKeyframe
 {
     ConstraintCommon common;
-    HumanoidPose pose;
+    MotionPose pose;
 };
 
 struct JointPositionConstraint
@@ -369,4 +383,4 @@ struct MotionConstraintSet
     std::optional<std::string> textPrompt;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

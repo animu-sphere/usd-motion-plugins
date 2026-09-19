@@ -7,23 +7,25 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
          _motion_core_version LIMIT_COUNT 1)
     string(STRIP "${_motion_core_version}" _motion_core_version)
 else()
-    set(_motion_core_version "0.9.0")
+    set(_motion_core_version "0.1.0")
 endif()
 
 project(motionCore
     VERSION ${_motion_core_version}
-    DESCRIPTION "Vendor-neutral humanoid motion value types"
+    DESCRIPTION "Vendor-neutral motion value types"
     LANGUAGES CXX)
 
+# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
+# public interface asks consumers for no more than C++17.
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT DEFINED MOTIONCORE_BUILD_TESTS)
-    if(DEFINED USDVRM_BUILD_TESTS)
-        set(_motion_core_tests_default "${USDVRM_BUILD_TESTS}")
+    if(DEFINED USDMOTION_BUILD_TESTS)
+        set(_motion_core_tests_default "${USDMOTION_BUILD_TESTS}")
     else()
         set(_motion_core_tests_default "${PROJECT_IS_TOP_LEVEL}")
     endif()
@@ -36,11 +38,11 @@ endif()
 if(NOT pxr_FOUND)
     find_package(pxr REQUIRED CONFIG)
 endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdVrmOpenUsd.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
 
 add_library(motionCore STATIC
     src/Compare.cpp
-    src/Humanoid.cpp)
+    src/MotionPose.cpp)
 add_library(motionCore::motionCore ALIAS motionCore)
 set_target_properties(motionCore PROPERTIES
     EXPORT_NAME motionCore
@@ -82,7 +84,9 @@ configure_package_config_file(
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/motionCoreConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion)
+    # While the API is 0.x a minor release may break it, so a consumer asking
+    # for 0.1 must not be handed 0.2 (the installed-consumer lane asks this way).
+    COMPATIBILITY SameMinorVersion)
 install(EXPORT motionCoreTargets
     FILE motionCoreTargets.cmake
     NAMESPACE motionCore::
@@ -94,6 +98,14 @@ install(FILES
 
 if(MOTIONCORE_BUILD_TESTS)
     enable_testing()
-    find_package(Python3 COMPONENTS Interpreter QUIET)
+    # In the workspace the root has already found the interpreter, under a name
+    # pxrConfig.cmake cannot clobber (the root CMakeLists.txt says why).
+    # Standalone, find it here, after find_package(pxr).
+    if(NOT USDMOTION_TEST_PYTHON)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
+        endif()
+    endif()
     add_subdirectory(tests)
 endif()

@@ -1,15 +1,19 @@
 # motionCore
 
-`motionCore` is the vendor-neutral humanoid motion value contract for the
-motion layer. It owns the VRM 1.0 humanoid vocabulary plus
-`motion::HumanoidPose`, `HumanoidAnimation`, independent `RootMotion`, and
-`MotionConstraintSet`.
+`motionCore` is the vendor-neutral motion value contract every motion library,
+connector and format repository shares
+([MOTION_CONTRACT.md](../../docs/design/MOTION_CONTRACT.md)). It owns the joint
+vocabulary (`HumanJoint`, version 1: 55 joints), `openstrata::motion::MotionPose`,
+`MotionClip`, independent `RootMotion`, `MotionChannelSet`, `SourceMetadata`
+and the declarative `MotionConstraintSet`.
 
-It deliberately has no GLB parser, VRM parser, USD stage authoring,
-plugin registration, network protocol, or vendor SDK. The sole OpenUSD
-dependency is the small `Gf` value-type library used for vectors and
-quaternions. `usdVrmaFileFormat` reads clips into these values; a future
-`vrmRetarget` library will map them onto a concrete avatar skeleton.
+It deliberately has no file parser, USD stage authoring, plugin registration,
+network protocol or vendor SDK. The sole OpenUSD dependency is the small `Gf`
+value-type library used for vectors and quaternions, and the boundary check
+refuses any other, and any product or avatar-format name in the code.
+
+It arrived from `usd-vrm-plugins` on 2026-09-19 with its history, and was
+renamed on arrival ([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-are-this-policys-applied-on-arrival)).
 
 All coordinates are right-handed, Y-up, metres. `World`, `Character`,
 `Skeleton`, and `JointLocal` identify the reference frame of a constraint;

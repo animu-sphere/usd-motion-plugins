@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <algorithm>
 #include <array>
 #include <utility>
 
-namespace motion
+namespace openstrata::motion
 {
 namespace
 {
 
-constexpr std::array<std::string_view, HumanBoneCount> kHumanBoneNames = {
+constexpr std::array<std::string_view, HumanJointCount> kHumanBoneNames = {
     "hips",
     "spine",
     "chest",
@@ -68,190 +68,190 @@ constexpr std::array<std::string_view, HumanBoneCount> kHumanBoneNames = {
     "rightLittleDistal",
 };
 
-static_assert(kHumanBoneNames.size() == HumanBoneCount,
-              "HumanBone names must cover the complete enum");
+static_assert(kHumanBoneNames.size() == HumanJointCount,
+              "HumanJoint names must cover the complete enum");
 
 } // namespace
 
 bool
-IsValidHumanBone(HumanBone bone) noexcept
+IsValidHumanJoint(HumanJoint joint) noexcept
 {
-    return static_cast<std::size_t>(bone) < HumanBoneCount;
+    return static_cast<std::size_t>(joint) < HumanJointCount;
 }
 
 std::string_view
-HumanBoneName(HumanBone bone) noexcept
+HumanJointName(HumanJoint joint) noexcept
 {
-    if (!IsValidHumanBone(bone))
+    if (!IsValidHumanJoint(joint))
     {
         return {};
     }
-    return kHumanBoneNames[static_cast<std::size_t>(bone)];
+    return kHumanBoneNames[static_cast<std::size_t>(joint)];
 }
 
-std::optional<HumanBone>
-FindHumanBone(std::string_view name) noexcept
+std::optional<HumanJoint>
+FindHumanJoint(std::string_view name) noexcept
 {
     for (std::size_t index = 0; index != kHumanBoneNames.size(); ++index)
     {
         if (kHumanBoneNames[index] == name)
         {
-            return static_cast<HumanBone>(index);
+            return static_cast<HumanJoint>(index);
         }
     }
     return std::nullopt;
 }
 
-std::optional<HumanBone>
-HumanBoneParent(HumanBone bone) noexcept
+std::optional<HumanJoint>
+HumanJointParent(HumanJoint joint) noexcept
 {
-    using Bone = HumanBone;
-    switch (bone)
+    using Joint = HumanJoint;
+    switch (joint)
     {
-    case Bone::Hips:
+    case Joint::Hips:
         return std::nullopt;
-    case Bone::Spine:
-        return Bone::Hips;
-    case Bone::Chest:
-        return Bone::Spine;
-    case Bone::UpperChest:
-        return Bone::Chest;
-    case Bone::Neck:
-        return Bone::UpperChest;
-    case Bone::Head:
-        return Bone::Neck;
-    case Bone::LeftEye:
-    case Bone::RightEye:
-    case Bone::Jaw:
-        return Bone::Head;
+    case Joint::Spine:
+        return Joint::Hips;
+    case Joint::Chest:
+        return Joint::Spine;
+    case Joint::UpperChest:
+        return Joint::Chest;
+    case Joint::Neck:
+        return Joint::UpperChest;
+    case Joint::Head:
+        return Joint::Neck;
+    case Joint::LeftEye:
+    case Joint::RightEye:
+    case Joint::Jaw:
+        return Joint::Head;
 
-    case Bone::LeftUpperLeg:
-    case Bone::RightUpperLeg:
-        return Bone::Hips;
-    case Bone::LeftLowerLeg:
-        return Bone::LeftUpperLeg;
-    case Bone::LeftFoot:
-        return Bone::LeftLowerLeg;
-    case Bone::LeftToes:
-        return Bone::LeftFoot;
-    case Bone::RightLowerLeg:
-        return Bone::RightUpperLeg;
-    case Bone::RightFoot:
-        return Bone::RightLowerLeg;
-    case Bone::RightToes:
-        return Bone::RightFoot;
+    case Joint::LeftUpperLeg:
+    case Joint::RightUpperLeg:
+        return Joint::Hips;
+    case Joint::LeftLowerLeg:
+        return Joint::LeftUpperLeg;
+    case Joint::LeftFoot:
+        return Joint::LeftLowerLeg;
+    case Joint::LeftToes:
+        return Joint::LeftFoot;
+    case Joint::RightLowerLeg:
+        return Joint::RightUpperLeg;
+    case Joint::RightFoot:
+        return Joint::RightLowerLeg;
+    case Joint::RightToes:
+        return Joint::RightFoot;
 
-    case Bone::LeftShoulder:
-    case Bone::RightShoulder:
-        return Bone::UpperChest;
-    case Bone::LeftUpperArm:
-        return Bone::LeftShoulder;
-    case Bone::LeftLowerArm:
-        return Bone::LeftUpperArm;
-    case Bone::LeftHand:
-        return Bone::LeftLowerArm;
-    case Bone::RightUpperArm:
-        return Bone::RightShoulder;
-    case Bone::RightLowerArm:
-        return Bone::RightUpperArm;
-    case Bone::RightHand:
-        return Bone::RightLowerArm;
+    case Joint::LeftShoulder:
+    case Joint::RightShoulder:
+        return Joint::UpperChest;
+    case Joint::LeftUpperArm:
+        return Joint::LeftShoulder;
+    case Joint::LeftLowerArm:
+        return Joint::LeftUpperArm;
+    case Joint::LeftHand:
+        return Joint::LeftLowerArm;
+    case Joint::RightUpperArm:
+        return Joint::RightShoulder;
+    case Joint::RightLowerArm:
+        return Joint::RightUpperArm;
+    case Joint::RightHand:
+        return Joint::RightLowerArm;
 
-    case Bone::LeftThumbMetacarpal:
-    case Bone::LeftIndexProximal:
-    case Bone::LeftMiddleProximal:
-    case Bone::LeftRingProximal:
-    case Bone::LeftLittleProximal:
-        return Bone::LeftHand;
-    case Bone::LeftThumbProximal:
-        return Bone::LeftThumbMetacarpal;
-    case Bone::LeftThumbDistal:
-        return Bone::LeftThumbProximal;
-    case Bone::LeftIndexIntermediate:
-        return Bone::LeftIndexProximal;
-    case Bone::LeftIndexDistal:
-        return Bone::LeftIndexIntermediate;
-    case Bone::LeftMiddleIntermediate:
-        return Bone::LeftMiddleProximal;
-    case Bone::LeftMiddleDistal:
-        return Bone::LeftMiddleIntermediate;
-    case Bone::LeftRingIntermediate:
-        return Bone::LeftRingProximal;
-    case Bone::LeftRingDistal:
-        return Bone::LeftRingIntermediate;
-    case Bone::LeftLittleIntermediate:
-        return Bone::LeftLittleProximal;
-    case Bone::LeftLittleDistal:
-        return Bone::LeftLittleIntermediate;
+    case Joint::LeftThumbMetacarpal:
+    case Joint::LeftIndexProximal:
+    case Joint::LeftMiddleProximal:
+    case Joint::LeftRingProximal:
+    case Joint::LeftLittleProximal:
+        return Joint::LeftHand;
+    case Joint::LeftThumbProximal:
+        return Joint::LeftThumbMetacarpal;
+    case Joint::LeftThumbDistal:
+        return Joint::LeftThumbProximal;
+    case Joint::LeftIndexIntermediate:
+        return Joint::LeftIndexProximal;
+    case Joint::LeftIndexDistal:
+        return Joint::LeftIndexIntermediate;
+    case Joint::LeftMiddleIntermediate:
+        return Joint::LeftMiddleProximal;
+    case Joint::LeftMiddleDistal:
+        return Joint::LeftMiddleIntermediate;
+    case Joint::LeftRingIntermediate:
+        return Joint::LeftRingProximal;
+    case Joint::LeftRingDistal:
+        return Joint::LeftRingIntermediate;
+    case Joint::LeftLittleIntermediate:
+        return Joint::LeftLittleProximal;
+    case Joint::LeftLittleDistal:
+        return Joint::LeftLittleIntermediate;
 
-    case Bone::RightThumbMetacarpal:
-    case Bone::RightIndexProximal:
-    case Bone::RightMiddleProximal:
-    case Bone::RightRingProximal:
-    case Bone::RightLittleProximal:
-        return Bone::RightHand;
-    case Bone::RightThumbProximal:
-        return Bone::RightThumbMetacarpal;
-    case Bone::RightThumbDistal:
-        return Bone::RightThumbProximal;
-    case Bone::RightIndexIntermediate:
-        return Bone::RightIndexProximal;
-    case Bone::RightIndexDistal:
-        return Bone::RightIndexIntermediate;
-    case Bone::RightMiddleIntermediate:
-        return Bone::RightMiddleProximal;
-    case Bone::RightMiddleDistal:
-        return Bone::RightMiddleIntermediate;
-    case Bone::RightRingIntermediate:
-        return Bone::RightRingProximal;
-    case Bone::RightRingDistal:
-        return Bone::RightRingIntermediate;
-    case Bone::RightLittleIntermediate:
-        return Bone::RightLittleProximal;
-    case Bone::RightLittleDistal:
-        return Bone::RightLittleIntermediate;
+    case Joint::RightThumbMetacarpal:
+    case Joint::RightIndexProximal:
+    case Joint::RightMiddleProximal:
+    case Joint::RightRingProximal:
+    case Joint::RightLittleProximal:
+        return Joint::RightHand;
+    case Joint::RightThumbProximal:
+        return Joint::RightThumbMetacarpal;
+    case Joint::RightThumbDistal:
+        return Joint::RightThumbProximal;
+    case Joint::RightIndexIntermediate:
+        return Joint::RightIndexProximal;
+    case Joint::RightIndexDistal:
+        return Joint::RightIndexIntermediate;
+    case Joint::RightMiddleIntermediate:
+        return Joint::RightMiddleProximal;
+    case Joint::RightMiddleDistal:
+        return Joint::RightMiddleIntermediate;
+    case Joint::RightRingIntermediate:
+        return Joint::RightRingProximal;
+    case Joint::RightRingDistal:
+        return Joint::RightRingIntermediate;
+    case Joint::RightLittleIntermediate:
+        return Joint::RightLittleProximal;
+    case Joint::RightLittleDistal:
+        return Joint::RightLittleIntermediate;
 
-    case Bone::Count:
+    case Joint::Count:
         return std::nullopt;
     }
     return std::nullopt;
 }
 
-std::optional<HumanBone>
-NearestPresentAncestor(HumanBone bone, const std::bitset<HumanBoneCount>& present) noexcept
+std::optional<HumanJoint>
+NearestPresentAncestor(HumanJoint joint, const std::bitset<HumanJointCount>& present) noexcept
 {
-    std::optional<HumanBone> parent = HumanBoneParent(bone);
+    std::optional<HumanJoint> parent = HumanJointParent(joint);
     while (parent)
     {
         if (present.test(static_cast<std::size_t>(*parent)))
         {
             return parent;
         }
-        parent = HumanBoneParent(*parent);
+        parent = HumanJointParent(*parent);
     }
     return std::nullopt;
 }
 
 std::string
-HumanBoneJointPath(HumanBone bone, const std::bitset<HumanBoneCount>& present)
+HumanJointPath(HumanJoint joint, const std::bitset<HumanJointCount>& present)
 {
-    if (!IsValidHumanBone(bone))
+    if (!IsValidHumanJoint(joint))
     {
         return {};
     }
-    // Every bone's parent has a smaller enum value, so walking up terminates.
-    std::string path(HumanBoneName(bone));
-    std::optional<HumanBone> ancestor = NearestPresentAncestor(bone, present);
+    // Every joint's parent has a smaller enum value, so walking up terminates.
+    std::string path(HumanJointName(joint));
+    std::optional<HumanJoint> ancestor = NearestPresentAncestor(joint, present);
     while (ancestor)
     {
         path.insert(0, "/");
-        path.insert(0, HumanBoneName(*ancestor));
+        path.insert(0, HumanJointName(*ancestor));
         ancestor = NearestPresentAncestor(*ancestor, present);
     }
     return path;
 }
 
-HumanoidPose::HumanoidPose()
+MotionPose::MotionPose()
 {
     // Exported rather than inline so every consumer receives the same identity
     // defaults across the motionCore DLL boundary.
@@ -259,30 +259,30 @@ HumanoidPose::HumanoidPose()
 }
 
 bool
-ExpressionWeights::Set(std::string_view name, float weight)
+MotionChannelSet::Set(std::string_view name, float value)
 {
     const auto position = std::lower_bound(
         entries.begin(), entries.end(), name,
-        [](const ExpressionWeight& entry, std::string_view sought) { return entry.name < sought; });
+        [](const MotionChannel& entry, std::string_view sought) { return entry.name < sought; });
     if (position != entries.end() && position->name == name)
     {
-        position->weight = weight;
+        position->value = value;
         return false;
     }
-    ExpressionWeight entry;
+    MotionChannel entry;
     entry.name.assign(name);
-    entry.weight = weight;
+    entry.value = value;
     entries.insert(position, std::move(entry));
     return true;
 }
 
 const float*
-ExpressionWeights::Find(std::string_view name) const noexcept
+MotionChannelSet::Find(std::string_view name) const noexcept
 {
     const auto position = std::lower_bound(
         entries.begin(), entries.end(), name,
-        [](const ExpressionWeight& entry, std::string_view sought) { return entry.name < sought; });
-    return position != entries.end() && position->name == name ? &position->weight : nullptr;
+        [](const MotionChannel& entry, std::string_view sought) { return entry.name < sought; });
+    return position != entries.end() && position->name == name ? &position->value : nullptr;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

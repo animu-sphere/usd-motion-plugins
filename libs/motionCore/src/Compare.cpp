@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionCore/Compare.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace motion
+namespace openstrata::motion
 {
 namespace
 {
@@ -40,7 +40,7 @@ struct ExactPolicy
         return a == b;
     }
     static bool
-    Weight(float a, float b) noexcept
+    Channel(float a, float b) noexcept
     {
         return a == b;
     }
@@ -85,9 +85,9 @@ struct TolerantPolicy
     }
 
     bool
-    Weight(float a, float b) const noexcept
+    Channel(float a, float b) const noexcept
     {
-        return Within(static_cast<double>(a) - b, tolerance.expression);
+        return Within(static_cast<double>(a) - b, tolerance.channel);
     }
 
     bool
@@ -158,9 +158,9 @@ Amount(double difference, const char* unit)
 }
 
 std::string
-BoneText(std::size_t index)
+JointText(std::size_t index)
 {
-    return std::string(HumanBoneName(static_cast<HumanBone>(index)));
+    return std::string(HumanJointName(static_cast<HumanJoint>(index)));
 }
 
 double
@@ -233,7 +233,7 @@ CompareRoot(const Policy& policy, const RootMotion& a, const RootMotion& b, std:
 
 template <typename Policy>
 bool
-ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
+ComparePose(const Policy& policy, const MotionPose& a, const MotionPose& b,
             std::string* difference)
 {
     if (!policy.Time(a.timestamp, b.timestamp))
@@ -248,7 +248,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
     if (a.validRotations != b.validRotations)
     {
         std::size_t index = 0;
-        while (index != HumanBoneCount &&
+        while (index != HumanJointCount &&
                a.validRotations.test(index) == b.validRotations.test(index))
         {
             ++index;
@@ -256,13 +256,13 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
         Report(difference,
                [&]
                {
-                   return BoneText(index) + (a.validRotations.test(index)
+                   return JointText(index) + (a.validRotations.test(index)
                                                  ? " is present only in the first pose"
                                                  : " is present only in the second pose");
                });
         return false;
     }
-    for (std::size_t index = 0; index != HumanBoneCount; ++index)
+    for (std::size_t index = 0; index != HumanJointCount; ++index)
     {
         if (!a.validRotations.test(index))
         {
@@ -275,7 +275,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
             Report(difference,
                    [&]
                    {
-                       return BoneText(index) + " rotation " +
+                       return JointText(index) + " rotation " +
                               Amount(AngleDifference(first, second), "rad");
                    });
             return false;
@@ -288,7 +288,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
     }
     if (a.confidence)
     {
-        for (std::size_t index = 0; index != HumanBoneCount; ++index)
+        for (std::size_t index = 0; index != HumanJointCount; ++index)
         {
             if (!a.validRotations.test(index))
             {
@@ -301,7 +301,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
                 Report(difference,
                        [&]
                        {
-                           return BoneText(index) + " confidence " +
+                           return JointText(index) + " confidence " +
                                   Amount(static_cast<double>(first) - second, "");
                        });
                 return false;
@@ -319,13 +319,13 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
         return false;
     }
     // A name is an identifier rather than a measurement, so it compares exactly
-    // under both policies and only the weight takes a tolerance. Both sets are
-    // sorted by name (Humanoid.h), so one walk finds the first difference, and
+    // under both policies and only the value takes a tolerance. Both sets are
+    // sorted by name (MotionPose.h), so one walk finds the first difference, and
     // at a mismatch the lexicographically smaller name is the one its own pose
     // reported alone.
     {
-        const std::vector<ExpressionWeight>& first = a.expressions.entries;
-        const std::vector<ExpressionWeight>& second = b.expressions.entries;
+        const std::vector<MotionChannel>& first = a.channels.entries;
+        const std::vector<MotionChannel>& second = b.channels.entries;
         const std::size_t shared = std::min(first.size(), second.size());
         for (std::size_t index = 0; index != shared; ++index)
         {
@@ -335,21 +335,21 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
                        [&]
                        {
                            const bool onlyFirst = first[index].name < second[index].name;
-                           return "expression '" +
+                           return "channel '" +
                                   (onlyFirst ? first[index].name : second[index].name) +
                                   "' is reported only by the " + (onlyFirst ? "first" : "second") +
                                   " pose";
                        });
                 return false;
             }
-            if (!policy.Weight(first[index].weight, second[index].weight))
+            if (!policy.Channel(first[index].value, second[index].value))
             {
                 Report(difference,
                        [&]
                        {
-                           return "expression '" + first[index].name + "' weight " +
-                                  Amount(static_cast<double>(first[index].weight) -
-                                             second[index].weight,
+                           return "channel '" + first[index].name + "' value " +
+                                  Amount(static_cast<double>(first[index].value) -
+                                             second[index].value,
                                          "");
                        });
                 return false;
@@ -361,7 +361,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
             Report(difference,
                    [&]
                    {
-                       return "expression '" + (longerIsFirst ? first : second)[shared].name +
+                       return "channel '" + (longerIsFirst ? first : second)[shared].name +
                               "' is reported only by the " + (longerIsFirst ? "first" : "second") +
                               " pose";
                    });
@@ -400,7 +400,7 @@ ComparePose(const Policy& policy, const HumanoidPose& a, const HumanoidPose& b,
 
 template <typename Policy>
 bool
-CompareAnimation(const Policy& policy, const HumanoidAnimation& a, const HumanoidAnimation& b,
+CompareAnimation(const Policy& policy, const MotionClip& a, const MotionClip& b,
                  std::string* difference)
 {
     if (a.samples.size() != b.samples.size())
@@ -513,28 +513,28 @@ NearlyEqual(const RootMotion& a, const RootMotion& b, const MotionTolerance& tol
 }
 
 bool
-NearlyEqual(const HumanoidPose& a, const HumanoidPose& b, const MotionTolerance& tolerance,
+NearlyEqual(const MotionPose& a, const MotionPose& b, const MotionTolerance& tolerance,
             std::string* difference)
 {
     return ComparePose(TolerantPolicy{tolerance}, a, b, difference);
 }
 
 bool
-NearlyEqual(const HumanoidAnimation& a, const HumanoidAnimation& b,
+NearlyEqual(const MotionClip& a, const MotionClip& b,
             const MotionTolerance& tolerance, std::string* difference)
 {
     return CompareAnimation(TolerantPolicy{tolerance}, a, b, difference);
 }
 
 bool
-operator==(const MotionSourceMetadata& a, const MotionSourceMetadata& b) noexcept
+operator==(const SourceMetadata& a, const SourceMetadata& b) noexcept
 {
     return a.kind == b.kind && a.provider == b.provider && a.protocol == b.protocol &&
            a.sourceId == b.sourceId;
 }
 
 bool
-operator!=(const MotionSourceMetadata& a, const MotionSourceMetadata& b) noexcept
+operator!=(const SourceMetadata& a, const SourceMetadata& b) noexcept
 {
     return !(a == b);
 }
@@ -564,51 +564,51 @@ operator!=(const ContactState& a, const ContactState& b) noexcept
 }
 
 bool
-operator==(const ExpressionWeight& a, const ExpressionWeight& b) noexcept
+operator==(const MotionChannel& a, const MotionChannel& b) noexcept
 {
-    return a.name == b.name && a.weight == b.weight;
+    return a.name == b.name && a.value == b.value;
 }
 
 bool
-operator!=(const ExpressionWeight& a, const ExpressionWeight& b) noexcept
+operator!=(const MotionChannel& a, const MotionChannel& b) noexcept
 {
     return !(a == b);
 }
 
 bool
-operator==(const ExpressionWeights& a, const ExpressionWeights& b) noexcept
+operator==(const MotionChannelSet& a, const MotionChannelSet& b) noexcept
 {
     return a.entries == b.entries;
 }
 
 bool
-operator!=(const ExpressionWeights& a, const ExpressionWeights& b) noexcept
+operator!=(const MotionChannelSet& a, const MotionChannelSet& b) noexcept
 {
     return !(a == b);
 }
 
 bool
-operator==(const HumanoidPose& a, const HumanoidPose& b) noexcept
+operator==(const MotionPose& a, const MotionPose& b) noexcept
 {
     return ComparePose(ExactPolicy{}, a, b, nullptr);
 }
 
 bool
-operator!=(const HumanoidPose& a, const HumanoidPose& b) noexcept
+operator!=(const MotionPose& a, const MotionPose& b) noexcept
 {
     return !(a == b);
 }
 
 bool
-operator==(const HumanoidAnimation& a, const HumanoidAnimation& b) noexcept
+operator==(const MotionClip& a, const MotionClip& b) noexcept
 {
     return CompareAnimation(ExactPolicy{}, a, b, nullptr);
 }
 
 bool
-operator!=(const HumanoidAnimation& a, const HumanoidAnimation& b) noexcept
+operator!=(const MotionClip& a, const MotionClip& b) noexcept
 {
     return !(a == b);
 }
 
-} // namespace motion
+} // namespace openstrata::motion

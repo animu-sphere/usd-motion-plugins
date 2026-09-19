@@ -72,8 +72,8 @@ if(USDMOTION_BUILD_TESTS)
     endif()
 endif()
 
-# Components, in dependency order, as each import lands:
-#   add_subdirectory("libs/motionCore")
+# Components, in dependency order (WORKSPACE.md §2.1), as each import lands.
+add_subdirectory("libs/motionCore")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)

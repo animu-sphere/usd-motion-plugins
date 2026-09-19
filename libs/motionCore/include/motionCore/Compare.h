@@ -29,7 +29,7 @@
 // recomputes what depends on it, which is wasteful and never wrong.
 //
 // **Provenance is part of the value and not part of the motion.**
-// `MotionSourceMetadata` says where a pose came from. Two poses recorded from
+// `SourceMetadata` says where a pose came from. Two poses recorded from
 // different senders are different values, so `==` reads the field; they can
 // still be the same motion, so `NearlyEqual` does not. This is the one place
 // the two comparisons read different fields, and it is the reason a parity
@@ -40,10 +40,10 @@
 // what the values are made of, not chosen to make a test pass.
 //
 // Both comparisons read exactly the fields a pose says it carries. An absent
-// bone's rotation slot and an unset root field hold whatever the producer left
+// joint's rotation slot and an unset root field hold whatever the producer left
 // in them, and comparing that would make two identical motions differ over
 // bytes neither pose claims to mean. The *claim* is compared: a pose that omits
-// a bone never equals one that carries it, whatever the two slots hold.
+// a joint never equals one that carries it, whatever the two slots hold.
 //
 // A NaN equals nothing, including itself, under both comparisons. That is a
 // property of the sample rather than of the comparison -- a non-finite
@@ -51,14 +51,14 @@
 // and a comparison that hid it would make the defect arrive later and quieter.
 #pragma once
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 #include "motionCore/api.h"
 
 #include "pxr/base/gf/quatf.h"
 
 #include <string>
 
-namespace motion
+namespace openstrata::motion
 {
 
 // The angle in radians between the orientations `a` and `b` describe, in
@@ -102,12 +102,13 @@ struct MotionTolerance
     // carries no accumulated error -- only the rounding.
     float confidence = 1e-6f;
 
-    // Dimensionless, conventionally in [0, 1]. Looser than `confidence`, which
-    // is otherwise the same kind of number, because an expression weight is
-    // *interpolated*: `LerpPose` blends it between two frames and a glTF
-    // sampler evaluates it between two keys, so it accumulates where a reported
-    // confidence does not. Twenty times the six-decimal rounding.
-    float expression = 1e-5f;
+    // A channel value: dimensionless, and for a weight conventionally in
+    // [0, 1]. Looser than `confidence`, which is otherwise the same kind of
+    // number, because a channel is *interpolated*: pose interpolation blends it
+    // between two frames and an animation sampler evaluates it between two
+    // keys, so it accumulates where a reported confidence does not. Twenty
+    // times the six-decimal rounding.
+    float channel = 1e-5f;
 
     // Seconds. The trace format's own quantum: a timestamp is exactly what was
     // written unless something recomputed it.
@@ -121,26 +122,26 @@ struct MotionTolerance
 // the first field that differed and by how much -- "leftUpperArm rotation
 // differs by 0.0031 rad", "sample 12: timestamp differs by 0.002 s". The
 // order is fixed, so the same pair always reports the same line: timestamp,
-// root, bones in humanoid enum order, confidence, contacts, expressions by
-// name, look-at target. `difference` is assigned only on a false return and is
+// root, joints in vocabulary order, confidence, contacts, channels by name,
+// look-at target. `difference` is assigned only on a false return and is
 // left untouched otherwise.
 //
-// An expression *name* is an identifier rather than a measurement, so it is
+// A channel *name* is an identifier rather than a measurement, so it is
 // compared exactly by both -- there is no tolerance under which "happy" and
-// "happyy" are the same channel. Only the weight takes one.
+// "happyy" are the same channel. Only the value takes one.
 MOTIONCORE_API bool NearlyEqual(const RootMotion& a, const RootMotion& b,
                                 const MotionTolerance& tolerance = {},
                                 std::string* difference = nullptr);
 
-MOTIONCORE_API bool NearlyEqual(const HumanoidPose& a, const HumanoidPose& b,
+MOTIONCORE_API bool NearlyEqual(const MotionPose& a, const MotionPose& b,
                                 const MotionTolerance& tolerance = {},
                                 std::string* difference = nullptr);
 
 // Sample counts must match exactly. Two clips of the same motion at different
 // rates are not near each other; resampling one onto the other's timeline is a
-// `motionRuntime` operation and the caller's decision to make.
-MOTIONCORE_API bool NearlyEqual(const HumanoidAnimation& a, const HumanoidAnimation& b,
+// sampling operation and the caller's decision to make.
+MOTIONCORE_API bool NearlyEqual(const MotionClip& a, const MotionClip& b,
                                 const MotionTolerance& tolerance = {},
                                 std::string* difference = nullptr);
 
-} // namespace motion
+} // namespace openstrata::motion
