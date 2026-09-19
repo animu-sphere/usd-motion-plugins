@@ -9,7 +9,7 @@ bridge every avatar format and every motion source share.
 > proposed, and six libraries are imported: `motionCore` — the value types
 > every other library builds on — `motionSampling`, `motionRecording`,
 > `motionUsd`, `motionSource` and `motionBvh`, with `motion_convert`,
-> `motion_bvh_inspect` and the producer profiles. The rest of the implementation arrives from
+> `motion_bvh_inspect`, `motion_record` and the producer profiles. The rest of the implementation arrives from
 > [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), where
 > it is built and measured today, one identity at a time
 > ([roadmap](docs/roadmap/current.md)); how to build the tree is in

@@ -38,7 +38,7 @@ beside each component, and two build modes, `ost` and plain CMake.
 | `motion_inspect` | CLI | `tools/motionInspect/` | reports on a motion stage or clip | new | reserved |
 | `motion_convert` | CLI | `tools/motionConvert/` | a recorded source + a named profile → a motion stage | `usd-vrm-plugins` `motion_bvh_convert` | **imported** 2026-09-19, with history (release v0.4.0); it authors through `motionUsd` |
 | `motion_bvh_inspect` | CLI | `tools/motionBvhInspect/` | what a BVH file holds, and which profiles fit it | `usd-vrm-plugins` `motion_bvh_inspect` | **imported** 2026-09-19, with history (release v0.4.0) |
-| `motion_record` | CLI | `tools/motionRecord/` | a recorded trace → a motion stage | `usd-vrm-plugins` `motion_capture` | reserved |
+| `motion_record` | CLI | `tools/motionRecord/` | a recorded trace → a motion stage | `usd-vrm-plugins` `motion_capture` | **imported** 2026-09-19, with history (release v0.3.0); it authors through `motionUsd` |
 | producer profiles | package data | `profiles/motion/` | one declarative file per producer and export preset | `usd-vrm-plugins` `profiles/motion/` | **imported** 2026-09-19, with history (release v0.4.0); installed to `share/usd-motion-plugins/profiles/motion/` |
 
 Libraries are plain static CMake libraries. Names follow the siblings'
@@ -85,7 +85,8 @@ motionSource ────→ motionCore
 motionBvh ───────→ motionSource
 execMotion ──────→ motionCore, motionSampling, motionRetarget, OpenExec
 tools/* ─────────→ the libraries they name (motion_convert: motionBvh,
-                   motionSource, motionUsd), OpenUSD stage authoring
+                   motionSource, motionUsd; motion_record: motionRecording,
+                   motionSampling, motionUsd), OpenUSD stage authoring
 ```
 
 This is the design policy's §24 with the recorded-source pair added.
