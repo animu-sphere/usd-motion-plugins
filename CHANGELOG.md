@@ -132,7 +132,7 @@ separate from the package version
     `openstrata::motion`.
   - The eight `VRM_RETARGET_*` codes are `MOTION_RETARGET_*`, each event name
     unchanged (DIAGNOSTICS.md §2.2).
-  - 24 of the unit suite's 58 tests arrived: every one about the body
+  - 24 of the unit suite's 56 tests arrived: every one about the body
     retarget. The rest test code that stayed behind.
 
   Then, each in a change of its own:
