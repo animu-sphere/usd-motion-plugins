@@ -107,6 +107,29 @@ before v0.2.0 and v0.3.0, by the user's call. They depend only on
 (design policy §42.8). `motion_convert` authors through `motionUsd`, which is
 why `motionUsd` takes a producer's rest.
 
+### Arrived ahead of its release: v0.2.0's retarget ✅ (2026-09-19)
+
+`motionRetarget` was imported with its history (`usd-vrm-plugins`' MIG-2),
+the generic half of `vrmRetarget` cut by header along the line that
+repository's WORKSPACE.md §9.5 draws. 32 commits arrived through
+`git filter-repo`, with `ExpressionResolver` and `LookAtEvaluator` left out of
+the history; a move-only commit and the rename followed. It depends only on
+`motionCore`, so nothing it needs is missing, and importing it now shortens
+the time `usd-vrm-plugins` holds a second copy. It still ships as v0.2.0's
+scope, with `motionUsd`'s reading half.
+
+- ✅ WS-O2 and RT-O1 decided by the user: `motionCore` alone (the resample
+  option went, and a caller resamples first), and the imported root-motion
+  vocabulary.
+- ✅ Finding 1 of that repository's §9.5: the required-bone set is the
+  caller's (`RetargetOptions::requiredBones`), and the library names no
+  format's set.
+- ✅ RETARGETING_POLICY.md §10: `BuildSkeletonDescriptor` and
+  `BuildSourceRestPose`, the two rules `usd-vrm-plugins` wrote twice.
+- ⬜ `usd-vrm-plugins` re-runs its OpenExec parity rows against this package
+  before it deletes its copy (its MIG-0 table). That waits on its consuming
+  change, which waits on `ost` (its report 41).
+
 ## Completion criteria
 
 v0.1.0 is done when `MotionPose`, `MotionClip`, `HumanJoint`, sampling with

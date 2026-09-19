@@ -1,0 +1,15 @@
+# OpenStrata plain-library descriptor. motionRetarget expands a MotionPose onto
+# a target skeleton given as plain values: the map, rest correction, root-motion
+# policy and retarget diagnostics (docs/design/RETARGETING_POLICY.md).
+schema: openstrata.library/v1alpha1
+library:
+  id: motionRetarget
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+requires:
+  libraries:
+    - id: motionCore
+      version: ">=0.1,<0.2"
+cmake:
+  package: motionRetarget
+  target: motionRetarget::motionRetarget

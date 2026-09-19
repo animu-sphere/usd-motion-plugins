@@ -122,6 +122,32 @@ separate from the package version
   30 time codes per second, and `customData.motion`. `--clip-name` is gone,
   because the mapping names the prim `Body`.
 
+- **`motionRetarget`, imported from `usd-vrm-plugins` with its history**
+  (vrm MIG-2), ahead of the v0.2.0 release that carries it. 32 commits came
+  through `git filter-repo`: the generic half of `vrmRetarget`, cut by header,
+  with the VRM half (`ExpressionResolver`, `LookAtEvaluator`) left out of the
+  history. A move-only commit and the rename followed:
+  - `TargetSkeleton` is `SkeletonDescriptor`, `TargetJoint` is
+    `SkeletonJoint`, and `HumanoidMap` is `RetargetMap`, in
+    `openstrata::motion`.
+  - The eight `VRM_RETARGET_*` codes are `MOTION_RETARGET_*`, each event name
+    unchanged (DIAGNOSTICS.md §2.2).
+  - 24 of the unit suite's 56 tests arrived: every one about the body
+    retarget. The rest test code that stayed behind.
+
+  Then, each in a change of its own:
+  - WS-O2 is decided: `motionRetarget` depends on `motionCore` alone.
+    `RetargetOptions::resampleRate` is gone, and a clip is retargeted at its
+    own sample times.
+  - The required-bone set is the caller's, as `RetargetOptions::requiredBones`,
+    empty by default. `RetargetMap::GetRequiredBones`, which stated VRM 1.0's
+    set, is gone. Under `Hips` root motion the hips are required regardless.
+  - `BuildSkeletonDescriptor` builds a skeleton from joint tokens and rest
+    matrices, and `BuildSourceRestPose` reads a clip's rest pose off its
+    semantic skeleton (RETARGETING_POLICY.md §10).
+  - RT-O1 is decided: the published root-motion vocabulary is the imported
+    `Hips` / `RootJoint` / `Ignore`.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are

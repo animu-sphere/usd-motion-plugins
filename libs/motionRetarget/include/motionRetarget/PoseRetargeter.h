@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: Apache-2.0
+#pragma once
+
+#include "motionRetarget/api.h"
+
+#include "motionRetarget/Diagnostics.h"
+#include "motionRetarget/RetargetMap.h"
+#include "motionRetarget/RestPose.h"
+#include "motionRetarget/RootMotionPolicy.h"
+#include "motionRetarget/SkeletonDescriptor.h"
+
+#include "motionCore/MotionPose.h"
+
+#include "pxr/base/gf/quatf.h"
+#include "pxr/base/gf/vec3f.h"
+#include "pxr/base/gf/vec3h.h"
+
+#include <string>
+#include <vector>
+
+namespace openstrata::motion
+{
+
+// One sample expanded into the target rig's joint order. Every vector is
+// GetSize() long, so it can be written straight into a UsdSkelAnimation without
+// a second expansion pass.
+struct RetargetedPose
+{
+    double timestamp = 0.0;
+    std::vector<pxr::GfQuatf> rotations;
+    std::vector<pxr::GfVec3f> translations;
+};
+
+// Exact, joint by joint: the same timestamp and the same rotation and
+// translation in every slot, in the rig's order. It exists for the caller
+// `RestPoseCorrection`'s does: `ExecTypeRegistry::RegisterType` will not
+// register a type it cannot compare, and `execVrm`'s `vrm.humanoidRetarget`
+// hands this value back whole.
+//
+// Exact means a rotation and its negation are *different* poses although they
+// pose the joint identically -- the conservative answer, and the one
+// `openstrata::motion::MotionPose`'s `operator==` gives. There is no `NearlyEqual`: the
+// OpenExec plan's parity step (P0-6) decides whether it compares these values
+// or the arrays a bake authors from them, and asks for one if it is the first.
+MOTIONRETARGET_API bool operator==(const RetargetedPose& a, const RetargetedPose& b) noexcept;
+MOTIONRETARGET_API bool operator!=(const RetargetedPose& a, const RetargetedPose& b) noexcept;
+
+struct RetargetedAnimation
+{
+    // The joint tokens these samples are ordered by — the target skeleton's
+    // own order, so the consumer can author `joints` without re-deriving it.
+    std::vector<std::string> joints;
+    std::vector<RetargetedPose> samples;
+    double startTime = 0.0;
+    double endTime = 0.0;
+    double frameRate = 30.0;
+    openstrata::motion::SourceMetadata source;
+};
+
+// One retargeted sample in the shape a UsdSkelAnimation states it at one time
+// code: the rig's joint tokens and one translation, rotation and scale per
+// joint, in that order. It is a RetargetedPose with the two things a bake adds
+// to one -- the `joints` the arrays are ordered by, and `scales` -- so a
+// consumer can author, or compare against, an animation's four arrays without
+// re-deriving either.
+//
+// `scales` is part of the shape rather than something a writer remembers:
+// UsdSkel reads translations, rotations and scales as a unit, and an animation
+// that authors no `scales` binds, reads back attribute by attribute, and then
+// resolves no joint transforms at all -- the rig stays at rest. A retargeted
+// clip never animates scale, so every entry is the joint's rest scale,
+// `SkeletonJoint::restScale`, narrowed to half: a bake states every joint whole,
+// and identity would replace a scaled rest rather than keep it. It is the rule
+// `motion_retarget` authors as one constant array.
+//
+// `timestamp` is the retarget's, in seconds. An animation places a sample at a
+// time code instead; the writer scales one to the other.
+//
+// It exists for `execVrm`'s `vrm.computeJointLocalTransforms`, which answers it
+// whole, so like every value that crosses an exec boundary it compares exactly.
+struct JointLocalTransforms
+{
+    double timestamp = 0.0;
+    std::vector<std::string> joints;
+    std::vector<pxr::GfVec3f> translations;
+    std::vector<pxr::GfQuatf> rotations;
+    std::vector<pxr::GfVec3h> scales;
+};
+
+// Exact, joint by joint, in the rig's order: the same joints, the same
+// timestamp, and the same entry in every slot of all three arrays. A rotation
+// and its negation are different values, as for RetargetedPose, and there is
+// no `NearlyEqual` for the same reason.
+MOTIONRETARGET_API bool operator==(const JointLocalTransforms& a,
+                                const JointLocalTransforms& b) noexcept;
+MOTIONRETARGET_API bool operator!=(const JointLocalTransforms& a,
+                                const JointLocalTransforms& b) noexcept;
+
+// The skeleton-space transform of one joint of a retargeted pose: its own local
+// rotation and translation with every ancestor's composed on, root first.
+//
+// A consumer needs this the moment it has to relate a retargeted rig to
+// something outside the rig -- a look-at target being the case that brought it
+// here, since `LookAtEvaluator` needs to know where the head *is* and a
+// RetargetedPose states only where each joint is relative to its parent. The
+// pose's arrays are one per joint of `skeleton`, so this walks the ancestor
+// chain rather than the whole rig.
+//
+// Returns false, leaving both outputs untouched, when the index is out of range
+// for either the skeleton or the pose, or when the ancestor chain does not
+// terminate -- a parent cycle is a rig this cannot answer for, and looping on
+// one would be worse than refusing.
+MOTIONRETARGET_API bool GetJointWorldTransform(const SkeletonDescriptor& skeleton,
+                                            const RetargetedPose& pose, int jointIndex,
+                                            pxr::GfQuatf* orientation, pxr::GfVec3f* position);
+
+// A retarget answers at the clip's own sample times. A caller that wants a
+// uniform timeline resamples the clip first (motionSampling's `Resample`) and
+// retargets what that returns: resampling is sampling's job, and this library
+// depends on motionCore alone (WORKSPACE.md §2.1, WS-O2).
+struct RetargetOptions
+{
+    RootMotionOptions rootMotion;
+
+    // The bones this target requires, in the order the caller wants them
+    // reported. Empty -- the default -- requires nothing: the joint vocabulary
+    // carries no required-bone rule, so the set is the caller's statement
+    // (RETARGETING_POLICY.md §4). A format supplies its own, and a rig with no
+    // such rule supplies none.
+    //
+    // One bone is required by the options themselves: under
+    // RootMotionMode::Hips the root lands on the hips, so a rig without them is
+    // reported whether or not this list names them.
+    std::vector<openstrata::motion::HumanJoint> requiredBones;
+};
+
+// What a rig and its map say about every retarget onto them, before any clip
+// is involved: each bone RetargetOptions requires that the map leaves unbound
+// (and the hips under RootMotionMode::Hips), each joint two bones
+// share, the first joint out of parent-before-child order, and a root joint the
+// options name and the rig does not have.
+//
+// `PoseRetargeter`'s clip overload reports these first. A caller that
+// retargets one pose at a time -- `execVrm`, whose rig and map are computed
+// once per edit and whose pose is computed per frame -- reports them from here,
+// once per rig, and gets the same list the clip overload would have produced.
+MOTIONRETARGET_API RetargetDiagnostics DiagnoseRig(const SkeletonDescriptor& skeleton,
+                                                const RetargetMap& map,
+                                                const RetargetOptions& options = RetargetOptions());
+
+// Expands semantic humanoid poses into a target rig's joint order.
+//
+// Joints the clip does not drive keep their rest rotation and rest translation,
+// so a partial clip (upper body only, say) leaves the rest of the rig at rest
+// instead of collapsing it to identity.
+class MOTIONRETARGET_API PoseRetargeter
+{
+  public:
+    PoseRetargeter(SkeletonDescriptor skeleton, RetargetMap map,
+                   SourceRestPose sourceRest = SourceRestPose(),
+                   RetargetOptions options = RetargetOptions());
+
+    const SkeletonDescriptor&
+    GetSkeleton() const noexcept
+    {
+        return _skeleton;
+    }
+    const RetargetMap&
+    GetMap() const noexcept
+    {
+        return _map;
+    }
+    const RetargetOptions&
+    GetOptions() const noexcept
+    {
+        return _options;
+    }
+
+    // Expands one pose. `diagnostics` may be null. What one pose can say is
+    // what it drives: a bone the rig does not bind, and the root motion a
+    // missing hips joint or a missing root joint drops. The rig's own report
+    // is DiagnoseRig's.
+    RetargetedPose Retarget(const openstrata::motion::MotionPose& pose,
+                            RetargetDiagnostics* diagnostics = nullptr) const;
+
+    // Expands a whole clip, one retargeted sample per clip sample. Reports DiagnoseRig's list and then every sample's, so a bone the clip
+    // starts driving halfway through is reported like one it drives from the
+    // first sample.
+    RetargetedAnimation Retarget(const openstrata::motion::MotionClip& animation,
+                                 RetargetDiagnostics* diagnostics = nullptr) const;
+
+  private:
+    RetargetedPose _RestPose() const;
+
+    SkeletonDescriptor _skeleton;
+    RetargetMap _map;
+    SourceRestPose _sourceRest;
+    RetargetOptions _options;
+    RestPoseCorrection _correction;
+};
+
+} // namespace openstrata::motion

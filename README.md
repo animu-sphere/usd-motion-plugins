@@ -46,7 +46,7 @@ Every one of them depends on this repository, and it depends on none of them.
 | `motionSampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
 | `motionRecording` | stream intake, recorder, the capture trace format | v0.1.0 |
 | `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` | v0.1.0, v0.2.0 |
-| `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy | v0.2.0 |
+| `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy (imported 2026-09-19) | v0.2.0 |
 | `motionSource`, `motionBvh` | recorded sources through declarative producer profiles | v0.4.0 |
 | `execMotion` | optional OpenExec nodes over the same libraries | v0.5.0 |
 

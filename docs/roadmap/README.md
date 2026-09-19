@@ -30,7 +30,7 @@ and `usd-mmd-plugins` as its Phase 9.
 | Release | Scope | Imports | Migration Phase | Status |
 | --- | --- | --- | --- | --- |
 | v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
-| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half, the reading half of `StageIo` (vrm MIG-2) | C | ⬜ |
+| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half — **imported 2026-09-19** —, the reading half of `StageIo` (vrm MIG-2) | C | 🚧 |
 | v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) | E | ⬜ |
 | v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | 🚧 |
 | v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item | — | ⬜ |
@@ -59,13 +59,11 @@ Every open question the design documents carry, in the order they block work.
 The owning document holds the question; this list only schedules it. MC-O1,
 USD-O1 and USD-O2 were decided on 2026-09-19, and MC-O4 narrowed to its
 non-scalar case, before the first import. RT-O2 and RT-O3 were carried the same
-day from `usd-vrm-plugins`' v0.9.0 decisions.
+day from `usd-vrm-plugins`' v0.9.0 decisions. DIAG-O1 was decided with the BVH
+import, and WS-O2 and RT-O1 with the retarget's.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| DIAG-O1 | Diagnostic code style | [DIAGNOSTICS §3](../reference/DIAGNOSTICS.md#3-open-questions) | the first imported diagnostic |
-| WS-O2 | `motionRetarget`'s edge to `motionSampling` | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | v0.2.0 |
-| RT-O1 | Root-motion vocabulary | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
 | USD-O4 | Channel attribute names | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.2.0 |
 | MC-O5 | `MotionStream`'s public shape | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.3.0 |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |

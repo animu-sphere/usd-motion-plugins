@@ -787,6 +787,12 @@ struct RootMotionPolicy {
 
 Do not silently transform root motion as a side effect of retargeting.
 
+The published API uses the imported vocabulary instead of these five names:
+`Hips`, `RootJoint` and `Ignore`, with `translationScale` and
+`preserveTargetHeight` (RT-O1, decided 2026-09-19). The mapping between the
+two, and what is not implemented yet, is
+[RETARGETING_POLICY.md §6](RETARGETING_POLICY.md#6-root-motion).
+
 ---
 
 ## 14. Recording
