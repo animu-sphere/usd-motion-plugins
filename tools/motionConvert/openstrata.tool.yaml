@@ -1,7 +1,7 @@
 # OpenStrata workspace-tool descriptor for motion_convert: a recorded source
 # and a named profile become a motion stage (WORKSPACE.md §1.2).
 #
-# It requires motionSource **by name** rather than only through motionBvh: it
+# It requires motionUsd, which authors the stage, and motionSource **by name** rather than only through motionBvh: it
 # matches a profile, converts, and reads a rest pose back, none of which
 # motionBvh's headers expose. The descriptor states the edge the tool actually
 # has, instead of leaving it to a transitive dependency that could stop being
@@ -19,4 +19,6 @@ requires:
     - id: motionBvh
       version: ">=0.1,<0.2"
     - id: motionSource
+      version: ">=0.1,<0.2"
+    - id: motionUsd
       version: ">=0.1,<0.2"

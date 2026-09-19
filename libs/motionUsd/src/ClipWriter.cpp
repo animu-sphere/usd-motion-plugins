@@ -2,6 +2,8 @@
 #include "motionUsd/ClipWriter.h"
 
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/quatd.h"
+#include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec3h.h"
@@ -91,17 +93,13 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
         timeCodes.push_back(timeCode);
     }
 
-    // A joint exists in the clip when any sample observed it. A joint the
-    // producer never solved is simply absent -- it is not authored at rest,
-    // because a joint that is present and unmoving means something different
-    // downstream from a joint that was never observed.
-    std::bitset<HumanJointCount> present;
+    std::bitset<HumanJointCount> observed;
     bool observedRoot = false;
     std::set<std::string> channels;
     std::size_t lookAtTargets = 0;
     for (const MotionPose& pose : clip.samples)
     {
-        present |= pose.validRotations;
+        observed |= pose.validRotations;
         observedRoot = observedRoot || pose.root.hasPosition;
         for (const MotionChannel& channel : pose.channels.entries)
         {
@@ -110,17 +108,62 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
         lookAtTargets += pose.lookAtTarget ? 1 : 0;
     }
 
-    // The one joint that is not purely a rotation question. Root translation is
-    // authored onto the hips and nowhere else, so a producer that reports a
-    // root position while never solving a hips *rotation* would otherwise drop
-    // its whole root motion here without a word. The hips join the joint set
-    // on the strength of the root observation; their rotation track falls back
-    // to identity below, exactly as any unobserved joint's does.
     const auto hips = static_cast<std::size_t>(HumanJoint::Hips);
-    if (observedRoot)
+    MotionStageRest rest;
+    if (options.rest)
     {
-        present.set(hips);
+        // The producer's rig is the joint set, whether or not a sample turned a
+        // joint: its rest is a measurement either way, and a joint set that
+        // varied with the motion would give two recordings of one rig two
+        // skeletons that do not compose.
+        rest = *options.rest;
+        if (!rest.present.test(hips))
+        {
+            *error = "the rest carries no hips, so the stage has nowhere to carry "
+                     "root translation";
+            return false;
+        }
+        if ((observed & ~rest.present).any())
+        {
+            *error = "a sample observes a joint the rest does not carry";
+            return false;
+        }
     }
+    else
+    {
+        // A joint exists in the clip when any sample observed it. A joint the
+        // producer never solved is simply absent -- it is not authored at rest,
+        // because a joint that is present and unmoving means something
+        // different downstream from a joint that was never observed.
+        rest.present = observed;
+        // The one joint that is not purely a rotation question. Root
+        // translation is authored onto the hips and nowhere else, so a producer
+        // that reports a root position while never solving a hips *rotation*
+        // would otherwise drop its whole root motion here without a word. The
+        // hips join the joint set on the strength of the root observation;
+        // their rotation track falls back to the rest below, exactly as any
+        // unobserved joint's does.
+        if (observedRoot)
+        {
+            rest.present.set(hips);
+        }
+        // The clip carries no rest pose -- its rotations are relative to the
+        // canonical rest, not the rest itself. Identity rests make a
+        // retargeter's rest-pose correction a no-op, which is the honest
+        // reading. The one exception is the hips translation: it is seeded with
+        // the first observed root position, so root motion arrives downstream
+        // as a delta from where the motion started rather than as an absolute
+        // height (USD_MAPPING.md §3).
+        for (const MotionPose& pose : clip.samples)
+        {
+            if (pose.root.hasPosition)
+            {
+                rest.localTranslations[hips] = pose.root.worldPosition;
+                break;
+            }
+        }
+    }
+    const std::bitset<HumanJointCount>& present = rest.present;
     if (!present.any())
     {
         *error = "the clip observes no joint and no root";
@@ -184,21 +227,16 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
     metadata["nominalFrameRate"] = pxr::VtValue(clip.nominalFrameRate);
     root.SetCustomDataByKey(pxr::TfToken("motion"), pxr::VtValue(metadata));
 
-    // A clip carries no rest pose -- its rotations are relative to the
-    // canonical rest, not the rest itself. Authoring identity rests makes a
-    // retargeter's rest-pose correction a no-op, which is the honest reading.
-    // The one exception is the hips translation: it is seeded with the first
-    // observed root position, so root motion arrives downstream as a delta from
-    // where the motion started rather than as an absolute height
-    // (USD_MAPPING.md §3).
-    pxr::GfVec3f hipsRest(0.0f);
-    for (const MotionPose& pose : clip.samples)
+    // A recorded source's provenance, verbatim, beside the motion rather than
+    // on every sample (MOTION_CONTRACT.md §7.1).
+    if (!options.provenance.empty())
     {
-        if (pose.root.hasPosition)
+        pxr::VtDictionary provenance;
+        for (const auto& [key, value] : options.provenance)
         {
-            hipsRest = pose.root.worldPosition;
-            break;
+            provenance[key] = pxr::VtValue(value);
         }
+        root.SetCustomDataByKey(pxr::TfToken("source"), pxr::VtValue(provenance));
     }
 
     const pxr::SdfPath skeletonPath = rootPath.AppendChild(pxr::TfToken("Skeleton"));
@@ -207,12 +245,11 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
     restTransforms.reserve(joints.size());
     for (const HumanJoint joint : joints)
     {
-        pxr::GfMatrix4d rest(1.0);
-        if (joint == HumanJoint::Hips)
-        {
-            rest.SetTranslate(pxr::GfVec3d(hipsRest[0], hipsRest[1], hipsRest[2]));
-        }
-        restTransforms.push_back(rest);
+        const auto slot = static_cast<std::size_t>(joint);
+        const pxr::GfVec3f& translation = rest.localTranslations[slot];
+        restTransforms.push_back(
+            pxr::GfMatrix4d(pxr::GfRotation(pxr::GfQuatd(rest.localRotations[slot])),
+                            pxr::GfVec3d(translation[0], translation[1], translation[2])));
     }
     skeleton.CreateJointsAttr(pxr::VtValue(jointTokens));
     skeleton.CreateRestTransformsAttr(pxr::VtValue(restTransforms));
@@ -248,7 +285,7 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
     // for one sample between two that reported their own teleports the body to
     // wherever the motion started and back. Holding states the same absence
     // without inventing the trip.
-    pxr::GfVec3f hipsHeld = hipsRest;
+    pxr::GfVec3f hipsHeld = rest.localTranslations[hips];
     for (std::size_t sample = 0; sample < clip.samples.size(); ++sample)
     {
         const MotionPose& pose = clip.samples[sample];
@@ -263,14 +300,21 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
         for (const HumanJoint joint : joints)
         {
             const auto slot = static_cast<std::size_t>(joint);
-            valuesT.push_back(joint == HumanJoint::Hips ? hipsHeld : pxr::GfVec3f(0.0f));
+            // Every joint holds its rest translation, and the hips carry body
+            // motion over theirs. Canonical motion puts body translation on the
+            // root alone, so zero for the others would not mean "unmoving" -- it
+            // would collapse each joint onto its parent, in a clip whose own
+            // skeleton says otherwise.
+            valuesT.push_back(joint == HumanJoint::Hips ? hipsHeld
+                                                        : rest.localTranslations[slot]);
             // A sample that did not observe a joint authors the rest rotation
             // rather than the previous sample's: holding is an intake policy
             // (MissingJointPolicy), and re-deciding it here would hide which
-            // policy actually ran.
-            valuesR.push_back(pose.validRotations.test(slot)
-                                  ? pose.localRotations[slot]
-                                  : pxr::GfQuatf(1.0f, pxr::GfVec3f(0.0f)));
+            // policy actually ran. The rest, not identity: a producer's rig
+            // can state a rest orientation for a joint it never moves, and
+            // identity would move it.
+            valuesR.push_back(pose.validRotations.test(slot) ? pose.localRotations[slot]
+                                                             : rest.localRotations[slot]);
         }
         translations.Set(valuesT, timeCodes[sample]);
         rotations.Set(valuesR, timeCodes[sample]);

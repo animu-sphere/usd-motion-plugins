@@ -46,6 +46,17 @@ TOLERANCE = 1e-6
 # and the tool, in float rather than double on the tool's side.
 ANGLE_TOLERANCE = 1e-5
 
+# USD_MAPPING.md §4.1: every motion stage is 30 time codes per second, and a
+# sample at `t` seconds is written at `t * 30`, snapped to the whole frame
+# within 1e-6 of it (motionUsd/ClipWriter.h).
+TIME_CODES_PER_SECOND = 30.0
+
+
+def time_code_for(seconds: float) -> float:
+    code = seconds * TIME_CODES_PER_SECOND
+    frame = round(code)
+    return float(frame) if abs(code - frame) <= 1e-6 else code
+
 
 class Failures:
     def __init__(self) -> None:
@@ -311,17 +322,32 @@ def check_conversion(failures: Failures, tool: str, bvh: pathlib.Path,
         return
 
     # --- what the stage says it is -----------------------------------------
-    rate = 1.0 / document.frame_time
-    failures.check(near(stage.GetTimeCodesPerSecond(), rate),
+    # A motion stage is always 30 time codes per second (USD_MAPPING.md §4.1,
+    # USD-O2), whatever the file's frame time: the samples keep their own
+    # times, and a time code is only where they are written.
+    failures.check(near(stage.GetTimeCodesPerSecond(), TIME_CODES_PER_SECOND),
                    f"timeCodesPerSecond is {stage.GetTimeCodesPerSecond()}, "
-                   f"and the file's frame time says {rate}")
+                   f"and a motion stage is always {TIME_CODES_PER_SECOND}")
     failures.check(near(stage.GetStartTimeCode(), 0.0),
                    "the clip does not start at time code 0")
+    last_code = time_code_for((len(document.rows) - 1) * document.frame_time)
     failures.check(
-        near(stage.GetEndTimeCode(), len(document.rows) - 1),
+        near(stage.GetEndTimeCode(), last_code),
         f"endTimeCode is {stage.GetEndTimeCode()}; the file carries "
-        f"{len(document.rows)} rows, so the last is "
-        f"{len(document.rows) - 1}")
+        f"{len(document.rows)} rows {document.frame_time} s apart, so the last "
+        f"is at {last_code}")
+    motion = (stage.GetDefaultPrim().GetCustomData().get("motion", {})
+              if stage.GetDefaultPrim() else {})
+    failures.check(stage.GetDefaultPrim().GetPath() == "/Animation",
+                   f"the default prim is {stage.GetDefaultPrim().GetPath()}, "
+                   f"not /Animation")
+    failures.check(motion.get("sourceFormat") == "bvh",
+                   f"customData.motion.sourceFormat is "
+                   f"{motion.get('sourceFormat')!r}")
+    failures.check(motion.get("rootMotionSource")
+                   == f"{profile['root']} translation",
+                   f"customData.motion.rootMotionSource is "
+                   f"{motion.get('rootMotionSource')!r}")
     failures.check(UsdGeom.GetStageUpAxis(stage) == "Y",
                    "the clip is not +Y up, which canonical motion is")
     failures.check(near(UsdGeom.GetStageMetersPerUnit(stage), 1.0),
@@ -417,7 +443,7 @@ def check_conversion(failures: Failures, tool: str, bvh: pathlib.Path,
     # after it would pass a check that only looked at the start.
     sampled = [0, 1, len(document.rows) // 2, len(document.rows) - 1]
     for frame in sampled:
-        time_code = frame
+        time_code = time_code_for(frame * document.frame_time)
         values_t = translations.Get(time_code)
         values_r = rotations.Get(time_code)
         if not failures.check(

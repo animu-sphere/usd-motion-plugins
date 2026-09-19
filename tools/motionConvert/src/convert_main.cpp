@@ -353,7 +353,7 @@ main(int argc, char** argv)
         std::to_string(conversion.report.droppedTranslationJoints.size());
 
     if (!motionConvertTool::WriteSemanticClip(options.outputPath, conversion.animation, conversion.rest,
-                                          options.clipName, provenance, &error))
+                                              profile.rootJoint, provenance, &error))
     {
         std::cerr << "motion_convert: " << error << "\n";
         return 1;

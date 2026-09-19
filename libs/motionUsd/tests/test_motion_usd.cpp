@@ -362,6 +362,72 @@ TestARefusedWriteTouchesNothing()
     assert(held->GetPrimAtPath(pxr::SdfPath("/Animation/Body")));
 }
 
+// A producer that states its rest: the rig is the joint set, every joint holds
+// its rest translation, an unturned joint keeps its rest rotation, and the
+// provenance survives beside the motion.
+void
+TestAProducerRestIsTheSkeleton()
+{
+    openstrata::motion::MotionStageRest rest;
+    rest.present.set(kHips);
+    rest.present.set(kSpine);
+    rest.present.set(kHead);
+    rest.localTranslations[kHips] = pxr::GfVec3f(0.0f, 0.95f, 0.0f);
+    rest.localTranslations[kSpine] = pxr::GfVec3f(0.0f, 0.1f, 0.0f);
+    rest.localTranslations[kHead] = pxr::GfVec3f(0.0f, 0.5f, 0.0f);
+    rest.localRotations[kHead] = RotationX(10.0f);
+
+    // No sample turns the head, and the second sample carries no root.
+    MotionClip clip = MakeClip();
+    clip.samples[1].root.hasPosition = false;
+    MotionStageOptions options;
+    options.rest = rest;
+    options.provenance = {{"profileId", "example-v1"}, {"producer", "Example"}};
+    const pxr::UsdStageRefPtr stage = WriteAndOpen(clip, options, "motionUsd_rest.usda");
+
+    const pxr::UsdSkelSkeleton skeleton(stage->GetPrimAtPath(pxr::SdfPath("/Animation/Skeleton")));
+    pxr::VtTokenArray joints;
+    skeleton.GetJointsAttr().Get(&joints);
+    assert(joints == pxr::VtTokenArray({pxr::TfToken("hips"), pxr::TfToken("hips/spine"),
+                                        pxr::TfToken("hips/spine/head")}));
+    pxr::VtMatrix4dArray rests;
+    skeleton.GetRestTransformsAttr().Get(&rests);
+    assert(rests[0].ExtractTranslation() == pxr::GfVec3d(0.0, 0.95f, 0.0));
+    assert(rests[1].ExtractTranslation() == pxr::GfVec3d(0.0, 0.1f, 0.0));
+    assert(SameOrientation(pxr::GfQuatf(rests[2].ExtractRotationQuat()), RotationX(10.0f)));
+
+    const pxr::UsdSkelAnimation body(stage->GetPrimAtPath(pxr::SdfPath("/Animation/Body")));
+    pxr::VtVec3fArray translations;
+    pxr::VtQuatfArray rotations;
+    body.GetTranslationsAttr().Get(&translations, pxr::UsdTimeCode(1.0));
+    body.GetRotationsAttr().Get(&rotations, pxr::UsdTimeCode(1.0));
+    // The root held from the sample before, not sent back to the rest.
+    assert(translations[0] == clip.samples[0].root.worldPosition);
+    assert(translations[1] == pxr::GfVec3f(0.0f, 0.1f, 0.0f));
+    assert(translations[2] == pxr::GfVec3f(0.0f, 0.5f, 0.0f));
+    assert(SameOrientation(rotations[2], RotationX(10.0f)));
+
+    const pxr::VtValue source = stage->GetDefaultPrim().GetCustomDataByKey(pxr::TfToken("source"));
+    assert(source.IsHolding<pxr::VtDictionary>());
+    const pxr::VtDictionary& provenance = source.UncheckedGet<pxr::VtDictionary>();
+    assert(Entry(provenance, "profileId").Get<std::string>() == "example-v1");
+    assert(Entry(provenance, "producer").Get<std::string>() == "Example");
+
+    // A rest with no hips has nowhere to carry the root; a sample turning a
+    // joint the rest does not carry is a clip of another rig.
+    const pxr::UsdStageRefPtr empty = pxr::UsdStage::CreateInMemory();
+    std::string error;
+    MotionStageOptions noHips;
+    noHips.rest = rest;
+    noHips.rest->present.reset(kHips);
+    assert(!openstrata::motion::AuthorMotionStage(empty, clip, noHips, nullptr, &error));
+    MotionStageOptions narrow;
+    narrow.rest = rest;
+    narrow.rest->present.reset(kSpine);
+    assert(!openstrata::motion::AuthorMotionStage(empty, clip, narrow, nullptr, &error));
+    assert(!empty->GetPrimAtPath(pxr::SdfPath("/Animation")));
+}
+
 // Re-running a conversion over its previous output replaces it.
 void
 TestRewritingReplacesThePreviousStage()
@@ -393,6 +459,7 @@ main()
     TestUnauthoredValuesAreReported();
     TestRefusalsAuthorNothing();
     TestARefusedWriteTouchesNothing();
+    TestAProducerRestIsTheSkeleton();
     TestRewritingReplacesThePreviousStage();
     std::puts("motionUsd tests passed");
     return 0;

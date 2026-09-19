@@ -107,8 +107,6 @@ GetConvertUsage()
            "Options:\n"
            "  --profile-dir DIR      Search DIR for profiles before the built-in\n"
            "                         locations. Repeatable, in the order given.\n"
-           "  --clip-name NAME       Prim name for the authored UsdSkelAnimation\n"
-           "                         (default SourceAnimation).\n"
            "  --quiet                Write the clip and print nothing.\n"
            "\n"
            "Limits (refusals of the pathological case; raise one for a file that\n"
@@ -157,13 +155,6 @@ ParseConvertOptions(const std::vector<std::string>& arguments, ConvertOptions* o
         else if (argument == "--output")
         {
             if (!TakeValue(arguments, &i, argument, &options->outputPath, error))
-            {
-                return false;
-            }
-        }
-        else if (argument == "--clip-name")
-        {
-            if (!TakeValue(arguments, &i, argument, &options->clipName, error))
             {
                 return false;
             }
@@ -246,11 +237,6 @@ ParseConvertOptions(const std::vector<std::string>& arguments, ConvertOptions* o
     {
         *error = "--output is required; this tool writes a clip and does not "
                  "print one";
-        return false;
-    }
-    if (options->clipName.empty())
-    {
-        *error = "--clip-name requires a name";
         return false;
     }
     // `--profile` is checked by main, not here. See ConvertOptions::profile.

@@ -37,12 +37,6 @@ struct ConvertOptions
 
     std::string outputPath;
 
-    // Prim name for the authored UsdSkelAnimation, as `motion_capture` spells
-    // it. The default differs from that tool's `BodyAnimation` because these
-    // clips are named after where they came from and a recorded file is not a
-    // session.
-    std::string clipName = "SourceAnimation";
-
     bool quiet = false;
 
     // Forwarded to the parser verbatim, exactly as the inspect tool forwards

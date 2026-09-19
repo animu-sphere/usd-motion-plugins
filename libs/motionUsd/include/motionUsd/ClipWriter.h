@@ -16,7 +16,14 @@
 
 #include "pxr/usd/usd/stage.h"
 
+#include "pxr/base/gf/quatf.h"
+#include "pxr/base/gf/vec3f.h"
+
+#include <array>
+#include <bitset>
 #include <cstddef>
+#include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,15 +39,47 @@ inline constexpr int MotionStageContractVersion = 1;
 // written.
 inline constexpr double MotionStageTimeCodesPerSecond = 30.0;
 
-// What the caller knows about the clip that the clip does not carry. Each
-// string is authored into `customData.motion` under the key of the same name
-// (USD_MAPPING.md §5), and left out when empty.
+// A producer's rest pose, joint by joint, for a clip whose rest is not
+// identity (USD_MAPPING.md §3): a recorded file states one, and a profile says
+// how to read it. Rotations default to identity and translations to zero, so a
+// caller fills only the joints it carries and sets them in `present`.
+//
+// It is the rest a retargeter corrects from. Authoring identity for a file
+// that stated otherwise would tell the retargeter that the source rig stands
+// exactly as the target does, and skip the correction without a word.
+struct MotionStageRest
+{
+    MotionStageRest()
+    {
+        localRotations.fill(pxr::GfQuatf(1.0f));
+        localTranslations.fill(pxr::GfVec3f(0.0f));
+    }
+
+    std::array<pxr::GfQuatf, HumanJointCount> localRotations;
+    std::array<pxr::GfVec3f, HumanJointCount> localTranslations;
+    std::bitset<HumanJointCount> present;
+};
+
+// What the caller knows about the clip that the clip does not carry.
 struct MotionStageOptions
 {
-    // How the motion arrived: `bvh`, `capture`, ...
+    // Authored into `customData.motion` under the key of the same name
+    // (USD_MAPPING.md §5), and left out when empty. How the motion arrived:
+    // `bvh`, `capture`, ...
     std::string sourceFormat;
     // Which producer channel became the hips translation.
     std::string rootMotionSource;
+
+    // The producer's rest. Absent for a clip whose rotations are relative to
+    // the canonical rest (a capture): the rest is then identity, except the
+    // hips translation at the first root position.
+    std::optional<MotionStageRest> rest;
+
+    // A recorded source's provenance, authored verbatim as the
+    // `customData.source` dictionary: the fields `SourceMetadata` narrows away
+    // survive here, beside the motion (MOTION_CONTRACT.md §7.1). Nothing reads
+    // them to decide anything.
+    std::map<std::string, std::string> provenance;
 };
 
 // What the stage holds, and what the clip carried that it does not.
@@ -68,24 +107,34 @@ struct MotionStageReport
 // with `upAxis = Y`, `metersPerUnit = 1` and 30 time codes per second, which
 // `Body` also states as `motion:timeCodesPerSecond` (EXEC_CONTRACT.md §5.1).
 //
-// - A joint is on the skeleton when any sample observed it, and the hips also
-//   when any sample carried a root position. A joint never observed is absent,
-//   not authored at rest.
-// - Rests are identity except the hips translation, which is the first
-//   observed root position (USD_MAPPING.md §3).
-// - `Body` authors rotations for every joint (identity where a sample did not
-//   observe one: holding is an intake policy, not this writer's), the root
-//   position as the hips translation (held from the last sample that carried
-//   one, starting at the rest), zero for every other translation, and a
-//   constant identity `scales` array, without which UsdSkel resolves no joint
-//   transform at all (USD_MAPPING.md §4.2).
+// - The joint set. Without a producer rest, a joint is on the skeleton when
+//   any sample observed it, and the hips also when any sample carried a root
+//   position; a joint never observed is absent, not authored at rest. With a
+//   producer rest it is `rest.present`, every joint the producer's rig carries,
+//   whether or not a sample turned it: two recordings of one rig must author
+//   one skeleton.
+// - Rests are the producer's, or, without one, identity except the hips
+//   translation at the first observed root position (USD_MAPPING.md §3).
+// - `Body` authors, for every joint:
+//   - its rotation, or its rest rotation where a sample did not observe it.
+//     Holding a previous rotation is an intake policy, not this writer's.
+//   - its rest translation, except the hips, which carry the root position.
+//     A sample with no root position holds the last one, starting at the
+//     rest.
+//   It also authors a constant identity `scales` array, without which UsdSkel
+//   resolves no joint transform at all (USD_MAPPING.md §4.2).
 // - A sample at `t` seconds is authored at `t * 30`, snapped to the nearest
 //   whole frame when within 1e-6 of it, so a clip taken at a divisor of 30 Hz
 //   lands on whole frames rather than on `62.00000000000001`.
 //
-// Refused, with nothing authored, when the stage already holds `/Animation`,
-// the clip has no sample, observes no joint and no root, or has a timestamp
-// that is not finite or does not increase. `report` may be null.
+// Refused, with nothing authored, when:
+// - the stage already holds `/Animation`;
+// - the clip has no sample, or observes no joint and no root;
+// - a timestamp is not finite or does not increase;
+// - a producer rest carries no hips, or a sample observes a joint the rest does
+//   not carry.
+//
+// `report` may be null.
 MOTIONUSD_API bool AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
                                      const MotionStageOptions& options,
                                      MotionStageReport* report, std::string* error);

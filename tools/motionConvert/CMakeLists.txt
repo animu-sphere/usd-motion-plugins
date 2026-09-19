@@ -52,6 +52,9 @@ endif()
 if(NOT TARGET motionSource::motionSource)
     find_package(motionSource REQUIRED CONFIG)
 endif()
+if(NOT TARGET motionUsd::motionUsd)
+    find_package(motionUsd REQUIRED CONFIG)
+endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
 
 add_executable(motion_convert
@@ -63,7 +66,7 @@ usdmotion_use_utf8_code_page(motion_convert)
 
 target_compile_features(motion_convert PRIVATE cxx_std_17)
 target_link_libraries(motion_convert
-    PRIVATE motionBvh::motionBvh motionSource::motionSource)
+    PRIVATE motionBvh::motionBvh motionSource::motionSource motionUsd::motionUsd)
 
 foreach(_usd_lib usd usdGeom usdSkel sdf tf gf vt arch)
     if(TARGET ${_usd_lib})
