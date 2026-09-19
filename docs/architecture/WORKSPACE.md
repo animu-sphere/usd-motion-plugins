@@ -7,9 +7,10 @@ them and to the rest of the ecosystem, and the invariants every change keeps.
 first, in its own pull request** — never through a README, a roadmap entry or
 code.
 
-Status (2026-09-19): **contract adopted, scaffold only.** The build and CI
-tree exists with no component in it. Every identity below is *reserved* until
-the change that creates it lands, and its row then says so. The shape follows the design
+Status (2026-09-19): **contract adopted; first component imported.**
+`motionCore` arrived from `usd-vrm-plugins` with its history. Every other
+identity below is *reserved* until the change that creates it lands, and its
+row then says so. The shape follows the design
 policy's §22 and the workspace discipline `usd-vrm-plugins` and
 `usd-mmd-plugins` share: plain libraries apart from plugin bundles, a manifest
 beside each component, and two build modes, `ost` and plain CMake.
@@ -20,7 +21,7 @@ beside each component, and two build modes, `ost` and plain CMake.
 
 | Identity | Directory | Role | Arrives from | Status |
 | --- | --- | --- | --- | --- |
-| `motionCore` | `libs/motionCore/` | `HumanJoint`, `MotionPose`, `RootMotion`, `MotionChannelSet`, `SourceMetadata`, `MotionClip`, constraints ([MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md)) | `usd-vrm-plugins` `motionCore`, renamed | reserved |
+| `motionCore` | `libs/motionCore/` | `HumanJoint`, `MotionPose`, `RootMotion`, `MotionChannelSet`, `SourceMetadata`, `MotionClip`, constraints ([MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md)) | `usd-vrm-plugins` `motionCore`, renamed | **imported** 2026-09-19, with history |
 | `motionSampling` | `libs/motionSampling/` | sampling with status, interpolation, resample, filter, blend, the pose buffer | `usd-vrm-plugins` `motionRuntime` (its sampling half) | reserved |
 | `motionRecording` | `libs/motionRecording/` | stream intake, `MotionRecorder`, the `motion-capture-trace` format, replay | `usd-vrm-plugins` `motionRuntime` (its capture half) | reserved |
 | `motionRetarget` | `libs/motionRetarget/` | `SkeletonDescriptor`, `RetargetMap`, rest correction, root-motion policy, retarget diagnostics ([RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md)) | `usd-vrm-plugins` `vrmRetarget`, its generic half | reserved |

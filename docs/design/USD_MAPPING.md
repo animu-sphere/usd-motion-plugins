@@ -38,11 +38,12 @@
 Stage metadata: `upAxis = "Y"`, `metersPerUnit = 1`, and `timeCodesPerSecond`
 per §4.1.
 
-`usd-vrm-plugins`' `.vrma` stage uses `/Animation/HumanoidSkeleton` and
-`/Animation/BodyAnimation`, with expressions under `/Animation/Expressions`.
-That stage is VRMA's and stays in that repository; whether this repository
-adopts its prim names or the design policy's is USD-O1, and until it is
-settled neither is frozen here.
+The prim names are the design policy's: `Skeleton`, `Body`, `Channels`
+(USD-O1, decided 2026-09-19). `usd-vrm-plugins`' `.vrma` stage uses
+`/Animation/HumanoidSkeleton` and `/Animation/BodyAnimation`, with expressions
+under `/Animation/Expressions`. That stage is VRMA's, stays in that
+repository and does not change; this stage is a different one, and a
+consumer tells them apart by `customData.motion`, not by guessing from names.
 
 ## 3. The skeleton
 
@@ -67,11 +68,14 @@ settled neither is frozen here.
 ### 4.1 Time
 
 - A sample at `t` seconds is authored at time code `t × timeCodesPerSecond`.
-- `usd-vrm-plugins` authors 30 time codes per second for every semantic clip,
-  including captures sampled at other rates; `usd-mmd-plugins` authors VMD
-  time at 30 so frames equal time codes. The design policy asks for the source
-  rate "when meaningful, otherwise a documented default" — which default, and
-  whether a 60 Hz capture authors at 60, is USD-O2.
+- **`timeCodesPerSecond` is always 30** (USD-O2, decided 2026-09-19),
+  including for a capture sampled at 60 Hz or at an irregular rate. That is
+  what `usd-vrm-plugins` authors for every semantic clip and what
+  `usd-mmd-plugins` authors for VMD time, so a stage from any of them composes
+  with the others without a retime, and the parity evidence that arrives with
+  the code needs no conversion. The design policy's "source rate when
+  meaningful" is answered by the next rule: the rate is a property of the
+  samples, which are kept, and a time code is only where they are written.
 - Sample times are authoritative; a time code is their encoding, never their
   meaning.
 
@@ -156,10 +160,11 @@ a stage bumps it; adding an optional prim or key does not.
 
 ## 9. Open questions
 
+USD-O1 (prim names, §2) and USD-O2 (time codes, §4.1) were decided on
+2026-09-19.
+
 | Id | Question | Resolve by |
 | --- | --- | --- |
-| USD-O1 | Prim names: the design policy's `Skeleton` / `Body` / `Channels`, or `usd-vrm-plugins`' shipped `HumanoidSkeleton` / `BodyAnimation` / `Expressions` | the first stage `motionUsd` authors |
-| USD-O2 | `timeCodesPerSecond`: always 30, or the source rate when it is uniform | the first non-30 Hz source authored here |
 | USD-O3 | Whether root orientation and velocities are authored explicitly, or only the hips translation | a consumer that reads them back |
 | USD-O4 | Generic channel attribute names under `/Animation/Channels` | the first channel `motionUsd` authors |
 | USD-O5 | The `Bindings` prim: typeless with namespaced properties, or a schema that passes design policy §4.3 | `usd-avatar-runtime`'s first composed scene |

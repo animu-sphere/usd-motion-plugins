@@ -8,12 +8,12 @@ nothing implemented. The "Implemented elsewhere" column says where the
 behaviour exists today, before it moves here; it is not a claim about this
 repository.
 
-Status (2026-09-17): **nothing is implemented.**
+Status (2026-09-19): **the core value types are implemented** (`motionCore`, imported).
 
 | Capability | Status | Contract | Implemented elsewhere | Release |
 | --- | --- | --- | --- | --- |
-| `HumanJoint`, `MotionPose`, `RootMotion`, `SourceMetadata` | — | [MOTION §2–§7](../design/MOTION_CONTRACT.md) | `usd-vrm-plugins` `motionCore` | v0.1.0 |
-| `MotionChannelSet` | — | [MOTION §6](../design/MOTION_CONTRACT.md#6-channels) | `usd-vrm-plugins` `ExpressionWeights` | v0.1.0 |
+| `HumanJoint` (vocabulary version 1, 55 joints, one hierarchy), `MotionPose`, `RootMotion`, `SourceMetadata`, `MotionClip`, exact `==` and `NearlyEqual` | supported — `motionCore_unit`, `motionCore_compare` | [MOTION §2–§7](../design/MOTION_CONTRACT.md) | — (imported 2026-09-19) | v0.1.0 |
+| `MotionChannelSet` with scalar values | supported — `motionCore_unit`, `motionCore_compare` | [MOTION §6](../design/MOTION_CONTRACT.md#6-channels) | — (imported 2026-09-19) | v0.1.0 |
 | Clip sampling with status, interpolation, resample, filter, blend | — | [MOTION §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling) | `usd-vrm-plugins` `motionRuntime` | v0.1.0 |
 | Stream intake, recorder, `motion-capture-trace` | — | [MOTION §9–§10](../design/MOTION_CONTRACT.md#9-motionstream-intake) | `usd-vrm-plugins` `motionRuntime` | v0.1.0 |
 | Authoring a motion stage | — | [USD §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage) | `usd-vrm-plugins` `motion_capture`, `.vrma` importer | v0.1.0 |

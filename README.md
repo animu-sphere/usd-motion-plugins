@@ -4,8 +4,9 @@ Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
 of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
 bridge every avatar format and every motion source share.
 
-> **Status: documentation and an empty build scaffold.** The design policy is
-> accepted and the contracts are proposed. The implementation arrives from
+> **Status: the first library has arrived.** The design policy is accepted,
+> the contracts are proposed, and `motionCore` — the value types every other
+> library builds on — is imported. The rest of the implementation arrives from
 > [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), where
 > it is built and measured today, one identity at a time
 > ([roadmap](docs/roadmap/current.md)); how to build the tree is in

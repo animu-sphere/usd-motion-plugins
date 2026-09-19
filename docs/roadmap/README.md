@@ -56,15 +56,13 @@ validation; its evaluator needs nothing from here.
 ## Open decisions
 
 Every open question the design documents carry, in the order they block work.
-The owning document holds the question; this list only schedules it.
+The owning document holds the question; this list only schedules it. MC-O1,
+USD-O1 and USD-O2 were decided on 2026-09-19, and MC-O4 narrowed to its
+non-scalar case, before the first import.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
 | DIAG-O1 | Diagnostic code style | [DIAGNOSTICS §3](../reference/DIAGNOSTICS.md#3-open-questions) | the first imported diagnostic |
-| MC-O1 | Joint vocabulary version 1 | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.1.0 |
-| USD-O1 | Motion stage prim names | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.1.0 |
-| USD-O2 | `timeCodesPerSecond` | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.1.0 |
-| MC-O4 | A channel's value type | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.1.0 |
 | WS-O2 | `motionRetarget`'s edge to `motionSampling` | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | v0.2.0 |
 | RT-O1 | Root-motion vocabulary | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
 | RT-O2 | Partial skeletons | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | v0.2.0 |
@@ -74,6 +72,7 @@ The owning document holds the question; this list only schedules it.
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |
 | MC-O6 | Tracking state | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a live producer |
+| MC-O4 | A non-scalar channel's value type | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | the first non-scalar channel |
 | RT-O4 | Bind transforms in the descriptor | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | a consumer |
 | USD-O3 | Explicit root orientation and velocities | [USD §9](../design/USD_MAPPING.md#9-open-questions) | a consumer |
 | USD-O5 | The `Bindings` prim | [USD §9](../design/USD_MAPPING.md#9-open-questions) | `usd-avatar-runtime` |

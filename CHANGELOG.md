@@ -38,6 +38,21 @@ separate from the package version
     `tests/installed_consumer/packages.json`. The list is empty until the first
     import, and the lane already runs.
   - The community files, and a building guide.
+- **`motionCore`, imported from `usd-vrm-plugins` with its history**
+  (Migration Phase A–B). Its 23 commits arrived through `git filter-repo`,
+  and the types were renamed on arrival in a commit of their own
+  (DESIGN_POLICY.md §42.2): namespace `openstrata::motion`; `HumanJoint`,
+  `MotionPose`, `MotionClip`, `SourceMetadata`, `MotionChannelSet` and
+  `MotionChannel` (whose weight is its `value`); `Humanoid.h` is
+  `MotionPose.h`. Four contract questions were decided before it landed:
+  MC-O1 (the 55-joint vocabulary is version 1), USD-O1 (`Skeleton` / `Body` /
+  `Channels`), USD-O2 (always 30 time codes per second) and MC-O4's scalar
+  case (a channel's value is a `float`). The boundary check refuses product,
+  device and avatar-format names in code. The package is `SameMinorVersion`,
+  and it is the installed-consumer lane's first row.
+- **The rendered CI workflow**, `ost-source-ci.yml`, with a graph cell ahead
+  of the three workspace cells. It could not be rendered for an empty
+  workspace under `ost` 0.22.10.
   - The rendered `ost` workflow is **not** included, because `ost` 0.22.10
     refuses a workspace graph with no member
     ([roadmap](docs/roadmap/current.md)).
