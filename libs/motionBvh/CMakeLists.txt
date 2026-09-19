@@ -7,7 +7,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
          _motion_bvh_version LIMIT_COUNT 1)
     string(STRIP "${_motion_bvh_version}" _motion_bvh_version)
 else()
-    set(_motion_bvh_version "0.9.0")
+    set(_motion_bvh_version "0.1.0")
 endif()
 
 project(motionBvh
@@ -16,14 +16,14 @@ project(motionBvh
     LANGUAGES CXX)
 
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT DEFINED MOTIONBVH_BUILD_TESTS)
-    if(DEFINED USDVRM_BUILD_TESTS)
-        set(_motion_bvh_tests_default "${USDVRM_BUILD_TESTS}")
+    if(DEFINED USDMOTION_BUILD_TESTS)
+        set(_motion_bvh_tests_default "${USDMOTION_BUILD_TESTS}")
     else()
         set(_motion_bvh_tests_default "${PROJECT_IS_TOP_LEVEL}")
     endif()
@@ -101,6 +101,13 @@ install(FILES
 
 if(MOTIONBVH_BUILD_TESTS)
     enable_testing()
-    find_package(Python3 COMPONENTS Interpreter QUIET)
+    # In the workspace the root has already found the interpreter (the root
+    # CMakeLists.txt says why under its own name); standalone, find it here.
+    if(NOT USDMOTION_TEST_PYTHON)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
+        endif()
+    endif()
     add_subdirectory(tests)
 endif()

@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 namespace
@@ -828,4 +828,4 @@ ParseBvhFile(const std::filesystem::path& path, BvhDocument* document, Diagnosti
     return ParseBvhText(text, document, diagnostic, resolved);
 }
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

@@ -43,7 +43,7 @@
 #include <string_view>
 #include <vector>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 // Three numbers in the file's own convention. See the header note above.
@@ -176,9 +176,9 @@ struct BvhDocument
 // because a `BvhDocument` is a plain struct that a caller — a test, a future
 // generator, an inspect tool building one to print — can also assemble by hand,
 // and every layer above is entitled to assume these invariants rather than
-// re-derive them. Failures are `VRM_BVH_PARSE_FAILED`: a document that cannot
+// re-derive them. Failures are `MOTION_BVH_PARSE_FAILED`: a document that cannot
 // have come from a file is not a semantic disagreement.
 MOTIONBVH_API bool ValidateBvhDocument(const BvhDocument& document,
                                        Diagnostic* diagnostic = nullptr);
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

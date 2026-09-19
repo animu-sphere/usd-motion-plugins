@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
-namespace motionBvhTool
+namespace motionConvertTool
 {
 
-// `motion_bvh_convert`'s arguments. A separate type from the inspect tool's
+// `motion_convert`'s arguments. A separate type from the inspect tool's
 // `Options` rather than a superset of it: the two commands share a directory
 // and a library, and nothing else. An inspection has no output and no profile,
 // a conversion has no `--frame`, and one struct carrying both would make every
@@ -24,7 +24,7 @@ struct ConvertOptions
     // A profile id, or a path to a profile file. Empty is the state a
     // conversion refuses from, and it is deliberately **not** an argument error
     // here: the frozen diagnostic set names that event
-    // `VRM_BVH_PROFILE_REQUIRED`, so main raises it with its code rather than
+    // `MOTION_BVH_PROFILE_REQUIRED`, so main raises it with its code rather than
     // as a generic complaint about argv. There is no default and no fallback
     // (roadmap §3.1).
     std::string profile;
@@ -48,7 +48,7 @@ struct ConvertOptions
     // Forwarded to the parser verbatim, exactly as the inspect tool forwards
     // them: a reader who had to raise a limit to look at a file should not have
     // to rebuild the tool to convert the same file.
-    motionBvh::BvhParseLimits limits;
+    openstrata::motion::bvh::BvhParseLimits limits;
 };
 
 // Parses argv. On failure `error` explains why and the result is false; on
@@ -60,4 +60,4 @@ bool ParseConvertOptions(const std::vector<std::string>& arguments, ConvertOptio
 
 const char* GetConvertUsage();
 
-} // namespace motionBvhTool
+} // namespace motionConvertTool

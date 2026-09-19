@@ -23,15 +23,15 @@
       "file": "malformed-channel-count.bvh",
       "status": "refused",
       "pins": "CHANNELS declares six and lists three, so the reader runs into the JOINT keyword. Reported as a structural failure naming JOINT -- calling it an unsupported channel would send the reader looking for a channel.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 233,
       "sha256": "f5e91b632d297bc9255ef26c9e03f921ce14ce677d0b4b6b910e9674fb816fa2"
     },
     {
       "file": "malformed-frame-count.bvh",
       "status": "refused",
-      "pins": "Declares four frames and carries two. There is no frame-count code in the frozen set, so this is VRM_BVH_PARSE_FAILED with the counts in its detail; inventing a code the moment a parser meets this file is the drift the freeze prevents.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "pins": "Declares four frames and carries two. There is no frame-count code in the frozen set, so this is MOTION_BVH_PARSE_FAILED with the counts in its detail; inventing a code the moment a parser meets this file is the drift the freeze prevents.",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 243,
       "sha256": "a5d415a82b60b86fc3f55fd30a73f456d5fefbc1940aee4181cf869f7e021935"
     },
@@ -39,7 +39,7 @@
       "file": "malformed-frame-time.bvh",
       "status": "refused",
       "pins": "A negative frame time. Nothing downstream can place two frames in time with it.",
-      "diagnostic": "VRM_BVH_INVALID_FRAME_TIME",
+      "diagnostic": "MOTION_BVH_INVALID_FRAME_TIME",
       "bytes": 244,
       "sha256": "873379f7a694937cb00c555cc56d650097170c8b9f78ac7e4d957e050647613e"
     },
@@ -47,7 +47,7 @@
       "file": "malformed-frame-width.bvh",
       "status": "refused",
       "pins": "The second of three rows carries five values instead of six. The refusal names that row -- which is the whole reason the motion section is read as lines rather than as a stream of numbers.",
-      "diagnostic": "VRM_BVH_FRAME_WIDTH_MISMATCH",
+      "diagnostic": "MOTION_BVH_FRAME_WIDTH_MISMATCH",
       "bytes": 264,
       "sha256": "4fd1584abd1a517a267a8c7a6d082b1cb93ab4979043234319c9fad1c437ab41"
     },
@@ -55,7 +55,7 @@
       "file": "malformed-missing-hierarchy.bvh",
       "status": "refused",
       "pins": "Starts at ROOT with no HIERARCHY keyword. The first refusal a file can earn, and it is reported on line 1 rather than after a speculative read.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 127,
       "sha256": "7917a2095f3257746e3b13aeb6be5a7e4be18f473458b86485dd0471772f559f"
     },
@@ -63,7 +63,7 @@
       "file": "malformed-missing-offset.bvh",
       "status": "refused",
       "pins": "A joint with CHANNELS and no OFFSET. A joint with no offset is not a bone, and a converter would have to invent one to build a rest pose.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 198,
       "sha256": "2f68fc5982a93b0f286d20608005704c0d0dd752be0b9031e1985d9ba713cbba"
     },
@@ -71,7 +71,7 @@
       "file": "malformed-no-motion.bvh",
       "status": "refused",
       "pins": "A hierarchy and no MOTION section. The file ends where the animation should start.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 154,
       "sha256": "b3912abc5ebfac8bd115b8f5718a753fc12e2c766c41f1ba4dc45520dd8f2ccd"
     },
@@ -79,7 +79,7 @@
       "file": "malformed-non-finite.bvh",
       "status": "refused",
       "pins": "A NaN in a motion row. Not a rounding question: a rotation that is not finite has no interpretation at any layer above.",
-      "diagnostic": "VRM_BVH_NON_FINITE_VALUE",
+      "diagnostic": "MOTION_BVH_NON_FINITE_VALUE",
       "bytes": 242,
       "sha256": "2e69b6714f9ebb59e808e08a9e26ee662bee08cbfea071cc61178ccd2174865f"
     },
@@ -87,7 +87,7 @@
       "file": "malformed-unclosed-joint.bvh",
       "status": "refused",
       "pins": "A JOINT block whose brace closes the wrong level, so MOTION arrives where a joint member was expected. Refused where the structure breaks, not at end of file.",
-      "diagnostic": "VRM_BVH_PARSE_FAILED",
+      "diagnostic": "MOTION_BVH_PARSE_FAILED",
       "bytes": 272,
       "sha256": "f2b0fa42785d14f3e24f3476f1383cecda7db6cc06de73516272072762274dad"
     },
@@ -95,7 +95,7 @@
       "file": "malformed-unsupported-channel.bvh",
       "status": "refused",
       "pins": "A CHANNELS list naming Wrotation. Refused rather than retained as an unknown column: nothing above could attribute its values, and a silently dropped channel shifts every number after it.",
-      "diagnostic": "VRM_BVH_UNSUPPORTED_CHANNEL",
+      "diagnostic": "MOTION_BVH_UNSUPPORTED_CHANNEL",
       "bytes": 189,
       "sha256": "9244c1ba5bbb11bf385596bfe99d289190387d5bb981a79353f49e5ee3d177d8"
     },

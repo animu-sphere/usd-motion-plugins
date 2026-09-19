@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace motionBvhTool
+namespace motionBvhInspectTool
 {
 namespace
 {
@@ -232,4 +232,4 @@ ParseOptions(const std::vector<std::string>& arguments, Options* options, bool* 
     return true;
 }
 
-} // namespace motionBvhTool
+} // namespace motionBvhInspectTool

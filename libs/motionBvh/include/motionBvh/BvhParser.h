@@ -16,7 +16,7 @@
 // as a flat stream of numbers, because a flat stream cannot tell a short row
 // from a missing frame — it only notices at the end of the file, and reports
 // the last frame as broken when the first one was. Reading lines puts
-// `VRM_BVH_FRAME_WIDTH_MISMATCH` on the row that is actually short. Blank lines
+// `MOTION_BVH_FRAME_WIDTH_MISMATCH` on the row that is actually short. Blank lines
 // are skipped: writers pad, and padding is not data.
 //
 // **Keywords are case-insensitive, joint names are verbatim.** Writers disagree
@@ -40,7 +40,7 @@
 #include <string>
 #include <string_view>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 // Refusals of the pathological case rather than limits anyone will meet: a
@@ -75,11 +75,11 @@ MOTIONBVH_API bool ParseBvhText(std::string_view text, BvhDocument* document,
                                 const BvhParseOptions& options = {});
 
 // Reads the file and parses it. A file that cannot be opened or read is
-// `VRM_BVH_PARSE_FAILED` with the reason in `detail`: this layer has no code of
+// `MOTION_BVH_PARSE_FAILED` with the reason in `detail`: this layer has no code of
 // its own for I/O, and inventing one would widen the frozen set for a failure
 // that is not about BVH.
 MOTIONBVH_API bool ParseBvhFile(const std::filesystem::path& path, BvhDocument* document,
                                 Diagnostic* diagnostic = nullptr,
                                 const BvhParseOptions& options = {});
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

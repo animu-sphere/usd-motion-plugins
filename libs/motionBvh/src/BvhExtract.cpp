@@ -9,19 +9,19 @@
 #include <utility>
 #include <vector>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 namespace
 {
 
-using motionSource::SourceAnimation;
-using motionSource::SourceEulerAngles;
-using motionSource::SourceEulerOrder;
-using motionSource::SourceJoint;
-using motionSource::SourceJointTrack;
-using motionSource::SourceSkeleton;
-using motionSource::SourceVec3;
+using openstrata::motion::SourceAnimation;
+using openstrata::motion::SourceEulerAngles;
+using openstrata::motion::SourceEulerOrder;
+using openstrata::motion::SourceJoint;
+using openstrata::motion::SourceJointTrack;
+using openstrata::motion::SourceSkeleton;
+using openstrata::motion::SourceVec3;
 
 constexpr std::size_t kNoColumn = static_cast<std::size_t>(-1);
 
@@ -78,7 +78,7 @@ OrderFromAxes(const std::array<int, 3>& axes, std::string* spelling)
         }
         spelling->push_back(kAxisLetters[axis]);
     }
-    return motionSource::FindSourceEulerOrder(*spelling);
+    return openstrata::motion::FindSourceEulerOrder(*spelling);
 }
 
 // Where one joint's values sit in a motion row, worked out once for the whole
@@ -118,7 +118,7 @@ BuildLayout(const BvhJoint& joint, JointLayout* layout, Diagnostic* diagnostic,
         {
             if (layout->position[static_cast<std::size_t>(axis)] != kNoColumn)
             {
-                // Not in the frozen set, so it is `VRM_BVH_PARSE_FAILED` with a
+                // Not in the frozen set, so it is `MOTION_BVH_PARSE_FAILED` with a
                 // precise detail rather than a new code (Diagnostics.h). Two
                 // columns claiming one component is unreadable rather than
                 // unmapped: taking either one would be a coin toss nobody is
@@ -253,7 +253,7 @@ ExtractBvhSource(const BvhDocument& document, SourceSkeleton* skeleton, SourceAn
             track.eulerAngles.reserve(document.frameCount);
             track.eulerOrder = layout.order;
             // The format's answer, not a producer's: see BvhExtract.h.
-            track.angleUnit = motionSource::SourceAngleUnit::Degrees;
+            track.angleUnit = openstrata::motion::SourceAngleUnit::Degrees;
         }
         for (std::size_t frame = 0; frame < document.frameCount; ++frame)
         {
@@ -296,12 +296,12 @@ ExtractBvhSource(const BvhDocument& document, SourceSkeleton* skeleton, SourceAn
     // of an invalid value reaching a converter, and the reason it carries is the
     // validator's own words rather than a guess at which shape was met.
     std::string reason;
-    if (!motionSource::ValidateSourceSkeleton(rig, &reason))
+    if (!openstrata::motion::ValidateSourceSkeleton(rig, &reason))
     {
         return Refuse(diagnostic, DiagnosticCode::ParseFailed, options.sourceId, {},
                       "the hierarchy is not a source rig: " + reason);
     }
-    if (!motionSource::ValidateSourceAnimation(clip, rig, &reason))
+    if (!openstrata::motion::ValidateSourceAnimation(clip, rig, &reason))
     {
         return Refuse(diagnostic, DiagnosticCode::ParseFailed, options.sourceId, {},
                       "the motion is not a source animation: " + reason);
@@ -312,4 +312,4 @@ ExtractBvhSource(const BvhDocument& document, SourceSkeleton* skeleton, SourceAn
     return true;
 }
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

@@ -1,11 +1,11 @@
-# motion_bvh_inspect · motion_bvh_convert
+# motion_bvh_inspect · motion_convert
 
-Two commands, one directory, and the split between them is the layer boundary:
-`motion_bvh_inspect` reports what a file **says**, and `motion_bvh_convert`
-reads it the way a named producer **meant** it. That is why the CMake project
-here is named after the layer rather than after either executable, and why they
-do not share a link line — the first names no OpenUSD at all, and the second
-authors a stage.
+Two commands, and the split between them is the layer boundary:
+`motion_bvh_inspect` reports what a file **says**, and `motion_convert`
+reads it the way a named producer **meant** it. They do not share a link line:
+the first names no OpenUSD at all, and the second authors a stage. In
+usd-vrm-plugins they shared one directory. Here each has its own
+(`tools/motionBvhInspect/`, and this one), and this README documents both.
 
 ## motion_bvh_inspect
 
@@ -25,7 +25,7 @@ That is the whole claim. It reports no unit, no up axis, no handedness, no
 rotation order and no humanoid bone, because a BVH file states none of them —
 they are facts about the application that *wrote* the file, and they live in a
 declarative producer profile one layer up
-([recorded-motion-sources.md §2](../../docs/roadmap/recorded-motion-sources.md)).
+([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
 
 ## Sections
 
@@ -56,7 +56,7 @@ whether a joint's position channels move at all is what separates translation
 animation from a rest offset restated every frame. Both are measurements, and
 both are what a profile has to be written from — which is why the tool that
 takes those measurements comes before the profile schema that consumes them
-(BVH-0 in the [plan](../../docs/roadmap/recorded-motion-sources.md)).
+(BVH-0 in the [plan](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
 
 ## What it does not do yet
 
@@ -67,13 +67,13 @@ be a candidate for. Reporting candidates arrives with the profiles; writing a
 detector first would settle the profile schema on whichever file happened to be
 inspected first, which is the failure the plan's ordering exists to prevent.
 
-## motion_bvh_convert
+## motion_convert
 
 BVH plus an explicitly named profile, to the avatar-independent semantic clip
 `motion_retarget` already consumes.
 
 ```console
-$ motion_bvh_convert capture.bvh --profile <id> --output canonical.usda
+$ motion_convert capture.bvh --profile <id> --output canonical.usda
 source:   capture.bvh
 profile:  <id> (<producer>)
 joints:   27 read, 22 bound, 5 ignored
@@ -95,12 +95,12 @@ That split is what makes one recording reusable across avatars, separates a
 parsing failure from a retarget failure, and keeps this tool free of VRM schema
 details — the source-rest-to-target-rest correction belongs to `vrmRetarget`,
 which v0.4.0 already shipped, and a converter that applied it would be a second
-one ([§4, §5](../../docs/roadmap/recorded-motion-sources.md)).
+one ([§4, §5](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
 
 ### There is no default profile
 
 A BVH file states no producer, so this tool never guesses one. `--profile` is
-required, and without it the run stops with `VRM_BVH_PROFILE_REQUIRED`. The
+required, and without it the run stops with `MOTION_BVH_PROFILE_REQUIRED`. The
 failure that forbids is specific: a near-miss profile produces motion that is
 *subtly misassembled* rather than absent, which is worse than a refusal because
 it looks like a result.
@@ -109,10 +109,10 @@ it looks like a result.
 first hit wins:
 
 1. every `--profile-dir`, in the order given
-2. `USDVRM_MOTION_PROFILE_PATH`, a list in the platform's PATH separator
-3. `<exe>/../share/usd-vrm-plugins/profiles/motion` — a `cmake --install`
+2. `USDMOTION_PROFILE_PATH`, a list in the platform's PATH separator
+3. `<exe>/../share/usd-motion-plugins/profiles/motion` — a `cmake --install`
    prefix, where the tools land in `<prefix>/bin/`
-4. `<exe>/../../../share/usd-vrm-plugins/profiles/motion` — an installed
+4. `<exe>/../../../share/usd-motion-plugins/profiles/motion` — an installed
    product, where `ost plugin product install` puts a tool member in
    `<prefix>/tools/<member>/bin/` and the product's data in `<prefix>/share/`
 5. `<exe>/../../../profiles/motion` — this repository
@@ -151,14 +151,14 @@ ran it to look at their capture would be the wrong place.
 ## Build
 
 ```sh
-cmake -S tools/motionBvh -B build/motion-bvh-tools \
+cmake -S tools/motionConvert -B build/motion-convert \
       -DCMAKE_PREFIX_PATH="<prefix holding motionBvh and motionSource>;<usd-install>"
-cmake --build build/motion-bvh-tools --config Release
-ctest --test-dir build/motion-bvh-tools -C Release --output-on-failure
+cmake --build build/motion-convert --config Release
+ctest --test-dir build/motion-convert -C Release --output-on-failure
 ```
 
 OpenUSD is needed on the prefix path, for two different reasons that are worth
-keeping apart. **`motion_bvh_convert` links it**, because authoring a clip is
+keeping apart. **`motion_convert` links it**, because authoring a clip is
 what it is for. **`motion_bvh_inspect` does not, and still needs it to
 configure**: `find_package(motionBvh)` resolves `motionSource` and, through it,
 `pxr` — the declared `motionBvh -> motionSource` edge — even though no source
@@ -170,7 +170,7 @@ artifact, which is why the boundary check does not inspect one — it checks the
 link line and the source, both of which say the same thing on every platform.
 
 The two executables have two different boundaries and the check is run twice,
-once per target. `motion_bvh_convert` is invoked with `--crossing`: it may
+once per target. `motion_convert` is invoked with `--crossing`: it may
 author a stage and name the humanoid vocabulary, and it still may not name
 `vrmRetarget` or `vrmSchema`, because the target avatar is the one thing this
 layer never binds to. The set of files each rule applies to is read out of that
@@ -187,7 +187,7 @@ and a reading of the `.bvh` text done in the test itself. A test that asked the
 parser what a file says and then checked the tool agreed would be one
 implementation agreeing with itself.
 
-`motion_bvh_convert_clip` does the same for the converter, and takes the same
+`motion_convert_clip` does the same for the converter, and takes the same
 care: it reads the `.bvh` and the profile itself, composes the Euler angles and
 walks the joint paths in its own code, and compares the clip on disk against
 that. The rest translations are checked against the sums of the `OFFSET` lines

@@ -15,11 +15,11 @@
 namespace
 {
 
-using motionSource::SourceJoint;
-using motionSource::SourceQuat;
-using motionSource::SourceSkeleton;
-using motionSource::SourceVec3;
-using motionSource::ValidateSourceSkeleton;
+using openstrata::motion::SourceJoint;
+using openstrata::motion::SourceQuat;
+using openstrata::motion::SourceSkeleton;
+using openstrata::motion::SourceVec3;
+using openstrata::motion::ValidateSourceSkeleton;
 
 SourceJoint
 MakeJoint(std::string name, int parent, SourceVec3 restTranslation)

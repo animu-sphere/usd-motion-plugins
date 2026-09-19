@@ -48,7 +48,7 @@
 #include <string_view>
 #include <vector>
 
-namespace motionSource
+namespace openstrata::motion
 {
 
 // Three numbers in the source's own basis and unit. See the header note above.
@@ -188,4 +188,4 @@ struct SourceSkeleton
 MOTIONSOURCE_API bool ValidateSourceSkeleton(const SourceSkeleton& skeleton,
                                              std::string* reason = nullptr);
 
-} // namespace motionSource
+} // namespace openstrata::motion

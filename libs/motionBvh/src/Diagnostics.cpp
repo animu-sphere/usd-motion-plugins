@@ -5,7 +5,7 @@
 #include <array>
 #include <cstdio>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 namespace
@@ -15,12 +15,12 @@ namespace
 // written out rather than derived from the enumerator spelling: a rename in the
 // enum must not silently rename a code a downstream tool matches on.
 constexpr std::array<std::string_view, DiagnosticCodeCount> kCodeStrings = {
-    "VRM_BVH_PARSE_FAILED",           "VRM_BVH_UNSUPPORTED_CHANNEL",
-    "VRM_BVH_FRAME_WIDTH_MISMATCH",   "VRM_BVH_INVALID_FRAME_TIME",
-    "VRM_BVH_NON_FINITE_VALUE",       "VRM_BVH_PROFILE_REQUIRED",
-    "VRM_BVH_PROFILE_MISMATCH",       "VRM_BVH_UNMAPPED_JOINT",
-    "VRM_BVH_REQUIRED_JOINT_MISSING", "VRM_BVH_INVALID_ROTATION_ORDER",
-    "VRM_BVH_INVALID_ROOT_POLICY",
+    "MOTION_BVH_PARSE_FAILED",           "MOTION_BVH_UNSUPPORTED_CHANNEL",
+    "MOTION_BVH_FRAME_WIDTH_MISMATCH",   "MOTION_BVH_INVALID_FRAME_TIME",
+    "MOTION_BVH_NON_FINITE_VALUE",       "MOTION_BVH_PROFILE_REQUIRED",
+    "MOTION_BVH_PROFILE_MISMATCH",       "MOTION_BVH_UNMAPPED_JOINT",
+    "MOTION_BVH_REQUIRED_JOINT_MISSING", "MOTION_BVH_INVALID_ROTATION_ORDER",
+    "MOTION_BVH_INVALID_ROOT_POLICY",
 };
 
 } // namespace
@@ -136,4 +136,4 @@ FormatDiagnostic(const Diagnostic& diagnostic)
     return line;
 }
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

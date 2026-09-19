@@ -31,25 +31,25 @@
 namespace
 {
 
-using motionSource::MatchSourceProfile;
-using motionSource::ParseSourceProfileFile;
-using motionSource::ParseSourceProfileText;
-using motionSource::RestPoseSource;
-using motionSource::RootRotationPolicy;
-using motionSource::RootTranslationPolicy;
-using motionSource::SourceAxis;
-using motionSource::SourceHandedness;
-using motionSource::SourceJoint;
-using motionSource::SourceJointMapping;
-using motionSource::SourceLengthUnit;
-using motionSource::SourceProfile;
-using motionSource::SourceProfileParseError;
-using motionSource::SourceProfileRefusal;
-using motionSource::SourceSkeleton;
-using motionSource::UnmappedJointPolicy;
-using motionSource::ValidateSourceProfile;
+using openstrata::motion::MatchSourceProfile;
+using openstrata::motion::ParseSourceProfileFile;
+using openstrata::motion::ParseSourceProfileText;
+using openstrata::motion::RestPoseSource;
+using openstrata::motion::RootRotationPolicy;
+using openstrata::motion::RootTranslationPolicy;
+using openstrata::motion::SourceAxis;
+using openstrata::motion::SourceHandedness;
+using openstrata::motion::SourceJoint;
+using openstrata::motion::SourceJointMapping;
+using openstrata::motion::SourceLengthUnit;
+using openstrata::motion::SourceProfile;
+using openstrata::motion::SourceProfileParseError;
+using openstrata::motion::SourceProfileRefusal;
+using openstrata::motion::SourceSkeleton;
+using openstrata::motion::UnmappedJointPolicy;
+using openstrata::motion::ValidateSourceProfile;
 
-using Bone = motion::HumanBone;
+using Bone = openstrata::motion::HumanJoint;
 
 // The whole vocabulary in one file, in the shape `SourceProfileFile.h` states:
 // a block mapping, two nested ones, a joint map in flow form and a flow
@@ -473,7 +473,7 @@ TestALoadedProfileMatchesARig()
     joint("propHandle", 0);
 
     const SourceProfile profile = Parse(kProfileText);
-    const motionSource::SourceProfileMatch match = MatchSourceProfile(profile, skeleton);
+    const openstrata::motion::SourceProfileMatch match = MatchSourceProfile(profile, skeleton);
     assert(match.refusal == SourceProfileRefusal::None);
     assert(match.bound.size() == 5);
     assert(match.BoundRequiredCount() == profile.RequiredMappingCount());

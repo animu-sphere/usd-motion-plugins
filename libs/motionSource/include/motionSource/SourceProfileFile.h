@@ -111,7 +111,7 @@
 #include <string>
 #include <string_view>
 
-namespace motionSource
+namespace openstrata::motion
 {
 
 // The `schemaVersion` a file must state. See the header note on why this number
@@ -146,4 +146,4 @@ MOTIONSOURCE_API bool ParseSourceProfileFile(const std::filesystem::path& path,
                                              SourceProfile* profile,
                                              SourceProfileParseError* error = nullptr);
 
-} // namespace motionSource
+} // namespace openstrata::motion

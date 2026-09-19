@@ -17,7 +17,7 @@ Three claims are checked, and each one is load-bearing rather than tidy:
   raises it holds none.
 * **No OpenUSD name, no humanoid vocabulary, no stage.** Three numbers on an
   OFFSET line are not a vector in any basis this layer knows, and which joint is
-  a `HumanBone` is a profile's answer. This is a rule about *source*, and since
+  a `HumanJoint` is a profile's answer. This is a rule about *source*, and since
   the extractor landed it is the only form the rule can take -- see below.
 
 **There is no binary import check here any more, and its removal is a
@@ -48,7 +48,7 @@ says so at length: in a monolithic OpenUSD build Gf and Sdf are the same
 library, so no import listing could tell an allowed dependency from a forbidden
 one even where the listing is stable.
 
-It runs over `tools/motionBvh` as well as over the library, because a CLI that
+It runs over `tools/motionConvert` and `tools/motionBvhInspect` as well as over the library, because a CLI that
 named a producer would put the assumption one directory away from the layer that
 forbids it and call the boundary kept. One script rather than two: a second copy
 of the producer list is a second list to keep current.
@@ -103,7 +103,7 @@ EXTRACTION_CODES = {"InvalidRotationOrder"}
 # claim that survives the grant, and it is checkable, which the previous
 # formulation ("no OpenUSD anywhere in this directory") no longer is once one
 # executable in it authors a clip.
-CROSSING_FORBIDDEN = r"vrmRetarget|vrmSchema|UsdVrm|VrmHumanoid"
+CROSSING_FORBIDDEN = r"motionRetarget|vrmRetarget|vrmSchema|UsdVrm|VrmHumanoid"
 
 
 def strip_comments(text: str) -> str:
@@ -152,8 +152,8 @@ def main() -> int:
     arguments = parser.parse_args()
 
     source = arguments.source.resolve()
-    # "libs/motionBvh" or "tools/motionBvh" -- both directories are named
-    # motionBvh, so the parent is what tells a failure apart.
+    # "libs/motionBvh", "tools/motionConvert" or "tools/motionBvhInspect": the
+    # parent and the name together tell a failure apart.
     label = f"{source.parent.name}/{source.name}"
     if arguments.cmake_target:
         label = f"{label} [{arguments.cmake_target}]"
@@ -232,9 +232,15 @@ def main() -> int:
     # library's own header names the OSC decoder in a comment about a rule the
     # two share -- and a boundary check that fired on prose would be answered
     # by deleting the sentence.
+    #
+    # The humanoid vocabulary is matched by name rather than by namespace:
+    # motionSource and motionCore share `openstrata::motion`, and this library's
+    # extractor names motionSource's types through it, so the qualification no
+    # longer tells the two apart.
     forbidden_api = re.compile(
         r"pxr/|PXR_NAMESPACE|\bGf(?:Vec|Quat|Matrix)|\bUsd[A-Z]|\bSdf[A-Z]|"
-        r"TF_REGISTRY_FUNCTION|\bHumanBone\b|\bmotion::|motionCore|"
+        r"TF_REGISTRY_FUNCTION|\bHumanJoint\w*|\bMotionPose\b|\bMotionClip\b|"
+        r"motionCore|motionRetarget|motionUsd|"
         r"vrmRetarget|vrmSchema|liveTransport|\bosc::|\bosc/")
     semantic = re.compile(r"DiagnosticCode::(?:" + "|".join(SEMANTIC_CODES) + r")\b")
     extraction_only = re.compile(
@@ -326,7 +332,7 @@ def main() -> int:
                 errors.append(f"{label} CMake must link no OpenUSD library")
                 break
     # The library's own edge, and only it. The tools directory is exempt because
-    # a tool links what a tool needs -- `motion_bvh_convert` authors a stage --
+    # a tool links what a tool needs -- `motion_convert` authors a stage --
     # and the --cmake-target filter is what keeps those apart.
     if not arguments.cmake_target:
         for call in calls:

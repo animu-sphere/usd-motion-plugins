@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace motionBvhTool
+namespace motionConvertTool
 {
 namespace
 {
@@ -81,7 +81,7 @@ TakePositive(const std::vector<std::string>& arguments, std::size_t* index, cons
 const char*
 GetConvertUsage()
 {
-    return "motion_bvh_convert - a BVH file and a named profile to a semantic "
+    return "motion_convert - a BVH file and a named profile to a semantic "
            "clip\n"
            "\n"
            "Reads a BVH file, reads it the way the named producer profile says to,\n"
@@ -96,7 +96,7 @@ GetConvertUsage()
            "is worse than a refusal because it looks like a result.\n"
            "\n"
            "Usage:\n"
-           "  motion_bvh_convert <file.bvh> --profile <id> --output <clip.usda>\n"
+           "  motion_convert <file.bvh> --profile <id> --output <clip.usda>\n"
            "\n"
            "Required:\n"
            "  --profile ID|PATH      The producer profile to read the file as: an\n"
@@ -257,4 +257,4 @@ ParseConvertOptions(const std::vector<std::string>& arguments, ConvertOptions* o
     return true;
 }
 
-} // namespace motionBvhTool
+} // namespace motionConvertTool

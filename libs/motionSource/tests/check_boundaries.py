@@ -19,7 +19,7 @@ makes that possible rather than merely intended:
   model is expressed in the source's own basis, unit and angle convention, so it
   names no Gf type and no humanoid bone. Four files are permitted a canonical
   type -- `CanonicalMetadata`, which derives the canonical provenance,
-  `SourceProfile`, whose joint map has a `HumanBone` on its right-hand side,
+  `SourceProfile`, whose joint map has a `HumanJoint` on its right-hand side,
   `SourceProfileFile`, which reads that right-hand side out of a file and cannot
   do it without naming what it reads, and `CanonicalConversion`, which produces
   canonical motion and could not do it without naming what canonical motion is
@@ -84,7 +84,7 @@ FORMAT_NAMES = [
 # was granted for the narrowest possible reason: a joint map's right-hand side is
 # a bone, so a reader of that map has to be able to turn a written word into one.
 # `CanonicalConversion` is the fourth and the last one this library has a reason
-# to grant: producing a `motion::HumanoidAnimation` is what a converter is for,
+# to grant: producing a `MotionClip` is what a converter is for,
 # and anything after it would be a second converter.
 CANONICAL_FILES = {
     "CanonicalMetadata.h", "CanonicalMetadata.cpp",
@@ -160,8 +160,14 @@ def main() -> int:
     # only where the crossing is declared, and they are one rule rather than two
     # because they answer one question: whether this file is allowed to say what
     # canonical motion is made of.
+    #
+    # By name, not by namespace: this library and motionCore share
+    # `openstrata::motion` (usd-motion-plugins' DESIGN_POLICY.md §23), so a
+    # qualification no longer says which of the two a name belongs to. The
+    # include root and motionCore's type names still do.
     canonical_api = re.compile(
-        r"\bmotion::|motionCore|\bHumanBone\b|"
+        r"motionCore|\bHumanJoint\w*|\bMotionPose\b|\bMotionClip\b|"
+        r"\bRootMotion\b|\bSourceMetadata\b|\bMotionChannel\w*|"
         r"pxr/|PXR_NAMESPACE|\bGf(?:Vec|Quat|Matrix)")
 
     for area in (source / "include", source / "src"):

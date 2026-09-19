@@ -79,9 +79,9 @@ if(WIN32)
         "PATH=path_list_prepend:$<TARGET_FILE_DIR:motionSource>"
         "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_source_gf}>"
         "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_source_gf}>/../bin")
-    if(Python3_EXECUTABLE)
+    if(USDMOTION_TEST_PYTHON)
         get_filename_component(_motion_source_python_dir
-                               "${Python3_EXECUTABLE}" DIRECTORY)
+                               "${USDMOTION_TEST_PYTHON}" DIRECTORY)
         list(APPEND _motion_source_test_path
              "PATH=path_list_prepend:${_motion_source_python_dir}")
     endif()
@@ -95,13 +95,13 @@ if(WIN32)
         ENVIRONMENT_MODIFICATION "${_motion_source_test_path}")
 endif()
 
-if(Python3_Interpreter_FOUND)
+if(USDMOTION_TEST_PYTHON)
     # Source and CMake only, and no binary argument, unlike every other boundary
     # check in this workspace: this library's one permitted dependency is
     # motionCore, whose Gf value types make an "imports no OpenUSD" claim false
     # by design. check_boundaries.py says so in place of pretending otherwise.
     add_test(NAME motionSource_boundaries
-        COMMAND "${Python3_EXECUTABLE}"
+        COMMAND "${USDMOTION_TEST_PYTHON}"
             "${CMAKE_CURRENT_SOURCE_DIR}/check_boundaries.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/..")
 endif()

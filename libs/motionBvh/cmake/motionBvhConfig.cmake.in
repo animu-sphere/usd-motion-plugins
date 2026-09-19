@@ -7,7 +7,7 @@ include(CMakeFindDependencyMacro)
 # on this line: this library's dependency is motionSource, and reaching past it
 # for OpenUSD would be this config asserting an edge the descriptor does not
 # declare.
-if(NOT TARGET motionSource::motionSource)
+if(NOT TARGET openstrata::motion::motionSource)
     find_dependency(motionSource CONFIG REQUIRED)
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/motionBvhTargets.cmake")

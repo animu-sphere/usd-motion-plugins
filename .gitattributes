@@ -15,6 +15,10 @@
 *.trace text eol=lf
 
 # Recorded motion and packet captures are compared byte for byte.
-*.bvh binary
+# A BVH file is text, and it checks out with LF everywhere as it does in
+# usd-vrm-plugins, where the corpus came from: the recorded manifest pins each
+# file's hash, so a CRLF smudge would make every recorded file a different
+# capture.
+*.bvh text eol=lf
 *.vrma binary
 *.npz binary

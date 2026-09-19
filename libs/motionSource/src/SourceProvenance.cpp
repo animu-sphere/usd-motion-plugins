@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionSource/SourceProvenance.h"
 
-namespace motionSource
+namespace openstrata::motion
 {
 
 bool
@@ -18,4 +18,4 @@ operator!=(const SourceProvenance& lhs, const SourceProvenance& rhs) noexcept
     return !(lhs == rhs);
 }
 
-} // namespace motionSource
+} // namespace openstrata::motion

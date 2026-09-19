@@ -49,7 +49,7 @@
 #include <string_view>
 #include <vector>
 
-namespace motionSource
+namespace openstrata::motion
 {
 
 // The axis sequence three angles are given in. Values are stable array indices;
@@ -231,4 +231,4 @@ MOTIONSOURCE_API bool ValidateSourceAnimation(const SourceAnimation& animation,
                                               const SourceSkeleton& skeleton,
                                               std::string* reason = nullptr);
 
-} // namespace motionSource
+} // namespace openstrata::motion

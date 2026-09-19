@@ -30,30 +30,30 @@
 #include <ostream>
 #include <string>
 
-namespace motionBvhTool
+namespace motionBvhInspectTool
 {
 
 // The counts the file states, and the repeated joint names it does not.
 // `source` is printed verbatim as the caller spelled it.
-void PrintSummary(std::ostream& out, const motionBvh::BvhDocument& document,
+void PrintSummary(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document,
                   const std::string& source);
 
 // Joints in declaration order, indented by depth, each with its offset, its
 // channels in declaration order, and the row column its first channel occupies.
-void PrintHierarchy(std::ostream& out, const motionBvh::BvhDocument& document);
+void PrintHierarchy(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document);
 
 // Row column -> joint and channel. The inverse of the hierarchy block, and the
 // one that answers "which number in this row is that".
-void PrintChannelMap(std::ostream& out, const motionBvh::BvhDocument& document);
+void PrintChannelMap(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document);
 
 // One motion row, by joint. `frameIndex` must be in range; the caller checks it
 // so the refusal can name the file's frame count.
-void PrintFrame(std::ostream& out, const motionBvh::BvhDocument& document, std::size_t frameIndex);
+void PrintFrame(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document, std::size_t frameIndex);
 
 // Per-column smallest and largest value across every frame. This is the block
 // BVH-0 measures a real producer's export with: whether a root translation is
 // in the tens or the hundredths is what separates one writer's unit from
 // another's, and it is a measurement rather than a conclusion.
-void PrintChannelRanges(std::ostream& out, const motionBvh::BvhDocument& document);
+void PrintChannelRanges(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document);
 
-} // namespace motionBvhTool
+} // namespace motionBvhInspectTool

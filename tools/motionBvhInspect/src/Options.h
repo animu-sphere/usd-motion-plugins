@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace motionBvhTool
+namespace motionBvhInspectTool
 {
 
 struct Options
@@ -34,7 +34,7 @@ struct Options
     // predicted should not have to rebuild the tool to look at it, and a test
     // can lower a limit to see the refusal without committing a pathological
     // fixture.
-    motionBvh::BvhParseLimits limits;
+    openstrata::motion::bvh::BvhParseLimits limits;
 };
 
 // Parses argv. On failure `error` explains why and the result is false; on
@@ -44,4 +44,4 @@ bool ParseOptions(const std::vector<std::string>& arguments, Options* options, b
 
 const char* GetUsage();
 
-} // namespace motionBvhTool
+} // namespace motionBvhInspectTool

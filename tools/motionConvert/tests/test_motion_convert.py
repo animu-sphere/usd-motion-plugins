@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""What `motion_bvh_convert` writes, checked against the `.bvh` text.
+"""What `motion_convert` writes, checked against the `.bvh` text.
 
 The tool composes three things this repository tests separately -- a parser, an
 extractor, and the conversion into canonical motion -- so what is left for a
@@ -510,9 +510,9 @@ def check_refusals(failures: Failures, tool: str, bvh: pathlib.Path,
     result = run_tool(tool, str(bvh), "--output", str(output))
     failures.check(result.returncode == 2,
                    f"a run with no --profile exited {result.returncode}")
-    failures.check("VRM_BVH_PROFILE_REQUIRED" in result.stderr,
+    failures.check("MOTION_BVH_PROFILE_REQUIRED" in result.stderr,
                    f"a run with no --profile did not raise "
-                   f"VRM_BVH_PROFILE_REQUIRED: {result.stderr}")
+                   f"MOTION_BVH_PROFILE_REQUIRED: {result.stderr}")
 
     # A profile id nothing provides. The refusal lists where it looked, because
     # "profile not found" with no list is the least actionable thing this tool
@@ -543,9 +543,9 @@ def check_refusals(failures: Failures, tool: str, bvh: pathlib.Path,
             result.returncode == 1,
             f"a profile mismatch exited {result.returncode}; the file is the "
             f"input that was wrong")
-        failures.check("VRM_BVH_PROFILE_MISMATCH" in result.stderr,
+        failures.check("MOTION_BVH_PROFILE_MISMATCH" in result.stderr,
                        f"a profile mismatch did not raise "
-                       f"VRM_BVH_PROFILE_MISMATCH: {result.stderr}")
+                       f"MOTION_BVH_PROFILE_MISMATCH: {result.stderr}")
 
     # A file that is not a BVH document at all: a syntax refusal, and the
     # profile is never reached.
@@ -556,8 +556,8 @@ def check_refusals(failures: Failures, tool: str, bvh: pathlib.Path,
                       str(output))
     failures.check(result.returncode == 1,
                    f"an unparseable file exited {result.returncode}")
-    failures.check("VRM_BVH_PARSE_FAILED" in result.stderr,
-                   f"an unparseable file did not raise VRM_BVH_PARSE_FAILED: "
+    failures.check("MOTION_BVH_PARSE_FAILED" in result.stderr,
+                   f"an unparseable file did not raise MOTION_BVH_PARSE_FAILED: "
                    f"{result.stderr}")
 
     # A file named as a profile whose id is not the one asked for. Refused
@@ -607,7 +607,7 @@ def check_refusals(failures: Failures, tool: str, bvh: pathlib.Path,
                       str(profile_dir), "--output", str(work))
     failures.check(result.returncode != 0,
                    "a clip that could not be written reported success")
-    failures.check("VRM_BVH_" not in result.stderr,
+    failures.check("MOTION_BVH_" not in result.stderr,
                    f"an output failure was reported as a diagnostic about the "
                    f"recorded file: {result.stderr}")
 
@@ -767,7 +767,7 @@ def check_a_profile_this_repository_did_not_ship(
                       "--output", str(work / "user-defined-mismatch.usda"))
     failures.check(
         result.returncode == 1
-        and "VRM_BVH_PROFILE_MISMATCH" in result.stderr,
+        and "MOTION_BVH_PROFILE_MISMATCH" in result.stderr,
         f"a user-defined profile was accepted for a rig it does not "
         f"describe: exit {result.returncode}, {result.stderr}")
 

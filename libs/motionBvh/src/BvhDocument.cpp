@@ -8,7 +8,7 @@
 #include <string>
 #include <unordered_set>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 namespace
@@ -371,4 +371,4 @@ ValidateBvhDocument(const BvhDocument& document, Diagnostic* diagnostic)
     return true;
 }
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

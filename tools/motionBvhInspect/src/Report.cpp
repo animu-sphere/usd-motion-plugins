@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace motionBvhTool
+namespace motionBvhInspectTool
 {
 namespace
 {
@@ -44,7 +44,7 @@ Rate(double frameTime)
 }
 
 std::string
-Offset(const motionBvh::BvhVec3& offset)
+Offset(const openstrata::motion::bvh::BvhVec3& offset)
 {
     return "(" + Value(offset.x) + ", " + Value(offset.y) + ", " + Value(offset.z) + ")";
 }
@@ -76,17 +76,17 @@ IndexWidth(std::size_t count)
 // name, and a column that said only `Hand.Xrotation` would leave a profile
 // author unable to tell which one it belongs to.
 std::string
-ChannelLabel(const motionBvh::BvhDocument& document, std::size_t jointIndex,
-             motionBvh::BvhChannel channel)
+ChannelLabel(const openstrata::motion::bvh::BvhDocument& document, std::size_t jointIndex,
+             openstrata::motion::bvh::BvhChannel channel)
 {
     return "[" + std::to_string(jointIndex) + "] " + document.joints[jointIndex].name + "." +
-           std::string(motionBvh::BvhChannelName(channel));
+           std::string(openstrata::motion::bvh::BvhChannelName(channel));
 }
 
 } // namespace
 
 void
-PrintSummary(std::ostream& out, const motionBvh::BvhDocument& document, const std::string& source)
+PrintSummary(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document, const std::string& source)
 {
     const std::size_t levels = document.joints.empty() ? 0 : document.MaxDepth() + 1;
 
@@ -110,7 +110,7 @@ PrintSummary(std::ostream& out, const motionBvh::BvhDocument& document, const st
     {
         std::map<std::string, std::size_t> counts;
         std::vector<std::string> order;
-        for (const motionBvh::BvhJoint& joint : document.joints)
+        for (const openstrata::motion::bvh::BvhJoint& joint : document.joints)
         {
             if (++counts[joint.name] == 2)
             {
@@ -127,12 +127,12 @@ PrintSummary(std::ostream& out, const motionBvh::BvhDocument& document, const st
 }
 
 void
-PrintHierarchy(std::ostream& out, const motionBvh::BvhDocument& document)
+PrintHierarchy(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document)
 {
     out << "hierarchy (declaration order; parent before child)\n";
     for (std::size_t index = 0; index < document.joints.size(); ++index)
     {
-        const motionBvh::BvhJoint& joint = document.joints[index];
+        const openstrata::motion::bvh::BvhJoint& joint = document.joints[index];
         const std::size_t depth = document.Depth(index);
 
         out << Indent(depth + 1) << "[" << index << "] " << joint.name
@@ -142,7 +142,7 @@ PrintHierarchy(std::ostream& out, const motionBvh::BvhDocument& document)
             out << " ";
             for (std::size_t i = 0; i < joint.channels.size(); ++i)
             {
-                out << (i == 0 ? "" : " ") << motionBvh::BvhChannelName(joint.channels[i]);
+                out << (i == 0 ? "" : " ") << openstrata::motion::bvh::BvhChannelName(joint.channels[i]);
             }
             out << "  column=" << joint.channelOffset;
         }
@@ -159,13 +159,13 @@ PrintHierarchy(std::ostream& out, const motionBvh::BvhDocument& document)
 }
 
 void
-PrintChannelMap(std::ostream& out, const motionBvh::BvhDocument& document)
+PrintChannelMap(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document)
 {
     out << "channel map (row column -> joint.channel)\n";
     const std::size_t width = IndexWidth(document.channelCount);
     for (std::size_t index = 0; index < document.joints.size(); ++index)
     {
-        const motionBvh::BvhJoint& joint = document.joints[index];
+        const openstrata::motion::bvh::BvhJoint& joint = document.joints[index];
         for (std::size_t i = 0; i < joint.channels.size(); ++i)
         {
             out << "  " << RightAligned(joint.channelOffset + i, width) << "  "
@@ -175,13 +175,13 @@ PrintChannelMap(std::ostream& out, const motionBvh::BvhDocument& document)
 }
 
 void
-PrintFrame(std::ostream& out, const motionBvh::BvhDocument& document, std::size_t frameIndex)
+PrintFrame(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document, std::size_t frameIndex)
 {
     out << "frame " << frameIndex << " of " << document.frameCount
         << " (t=" << Seconds(static_cast<double>(frameIndex) * document.frameTime) << " s)\n";
     for (std::size_t index = 0; index < document.joints.size(); ++index)
     {
-        const motionBvh::BvhJoint& joint = document.joints[index];
+        const openstrata::motion::bvh::BvhJoint& joint = document.joints[index];
         out << "  [" << index << "] " << joint.name;
         if (joint.channels.empty())
         {
@@ -193,7 +193,7 @@ PrintFrame(std::ostream& out, const motionBvh::BvhDocument& document, std::size_
         for (std::size_t i = 0; i < joint.channels.size(); ++i)
         {
             const std::optional<float> value = document.ChannelValue(frameIndex, index, i);
-            out << "  " << motionBvh::BvhChannelName(joint.channels[i]) << "="
+            out << "  " << openstrata::motion::bvh::BvhChannelName(joint.channels[i]) << "="
                 << (value ? Value(*value) : std::string("?"));
         }
         out << "\n";
@@ -201,7 +201,7 @@ PrintFrame(std::ostream& out, const motionBvh::BvhDocument& document, std::size_
 }
 
 void
-PrintChannelRanges(std::ostream& out, const motionBvh::BvhDocument& document)
+PrintChannelRanges(std::ostream& out, const openstrata::motion::bvh::BvhDocument& document)
 {
     out << "channel ranges over " << document.frameCount << " frame(s)\n";
     if (document.frameCount == 0 || document.channelCount == 0)
@@ -252,7 +252,7 @@ PrintChannelRanges(std::ostream& out, const motionBvh::BvhDocument& document)
     const std::size_t width = IndexWidth(document.channelCount);
     for (std::size_t index = 0; index < document.joints.size(); ++index)
     {
-        const motionBvh::BvhJoint& joint = document.joints[index];
+        const openstrata::motion::bvh::BvhJoint& joint = document.joints[index];
         for (std::size_t i = 0; i < joint.channels.size(); ++i)
         {
             const std::size_t column = joint.channelOffset + i;
@@ -264,4 +264,4 @@ PrintChannelRanges(std::ostream& out, const motionBvh::BvhDocument& document)
     }
 }
 
-} // namespace motionBvhTool
+} // namespace motionBvhInspectTool

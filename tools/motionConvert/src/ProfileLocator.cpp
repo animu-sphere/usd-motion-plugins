@@ -15,7 +15,7 @@
 #include <unistd.h>
 #endif
 
-namespace motionBvhTool
+namespace motionConvertTool
 {
 namespace
 {
@@ -132,13 +132,13 @@ ProfileSearchPath(const std::vector<std::string>& extraDirs)
     // allocates, and this reads one variable once at startup.
     std::size_t length = 0;
     char* value = nullptr;
-    if (::_dupenv_s(&value, &length, "USDVRM_MOTION_PROFILE_PATH") == 0)
+    if (::_dupenv_s(&value, &length, "USDMOTION_PROFILE_PATH") == 0)
     {
         AppendPathList(value, &directories);
         std::free(value);
     }
 #else
-    AppendPathList(std::getenv("USDVRM_MOTION_PROFILE_PATH"), &directories);
+    AppendPathList(std::getenv("USDMOTION_PROFILE_PATH"), &directories);
 #endif
 
     const std::filesystem::path executableDir = ExecutableDirectory();
@@ -146,7 +146,7 @@ ProfileSearchPath(const std::vector<std::string>& extraDirs)
     {
         // <prefix>/bin/<exe> -> <prefix>/share/... : a `cmake --install`
         // prefix, and a member archive unpacked on its own.
-        directories.push_back(executableDir.parent_path() / "share" / "usd-vrm-plugins" /
+        directories.push_back(executableDir.parent_path() / "share" / "usd-motion-plugins" /
                               "profiles" / "motion");
         // <prefix>/tools/<member>/bin/<exe> -> <prefix>/share/... : an
         // installed product, and this repository's own build tree. The two
@@ -171,7 +171,7 @@ ProfileSearchPath(const std::vector<std::string>& extraDirs)
             !memberDir.filename().empty())
         {
             const std::filesystem::path prefix = toolsDir.parent_path();
-            directories.push_back(prefix / "share" / "usd-vrm-plugins" / "profiles" / "motion");
+            directories.push_back(prefix / "share" / "usd-motion-plugins" / "profiles" / "motion");
             // tools/<member>/bin/<exe> -> the repository root's
             // profiles/motion.
             directories.push_back(prefix / "profiles" / "motion");
@@ -217,9 +217,9 @@ ResolveProfilePath(const std::string& request, const std::vector<std::string>& e
     if (directories.empty())
     {
         *error += "\n  (nowhere: pass --profile-dir, set "
-                  "USDVRM_MOTION_PROFILE_PATH, or name a file)";
+                  "USDMOTION_PROFILE_PATH, or name a file)";
     }
     return false;
 }
 
-} // namespace motionBvhTool
+} // namespace motionConvertTool

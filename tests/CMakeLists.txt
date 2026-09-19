@@ -18,6 +18,29 @@ add_test(NAME workspace_docs_selftest
     COMMAND "${USDMOTION_TEST_PYTHON}" "${PROJECT_SOURCE_DIR}/scripts/check_docs.py"
         --selftest)
 
+# A shipped profile still describes the file it claims to: a question about the
+# data, answerable with no build. The first run holds the profiles against a
+# producer's recorded export. The pair after it holds an invented rig with no
+# bytes anywhere, and the second of the two is a profile that gets exactly one
+# thing wrong and must fail -- passing alone would be satisfied by a check that
+# had quietly stopped looking.
+add_test(NAME workspace_motion_profiles
+    COMMAND "${USDMOTION_TEST_PYTHON}"
+        "${PROJECT_SOURCE_DIR}/scripts/check_motion_profiles.py")
+set_property(TEST workspace_motion_profiles APPEND PROPERTY LABELS "motion.real-corpus")
+set(_motion_profile_fixture "${PROJECT_SOURCE_DIR}/tests/motion/fixtures/profile-check")
+add_test(NAME workspace_motion_profiles_absent
+    COMMAND "${USDMOTION_TEST_PYTHON}"
+        "${PROJECT_SOURCE_DIR}/scripts/check_motion_profiles.py"
+        --profiles "${_motion_profile_fixture}/profiles"
+        --corpus "${_motion_profile_fixture}/corpus")
+add_test(NAME workspace_motion_profiles_absent_misplaced
+    COMMAND "${USDMOTION_TEST_PYTHON}"
+        "${PROJECT_SOURCE_DIR}/scripts/check_motion_profiles.py"
+        --profiles "${_motion_profile_fixture}/profiles-misplaced"
+        --corpus "${_motion_profile_fixture}/corpus")
+set_tests_properties(workspace_motion_profiles_absent_misplaced PROPERTIES WILL_FAIL TRUE)
+
 # The OpenUSD install root, from where pxrConfig.cmake was found.
 set(_usd_root "")
 if(pxr_DIR AND EXISTS "${pxr_DIR}/bin")

@@ -18,12 +18,12 @@
 namespace
 {
 
-using motionBvh::BvhChannel;
-using motionBvh::BvhDocument;
-using motionBvh::BvhJoint;
-using motionBvh::BvhVec3;
-using motionBvh::Diagnostic;
-using motionBvh::DiagnosticCode;
+using openstrata::motion::bvh::BvhChannel;
+using openstrata::motion::bvh::BvhDocument;
+using openstrata::motion::bvh::BvhJoint;
+using openstrata::motion::bvh::BvhVec3;
+using openstrata::motion::bvh::Diagnostic;
+using openstrata::motion::bvh::DiagnosticCode;
 
 BvhJoint
 MakeJoint(std::string name, int parent, std::vector<BvhChannel> channels, std::size_t channelOffset)
@@ -62,28 +62,28 @@ MakeDocument()
 void
 TestChannelVocabulary()
 {
-    assert(motionBvh::BvhChannelName(BvhChannel::Xposition) == "Xposition");
-    assert(motionBvh::BvhChannelName(BvhChannel::Zrotation) == "Zrotation");
-    assert(motionBvh::BvhChannelName(BvhChannel::Count).empty());
+    assert(openstrata::motion::bvh::BvhChannelName(BvhChannel::Xposition) == "Xposition");
+    assert(openstrata::motion::bvh::BvhChannelName(BvhChannel::Zrotation) == "Zrotation");
+    assert(openstrata::motion::bvh::BvhChannelName(BvhChannel::Count).empty());
 
     // Writers disagree about case, and a case difference is not a meaning
     // difference.
-    assert(motionBvh::FindBvhChannel("Xrotation") == BvhChannel::Xrotation);
-    assert(motionBvh::FindBvhChannel("xrotation") == BvhChannel::Xrotation);
-    assert(motionBvh::FindBvhChannel("XROTATION") == BvhChannel::Xrotation);
-    assert(motionBvh::FindBvhChannel("XRotation") == BvhChannel::Xrotation);
+    assert(openstrata::motion::bvh::FindBvhChannel("Xrotation") == BvhChannel::Xrotation);
+    assert(openstrata::motion::bvh::FindBvhChannel("xrotation") == BvhChannel::Xrotation);
+    assert(openstrata::motion::bvh::FindBvhChannel("XROTATION") == BvhChannel::Xrotation);
+    assert(openstrata::motion::bvh::FindBvhChannel("XRotation") == BvhChannel::Xrotation);
 
-    assert(!motionBvh::FindBvhChannel("Wrotation"));
-    assert(!motionBvh::FindBvhChannel("Xscale"));
-    assert(!motionBvh::FindBvhChannel("Xrotation "));
-    assert(!motionBvh::FindBvhChannel(""));
+    assert(!openstrata::motion::bvh::FindBvhChannel("Wrotation"));
+    assert(!openstrata::motion::bvh::FindBvhChannel("Xscale"));
+    assert(!openstrata::motion::bvh::FindBvhChannel("Xrotation "));
+    assert(!openstrata::motion::bvh::FindBvhChannel(""));
 
-    for (std::size_t index = 0; index < motionBvh::BvhChannelCount; ++index)
+    for (std::size_t index = 0; index < openstrata::motion::bvh::BvhChannelCount; ++index)
     {
         const auto channel = static_cast<BvhChannel>(index);
-        assert(motionBvh::BvhChannelIsPosition(channel) !=
-               motionBvh::BvhChannelIsRotation(channel));
-        assert(motionBvh::FindBvhChannel(motionBvh::BvhChannelName(channel)) == channel);
+        assert(openstrata::motion::bvh::BvhChannelIsPosition(channel) !=
+               openstrata::motion::bvh::BvhChannelIsRotation(channel));
+        assert(openstrata::motion::bvh::FindBvhChannel(openstrata::motion::bvh::BvhChannelName(channel)) == channel);
     }
 }
 
@@ -91,7 +91,7 @@ void
 TestAccessors()
 {
     const BvhDocument document = MakeDocument();
-    assert(motionBvh::ValidateBvhDocument(document));
+    assert(openstrata::motion::bvh::ValidateBvhDocument(document));
 
     const float* frame0 = document.Frame(0);
     const float* frame1 = document.Frame(1);
@@ -149,7 +149,7 @@ TestCyclicParentTerminates()
         document.joints.push_back(MakeJoint("Hips", 0, {}, 0));
         assert(document.Depth(0) == 0);
         assert(document.MaxDepth() == 0);
-        assert(!motionBvh::ValidateBvhDocument(document));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document));
     }
     {
         // A two-joint cycle, which no single index check would catch.
@@ -159,7 +159,7 @@ TestCyclicParentTerminates()
         assert(document.Depth(0) == 0);
         assert(document.Depth(1) == 0);
         assert(document.MaxDepth() == 0);
-        assert(!motionBvh::ValidateBvhDocument(document));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document));
     }
     // The accepted shape still reports real depths, so the bound did not turn
     // every answer into zero.
@@ -175,14 +175,14 @@ TestValidationRefusals()
 
     {
         BvhDocument empty;
-        assert(!motionBvh::ValidateBvhDocument(empty, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(empty, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
     }
     {
         // A second parentless joint: a BVH document has exactly one root.
         BvhDocument document = MakeDocument();
         document.joints[1].parent = -1;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
     }
     {
@@ -190,7 +190,7 @@ TestValidationRefusals()
         // array in order and would read an uninitialised parent.
         BvhDocument document = MakeDocument();
         document.joints[1].parent = 1;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
     }
     {
@@ -199,52 +199,52 @@ TestValidationRefusals()
         // wrong joint.
         BvhDocument document = MakeDocument();
         document.joints[1].channelOffset = 5;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
         assert(diagnostic.subject == "Spine");
     }
     {
         BvhDocument document = MakeDocument();
         document.channelCount = 8;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
     }
     {
         BvhDocument document = MakeDocument();
         document.values.pop_back();
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::ParseFailed);
     }
     {
         BvhDocument document = MakeDocument();
         document.values[4] = std::numeric_limits<float>::quiet_NaN();
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::NonFiniteValue);
     }
     {
         BvhDocument document = MakeDocument();
         document.joints[0].offset.y = std::numeric_limits<float>::infinity();
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::NonFiniteValue);
         assert(diagnostic.subject == "Hips");
     }
     {
         BvhDocument document = MakeDocument();
         document.joints[1].endSiteOffset->z = -std::numeric_limits<float>::infinity();
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::NonFiniteValue);
         assert(diagnostic.subject == "Spine");
     }
     {
         BvhDocument document = MakeDocument();
         document.frameTime = 0.0;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::InvalidFrameTime);
     }
     {
         BvhDocument document = MakeDocument();
         document.frameTime = -0.5;
-        assert(!motionBvh::ValidateBvhDocument(document, &diagnostic));
+        assert(!openstrata::motion::bvh::ValidateBvhDocument(document, &diagnostic));
         assert(diagnostic.code == DiagnosticCode::InvalidFrameTime);
     }
 }
@@ -259,11 +259,11 @@ TestZeroFrameTimeBelowTwoFrames()
     document.frameCount = 1;
     document.values.resize(9);
     document.frameTime = 0.0;
-    assert(motionBvh::ValidateBvhDocument(document));
+    assert(openstrata::motion::bvh::ValidateBvhDocument(document));
 
     document.frameCount = 0;
     document.values.clear();
-    assert(motionBvh::ValidateBvhDocument(document));
+    assert(openstrata::motion::bvh::ValidateBvhDocument(document));
 }
 
 } // namespace

@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-namespace motionSource
+namespace openstrata::motion
 {
 namespace
 {
@@ -329,4 +329,4 @@ ValidateSourceAnimation(const SourceAnimation& animation, const SourceSkeleton& 
     return true;
 }
 
-} // namespace motionSource
+} // namespace openstrata::motion

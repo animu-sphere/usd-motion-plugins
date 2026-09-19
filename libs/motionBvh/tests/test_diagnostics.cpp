@@ -17,42 +17,42 @@
 namespace
 {
 
-using motionBvh::Diagnostic;
-using motionBvh::DiagnosticCode;
-using motionBvh::DiagnosticSeverity;
+using openstrata::motion::bvh::Diagnostic;
+using openstrata::motion::bvh::DiagnosticCode;
+using openstrata::motion::bvh::DiagnosticSeverity;
 
 constexpr std::string_view kExpectedStrings[] = {
-    "VRM_BVH_PARSE_FAILED",           "VRM_BVH_UNSUPPORTED_CHANNEL",
-    "VRM_BVH_FRAME_WIDTH_MISMATCH",   "VRM_BVH_INVALID_FRAME_TIME",
-    "VRM_BVH_NON_FINITE_VALUE",       "VRM_BVH_PROFILE_REQUIRED",
-    "VRM_BVH_PROFILE_MISMATCH",       "VRM_BVH_UNMAPPED_JOINT",
-    "VRM_BVH_REQUIRED_JOINT_MISSING", "VRM_BVH_INVALID_ROTATION_ORDER",
-    "VRM_BVH_INVALID_ROOT_POLICY",
+    "MOTION_BVH_PARSE_FAILED",           "MOTION_BVH_UNSUPPORTED_CHANNEL",
+    "MOTION_BVH_FRAME_WIDTH_MISMATCH",   "MOTION_BVH_INVALID_FRAME_TIME",
+    "MOTION_BVH_NON_FINITE_VALUE",       "MOTION_BVH_PROFILE_REQUIRED",
+    "MOTION_BVH_PROFILE_MISMATCH",       "MOTION_BVH_UNMAPPED_JOINT",
+    "MOTION_BVH_REQUIRED_JOINT_MISSING", "MOTION_BVH_INVALID_ROTATION_ORDER",
+    "MOTION_BVH_INVALID_ROOT_POLICY",
 };
 
 void
 TestCodeStrings()
 {
-    static_assert(std::size(kExpectedStrings) == motionBvh::DiagnosticCodeCount,
+    static_assert(std::size(kExpectedStrings) == openstrata::motion::bvh::DiagnosticCodeCount,
                   "the set is frozen: a new code needs a contract change in "
                   "docs/roadmap/recorded-motion-sources.md §6 first");
 
     std::set<std::string_view> unique;
-    for (std::size_t index = 0; index < motionBvh::DiagnosticCodeCount; ++index)
+    for (std::size_t index = 0; index < openstrata::motion::bvh::DiagnosticCodeCount; ++index)
     {
         const auto code = static_cast<DiagnosticCode>(index);
-        const std::string_view text = motionBvh::DiagnosticCodeString(code);
+        const std::string_view text = openstrata::motion::bvh::DiagnosticCodeString(code);
         assert(text == kExpectedStrings[index]);
-        assert(text.rfind("VRM_BVH_", 0) == 0);
+        assert(text.rfind("MOTION_BVH_", 0) == 0);
         assert(unique.insert(text).second);
-        assert(motionBvh::FindDiagnosticCode(text) == code);
+        assert(openstrata::motion::bvh::FindDiagnosticCode(text) == code);
     }
 
     // Not a code, not this namespace's, and not an enumerator spelling.
-    assert(!motionBvh::FindDiagnosticCode("VRM_VMC_PACKET_MALFORMED"));
-    assert(!motionBvh::FindDiagnosticCode("ParseFailed"));
-    assert(!motionBvh::FindDiagnosticCode(""));
-    assert(motionBvh::DiagnosticCodeString(DiagnosticCode::Count).empty());
+    assert(!openstrata::motion::bvh::FindDiagnosticCode("VRM_VMC_PACKET_MALFORMED"));
+    assert(!openstrata::motion::bvh::FindDiagnosticCode("ParseFailed"));
+    assert(!openstrata::motion::bvh::FindDiagnosticCode(""));
+    assert(openstrata::motion::bvh::DiagnosticCodeString(DiagnosticCode::Count).empty());
 }
 
 // The split is the layer boundary: a reader raises the first five and nothing
@@ -60,19 +60,19 @@ TestCodeStrings()
 void
 TestSyntaxAndSemanticHalves()
 {
-    assert(motionBvh::SyntaxDiagnosticCodeCount == 5);
-    assert(motionBvh::DiagnosticIsSyntax(DiagnosticCode::ParseFailed));
-    assert(motionBvh::DiagnosticIsSyntax(DiagnosticCode::UnsupportedChannel));
-    assert(motionBvh::DiagnosticIsSyntax(DiagnosticCode::FrameWidthMismatch));
-    assert(motionBvh::DiagnosticIsSyntax(DiagnosticCode::InvalidFrameTime));
-    assert(motionBvh::DiagnosticIsSyntax(DiagnosticCode::NonFiniteValue));
+    assert(openstrata::motion::bvh::SyntaxDiagnosticCodeCount == 5);
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::ParseFailed));
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::UnsupportedChannel));
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::FrameWidthMismatch));
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::InvalidFrameTime));
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::NonFiniteValue));
 
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::ProfileRequired));
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::ProfileMismatch));
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::UnmappedJoint));
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::RequiredJointMissing));
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::InvalidRotationOrder));
-    assert(!motionBvh::DiagnosticIsSyntax(DiagnosticCode::InvalidRootPolicy));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::ProfileRequired));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::ProfileMismatch));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::UnmappedJoint));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::RequiredJointMissing));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::InvalidRotationOrder));
+    assert(!openstrata::motion::bvh::DiagnosticIsSyntax(DiagnosticCode::InvalidRootPolicy));
 }
 
 // One code continues, the rest stop. Nothing in the syntax half is recoverable:
@@ -80,22 +80,22 @@ TestSyntaxAndSemanticHalves()
 void
 TestSeverityAndRecoverability()
 {
-    for (std::size_t index = 0; index < motionBvh::DiagnosticCodeCount; ++index)
+    for (std::size_t index = 0; index < openstrata::motion::bvh::DiagnosticCodeCount; ++index)
     {
         const auto code = static_cast<DiagnosticCode>(index);
         const bool isUnmapped = code == DiagnosticCode::UnmappedJoint;
-        assert(motionBvh::DiagnosticIsRecoverable(code) == isUnmapped);
-        assert(motionBvh::DiagnosticDefaultSeverity(code) ==
+        assert(openstrata::motion::bvh::DiagnosticIsRecoverable(code) == isUnmapped);
+        assert(openstrata::motion::bvh::DiagnosticDefaultSeverity(code) ==
                (isUnmapped ? DiagnosticSeverity::Warning : DiagnosticSeverity::Error));
-        if (motionBvh::DiagnosticIsSyntax(code))
+        if (openstrata::motion::bvh::DiagnosticIsSyntax(code))
         {
-            assert(!motionBvh::DiagnosticIsRecoverable(code));
+            assert(!openstrata::motion::bvh::DiagnosticIsRecoverable(code));
         }
     }
 
-    assert(motionBvh::DiagnosticSeverityString(DiagnosticSeverity::Info) == "info");
-    assert(motionBvh::DiagnosticSeverityString(DiagnosticSeverity::Warning) == "warning");
-    assert(motionBvh::DiagnosticSeverityString(DiagnosticSeverity::Error) == "error");
+    assert(openstrata::motion::bvh::DiagnosticSeverityString(DiagnosticSeverity::Info) == "info");
+    assert(openstrata::motion::bvh::DiagnosticSeverityString(DiagnosticSeverity::Warning) == "warning");
+    assert(openstrata::motion::bvh::DiagnosticSeverityString(DiagnosticSeverity::Error) == "error");
 }
 
 // MakeDiagnostic fills severity and recoverable from the code, so the two
@@ -103,13 +103,13 @@ TestSeverityAndRecoverability()
 void
 TestMakeDiagnostic()
 {
-    const Diagnostic parse = motionBvh::MakeDiagnostic(DiagnosticCode::ParseFailed, "why");
+    const Diagnostic parse = openstrata::motion::bvh::MakeDiagnostic(DiagnosticCode::ParseFailed, "why");
     assert(parse.severity == DiagnosticSeverity::Error);
     assert(!parse.recoverable);
     assert(parse.detail == "why");
     assert(!parse.line);
 
-    const Diagnostic unmapped = motionBvh::MakeDiagnostic(DiagnosticCode::UnmappedJoint);
+    const Diagnostic unmapped = openstrata::motion::bvh::MakeDiagnostic(DiagnosticCode::UnmappedJoint);
     assert(unmapped.severity == DiagnosticSeverity::Warning);
     assert(unmapped.recoverable);
     assert(unmapped.detail.empty());
@@ -118,26 +118,26 @@ TestMakeDiagnostic()
 void
 TestFormatting()
 {
-    Diagnostic diagnostic = motionBvh::MakeDiagnostic(DiagnosticCode::FrameWidthMismatch,
+    Diagnostic diagnostic = openstrata::motion::bvh::MakeDiagnostic(DiagnosticCode::FrameWidthMismatch,
                                                       "expected 57 values, read 54");
     diagnostic.source = "capture.bvh";
     diagnostic.line = 42;
     diagnostic.subject = "frame 3";
-    assert(motionBvh::FormatDiagnostic(diagnostic) ==
-           "[VRM_BVH_FRAME_WIDTH_MISMATCH] error source=capture.bvh line=42 "
+    assert(openstrata::motion::bvh::FormatDiagnostic(diagnostic) ==
+           "[MOTION_BVH_FRAME_WIDTH_MISMATCH] error source=capture.bvh line=42 "
            "subject=frame 3: expected 57 values, read 54");
 
     // Absent optional fields are omitted rather than printed empty.
-    const Diagnostic bare = motionBvh::MakeDiagnostic(DiagnosticCode::ProfileRequired);
-    assert(motionBvh::FormatDiagnostic(bare) == "[VRM_BVH_PROFILE_REQUIRED] error");
+    const Diagnostic bare = openstrata::motion::bvh::MakeDiagnostic(DiagnosticCode::ProfileRequired);
+    assert(openstrata::motion::bvh::FormatDiagnostic(bare) == "[MOTION_BVH_PROFILE_REQUIRED] error");
 
     // `recoverable` is printed only when it is true -- the default is what
     // stops the read, and saying so on every line hides the one case that
     // does not.
-    Diagnostic warning = motionBvh::MakeDiagnostic(DiagnosticCode::UnmappedJoint, "no mapping");
+    Diagnostic warning = openstrata::motion::bvh::MakeDiagnostic(DiagnosticCode::UnmappedJoint, "no mapping");
     warning.subject = "PropAnchor";
-    assert(motionBvh::FormatDiagnostic(warning) ==
-           "[VRM_BVH_UNMAPPED_JOINT] warning recoverable subject=PropAnchor"
+    assert(openstrata::motion::bvh::FormatDiagnostic(warning) ==
+           "[MOTION_BVH_UNMAPPED_JOINT] warning recoverable subject=PropAnchor"
            ": no mapping");
 }
 
@@ -151,6 +151,6 @@ main()
     TestSeverityAndRecoverability();
     TestMakeDiagnostic();
     TestFormatting();
-    std::printf("motionBvh diagnostics: %zu code(s) verified\n", motionBvh::DiagnosticCodeCount);
+    std::printf("motionBvh diagnostics: %zu code(s) verified\n", openstrata::motion::bvh::DiagnosticCodeCount);
     return 0;
 }

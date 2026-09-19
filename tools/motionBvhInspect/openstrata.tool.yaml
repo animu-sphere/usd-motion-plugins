@@ -1,0 +1,15 @@
+# OpenStrata workspace-tool descriptor for motion_bvh_inspect: what a BVH file
+# holds, and which profiles fit it (WORKSPACE.md §1.2). It needs the syntax
+# layer alone, so it requires motionBvh and nothing else by name.
+schema: openstrata.tool/v1alpha1
+tool:
+  id: motion_bvh_inspect
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+  license: Apache-2.0
+executables: [motion_bvh_inspect]
+directories: [bin]
+requires:
+  libraries:
+    - id: motionBvh
+      version: ">=0.1,<0.2"

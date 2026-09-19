@@ -26,12 +26,12 @@
 #include <cstddef>
 #include <vector>
 
-namespace motionBvhTool
+namespace motionConvertTool
 {
 
 bool
-WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation& animation,
-                  const motionSource::CanonicalRestPose& rest, const std::string& clipName,
+WriteSemanticClip(const std::string& outputPath, const openstrata::motion::MotionClip& animation,
+                  const openstrata::motion::CanonicalRestPose& rest, const std::string& clipName,
                   const std::map<std::string, std::string>& provenance, std::string* error)
 {
     if (animation.samples.empty())
@@ -57,7 +57,7 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
     // because the alternative is authoring body translation onto a joint that
     // is not in the joint set, which USD would accept and no reader would
     // notice.
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
     if (!rest.present.test(hips))
     {
         *error = "the profile bound no hips, so the clip has nowhere to carry "
@@ -65,19 +65,19 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
         return false;
     }
 
-    std::vector<motion::HumanBone> bones;
+    std::vector<openstrata::motion::HumanJoint> bones;
     pxr::VtTokenArray joints;
     bones.reserve(rest.present.count());
     joints.reserve(rest.present.count());
-    for (std::size_t index = 0; index < motion::HumanBoneCount; ++index)
+    for (std::size_t index = 0; index < openstrata::motion::HumanJointCount; ++index)
     {
         if (!rest.present.test(index))
         {
             continue;
         }
-        const auto bone = static_cast<motion::HumanBone>(index);
+        const auto bone = static_cast<openstrata::motion::HumanJoint>(index);
         bones.push_back(bone);
-        joints.push_back(pxr::TfToken(motion::HumanBoneJointPath(bone, rest.present)));
+        joints.push_back(pxr::TfToken(openstrata::motion::HumanJointPath(bone, rest.present)));
     }
 
     const double frameRate = animation.nominalFrameRate > 0.0 ? animation.nominalFrameRate : 30.0;
@@ -109,7 +109,7 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
     // Canonical, not the source's: the basis change already happened, and a
     // stage restating the file's centimetres would undo it downstream.
     pxr::UsdGeomSetStageUpAxis(stage, pxr::UsdGeomTokens->y);
-    pxr::UsdGeomSetStageMetersPerUnit(stage, motionSource::CanonicalUnitInMeters);
+    pxr::UsdGeomSetStageMetersPerUnit(stage, openstrata::motion::CanonicalUnitInMeters);
     stage->SetTimeCodesPerSecond(frameRate);
     stage->SetFramesPerSecond(frameRate);
     stage->SetStartTimeCode(animation.startTime * frameRate);
@@ -132,7 +132,7 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
     const pxr::UsdSkelSkeleton skeleton = pxr::UsdSkelSkeleton::Define(stage, skeletonPath);
     pxr::VtMatrix4dArray restTransforms;
     restTransforms.reserve(bones.size());
-    for (const motion::HumanBone bone : bones)
+    for (const openstrata::motion::HumanJoint bone : bones)
     {
         const auto slot = static_cast<std::size_t>(bone);
         const pxr::GfVec3f& translation = rest.localTranslations[slot];
@@ -153,13 +153,13 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
     const pxr::VtVec3hArray identityScales(bones.size(), pxr::GfVec3h(1.0f));
     clip.CreateScalesAttr(pxr::VtValue(identityScales));
 
-    for (const motion::HumanoidPose& pose : animation.samples)
+    for (const openstrata::motion::MotionPose& pose : animation.samples)
     {
         pxr::VtVec3fArray valuesT;
         pxr::VtQuatfArray valuesR;
         valuesT.reserve(bones.size());
         valuesR.reserve(bones.size());
-        for (const motion::HumanBone bone : bones)
+        for (const openstrata::motion::HumanJoint bone : bones)
         {
             const auto slot = static_cast<std::size_t>(bone);
             // Every joint holds its rest translation, and the hips carry body
@@ -168,7 +168,7 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
             // would not mean "unmoving" -- it would collapse each bone onto its
             // parent, in a clip whose own skeleton says otherwise.
             pxr::GfVec3f translation = rest.localTranslations[slot];
-            if (bone == motion::HumanBone::Hips && pose.root.hasPosition)
+            if (bone == openstrata::motion::HumanJoint::Hips && pose.root.hasPosition)
             {
                 translation = pose.root.worldPosition;
             }
@@ -198,4 +198,4 @@ WriteSemanticClip(const std::string& outputPath, const motion::HumanoidAnimation
     return true;
 }
 
-} // namespace motionBvhTool
+} // namespace motionConvertTool

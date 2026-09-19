@@ -17,13 +17,13 @@
 // that boundary in code, and `motionBvh_boundaries` checks that the parser's
 // sources never name a semantic code.
 //
-// **A namespace that does not merge with the live one.** `VRM_BVH_*` is a
+// **A namespace that does not merge with the live one.** `MOTION_BVH_*` is a
 // recorded file's; `VRM_VMC_*` is a protocol's; `VRM_MOTION_*` is the canonical
 // layer's and belongs to the motion libraries rather than to any reader. A
 // dropped packet and a short motion row are not the same class of event, and a
 // reader should not have to know which adapter it is being compared against.
 //
-// **The set is closed, and a failure it does not name is `VRM_BVH_PARSE_FAILED`
+// **The set is closed, and a failure it does not name is `MOTION_BVH_PARSE_FAILED`
 // with a precise `detail`.** A file declaring ten frames and carrying eight is
 // the standing example: there is no frame-count code, and adding one the moment
 // a parser meets that file is exactly the drift freezing the set prevents.
@@ -37,7 +37,7 @@
 #include <string>
 #include <string_view>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 // Values are stable array indices; append only before Count, and only with a
@@ -100,7 +100,7 @@ enum class DiagnosticSeverity : std::uint8_t
     Error,
 };
 
-// The stable string, e.g. "VRM_BVH_FRAME_WIDTH_MISMATCH". This is the contract;
+// The stable string, e.g. "MOTION_BVH_FRAME_WIDTH_MISMATCH". This is the contract;
 // the enumerator spelling is not.
 MOTIONBVH_API std::string_view DiagnosticCodeString(DiagnosticCode code) noexcept;
 
@@ -114,7 +114,7 @@ MOTIONBVH_API DiagnosticSeverity DiagnosticDefaultSeverity(DiagnosticCode code) 
 MOTIONBVH_API bool DiagnosticIsSyntax(DiagnosticCode code) noexcept;
 
 // Whether a conversion can continue past this code by default. Only
-// `VRM_BVH_UNMAPPED_JOINT` can: a file carrying a joint no profile maps is the
+// `MOTION_BVH_UNMAPPED_JOINT` can: a file carrying a joint no profile maps is the
 // normal case for every producer that exports more than a humanoid, and a
 // profile's unmapped-joint policy is what decides. Nothing in the syntax half
 // is recoverable — a document is parsed whole or refused, so there is no
@@ -151,7 +151,7 @@ MOTIONBVH_API Diagnostic MakeDiagnostic(DiagnosticCode code, std::string detail 
 
 // A single deterministic line, stable enough for a golden test to compare:
 //
-//     [VRM_BVH_FRAME_WIDTH_MISMATCH] error source=capture.bvh line=42
+//     [MOTION_BVH_FRAME_WIDTH_MISMATCH] error source=capture.bvh line=42
 //     subject=frame 3: expected 57 values, read 54
 //
 // Absent optional fields are omitted rather than printed empty, the field order
@@ -160,4 +160,4 @@ MOTIONBVH_API Diagnostic MakeDiagnostic(DiagnosticCode code, std::string detail 
 // that does not.
 MOTIONBVH_API std::string FormatDiagnostic(const Diagnostic& diagnostic);
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

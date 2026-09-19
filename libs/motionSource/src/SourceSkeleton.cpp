@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-namespace motionSource
+namespace openstrata::motion
 {
 namespace
 {
@@ -263,4 +263,4 @@ ValidateSourceSkeleton(const SourceSkeleton& skeleton, std::string* reason)
     return true;
 }
 
-} // namespace motionSource
+} // namespace openstrata::motion

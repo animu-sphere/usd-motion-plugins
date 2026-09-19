@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// motion_bvh_convert — a recorded file, read the way its producer meant it.
+// motion_convert — a recorded file, read the way its producer meant it.
 //
 // This is the composition point, not the algorithm. `motionBvh` turns bytes
 // into a document and a document into source values, `motionSource` matches a
@@ -22,7 +22,7 @@
 // the code.
 //
 // *There is no default profile and no fallback.* A missing `--profile` is
-// `VRM_BVH_PROFILE_REQUIRED` and stops the run. A BVH file states no producer,
+// `MOTION_BVH_PROFILE_REQUIRED` and stops the run. A BVH file states no producer,
 // so the alternative is concluding one from joint names — and a near-miss
 // profile produces motion that is subtly misassembled rather than absent, which
 // is worse than a refusal because it looks like a result (§3.1).
@@ -47,7 +47,7 @@
 #include "motionSource/SourceProfileFile.h"
 #include "motionSource/SourceSkeleton.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -59,18 +59,18 @@
 namespace
 {
 
-using motionBvh::DiagnosticCode;
+using openstrata::motion::bvh::DiagnosticCode;
 
 void
-PrintDiagnostic(const motionBvh::Diagnostic& diagnostic)
+PrintDiagnostic(const openstrata::motion::bvh::Diagnostic& diagnostic)
 {
-    std::cerr << "motion_bvh_convert: " << motionBvh::FormatDiagnostic(diagnostic) << "\n";
+    std::cerr << "motion_convert: " << openstrata::motion::bvh::FormatDiagnostic(diagnostic) << "\n";
 }
 
-motionBvh::Diagnostic
+openstrata::motion::bvh::Diagnostic
 Raise(DiagnosticCode code, const std::string& source, std::string detail, std::string subject = {})
 {
-    motionBvh::Diagnostic diagnostic = motionBvh::MakeDiagnostic(code, std::move(detail));
+    openstrata::motion::bvh::Diagnostic diagnostic = openstrata::motion::bvh::MakeDiagnostic(code, std::move(detail));
     diagnostic.source = source;
     diagnostic.subject = std::move(subject);
     return diagnostic;
@@ -78,7 +78,7 @@ Raise(DiagnosticCode code, const std::string& source, std::string detail, std::s
 
 // A profile's typed refusal onto the reader's frozen code.
 //
-// Three of the seven collapse onto `VRM_BVH_PROFILE_MISMATCH` and that is the
+// Three of the seven collapse onto `MOTION_BVH_PROFILE_MISMATCH` and that is the
 // mapping working rather than information lost: a rig that roots elsewhere, one
 // whose hierarchy disagrees, and one that repeats a mapped name are all "this
 // profile does not describe this file", and the refusal's own `detail` carries
@@ -86,26 +86,26 @@ Raise(DiagnosticCode code, const std::string& source, std::string detail, std::s
 // acts differently on them — a missing required joint is a file from a
 // different export, an unmapped joint is a policy question the profile answers.
 DiagnosticCode
-CodeForProfileRefusal(motionSource::SourceProfileRefusal refusal)
+CodeForProfileRefusal(openstrata::motion::SourceProfileRefusal refusal)
 {
     switch (refusal)
     {
-    case motionSource::SourceProfileRefusal::RequiredJointMissing:
+    case openstrata::motion::SourceProfileRefusal::RequiredJointMissing:
         return DiagnosticCode::RequiredJointMissing;
-    case motionSource::SourceProfileRefusal::UnmappedJointRefused:
+    case openstrata::motion::SourceProfileRefusal::UnmappedJointRefused:
         return DiagnosticCode::UnmappedJoint;
-    case motionSource::SourceProfileRefusal::SkeletonInvalid:
+    case openstrata::motion::SourceProfileRefusal::SkeletonInvalid:
         // The rig came out of the document, so a rig that is not a rig is a
         // fact about the file. The set is closed and names no code for it,
-        // which is what `VRM_BVH_PARSE_FAILED` with a precise detail is for
+        // which is what `MOTION_BVH_PARSE_FAILED` with a precise detail is for
         // (Diagnostics.h).
         return DiagnosticCode::ParseFailed;
-    case motionSource::SourceProfileRefusal::ProfileInvalid:
-    case motionSource::SourceProfileRefusal::RootJointMismatch:
-    case motionSource::SourceProfileRefusal::AmbiguousJointName:
-    case motionSource::SourceProfileRefusal::HierarchyMismatch:
-    case motionSource::SourceProfileRefusal::None:
-    case motionSource::SourceProfileRefusal::Count:
+    case openstrata::motion::SourceProfileRefusal::ProfileInvalid:
+    case openstrata::motion::SourceProfileRefusal::RootJointMismatch:
+    case openstrata::motion::SourceProfileRefusal::AmbiguousJointName:
+    case openstrata::motion::SourceProfileRefusal::HierarchyMismatch:
+    case openstrata::motion::SourceProfileRefusal::None:
+    case openstrata::motion::SourceProfileRefusal::Count:
         break;
     }
     return DiagnosticCode::ProfileMismatch;
@@ -119,26 +119,26 @@ Number(double value)
     return buffer;
 }
 
-// The bones a conversion composed a chain into, in `HumanBone` order, as the
+// The bones a conversion composed a chain into, in `HumanJoint` order, as the
 // report prints them and as the clip records them.
 std::string
-BoneList(const std::vector<motion::HumanBone>& bones)
+BoneList(const std::vector<openstrata::motion::HumanJoint>& bones)
 {
     std::string text;
-    for (const motion::HumanBone bone : bones)
+    for (const openstrata::motion::HumanJoint bone : bones)
     {
         if (!text.empty())
         {
             text += ", ";
         }
-        text += std::string(motion::HumanBoneName(bone));
+        text += std::string(openstrata::motion::HumanJointName(bone));
     }
     return text;
 }
 
 void
-PrintReport(const motionSource::SourceConversion& conversion,
-            const motionSource::SourceProfile& profile, const motionBvh::BvhDocument& document,
+PrintReport(const openstrata::motion::SourceConversion& conversion,
+            const openstrata::motion::SourceProfile& profile, const openstrata::motion::bvh::BvhDocument& document,
             const std::string& sourceId, const std::string& outputPath)
 {
     const std::size_t bound = conversion.match.bound.size();
@@ -155,7 +155,7 @@ PrintReport(const motionSource::SourceConversion& conversion,
     // the two: a rig restating its rest geometry every frame lost nothing,
     // and a rig whose elbow actually translates lost motion
     // (CanonicalConversion.h).
-    const motionSource::ConversionReport& report = conversion.report;
+    const openstrata::motion::ConversionReport& report = conversion.report;
     std::printf("dropped:  %zu joint(s) whose translation varied\n",
                 report.droppedTranslationJoints.size());
     std::printf("restated: %zu joint(s) restating rest geometry\n",
@@ -174,17 +174,17 @@ main(int argc, char** argv)
 {
     const std::vector<std::string> arguments(argv + 1, argv + argc);
 
-    motionBvhTool::ConvertOptions options;
+    motionConvertTool::ConvertOptions options;
     bool showHelp = false;
     std::string error;
-    if (!motionBvhTool::ParseConvertOptions(arguments, &options, &showHelp, &error))
+    if (!motionConvertTool::ParseConvertOptions(arguments, &options, &showHelp, &error))
     {
-        std::cerr << "motion_bvh_convert: " << error << "\n\n" << motionBvhTool::GetConvertUsage();
+        std::cerr << "motion_convert: " << error << "\n\n" << motionConvertTool::GetConvertUsage();
         return 2;
     }
     if (showHelp)
     {
-        std::fputs(motionBvhTool::GetConvertUsage(), stdout);
+        std::fputs(motionConvertTool::GetConvertUsage(), stdout);
         return 0;
     }
 
@@ -203,21 +203,21 @@ main(int argc, char** argv)
     }
 
     std::filesystem::path profilePath;
-    if (!motionBvhTool::ResolveProfilePath(options.profile, options.profileDirs, &profilePath,
+    if (!motionConvertTool::ResolveProfilePath(options.profile, options.profileDirs, &profilePath,
                                            &error))
     {
-        std::cerr << "motion_bvh_convert: " << error << "\n";
+        std::cerr << "motion_convert: " << error << "\n";
         return 2;
     }
 
-    motionSource::SourceProfile profile;
-    motionSource::SourceProfileParseError profileError;
-    if (!motionSource::ParseSourceProfileFile(profilePath, &profile, &profileError))
+    openstrata::motion::SourceProfile profile;
+    openstrata::motion::SourceProfileParseError profileError;
+    if (!openstrata::motion::ParseSourceProfileFile(profilePath, &profile, &profileError))
     {
         // A malformed profile file is not an event in the reader's diagnostic
         // set (SourceProfileFile.h), and it has exactly one candidate there: a
         // profile nobody could read is a conversion with no profile, which is
-        // the state `VRM_BVH_PROFILE_REQUIRED` names.
+        // the state `MOTION_BVH_PROFILE_REQUIRED` names.
         std::string detail = profilePath.string() + ": " + profileError.reason;
         if (profileError.line != 0)
         {
@@ -231,9 +231,9 @@ main(int argc, char** argv)
     // The id a file states must be the id that was asked for. See
     // ProfileLocator.h: a renamed file would otherwise let this conversion
     // record a profile id it never read.
-    if (!motionBvhTool::ProfileRequestIsPath(options.profile) && profile.id != options.profile)
+    if (!motionConvertTool::ProfileRequestIsPath(options.profile) && profile.id != options.profile)
     {
-        std::cerr << "motion_bvh_convert: " << profilePath.string() << " states id '" << profile.id
+        std::cerr << "motion_convert: " << profilePath.string() << " states id '" << profile.id
                   << "', not '" << options.profile << "' as asked for\n";
         return 2;
     }
@@ -242,9 +242,9 @@ main(int argc, char** argv)
     // refuses an unspecified convention. Checked on the typed values rather
     // than by reading that validator's prose, because picking a code out of a
     // sentence is the thing roadmap §10 rejected -- and because this is the one
-    // raiser `VRM_BVH_INVALID_ROOT_POLICY` has.
-    if (profile.rootTranslation == motionSource::RootTranslationPolicy::Unspecified ||
-        profile.rootRotation == motionSource::RootRotationPolicy::Unspecified)
+    // raiser `MOTION_BVH_INVALID_ROOT_POLICY` has.
+    if (profile.rootTranslation == openstrata::motion::RootTranslationPolicy::Unspecified ||
+        profile.rootRotation == openstrata::motion::RootRotationPolicy::Unspecified)
     {
         PrintDiagnostic(Raise(DiagnosticCode::InvalidRootPolicy, options.inputPath,
                               profilePath.string() + " states no root translation or rotation "
@@ -254,14 +254,14 @@ main(int argc, char** argv)
     }
 
     // --- the file ----------------------------------------------------------
-    motionBvh::BvhParseOptions parseOptions;
+    openstrata::motion::bvh::BvhParseOptions parseOptions;
     parseOptions.limits = options.limits;
     // Left empty on purpose: `ParseBvhFile` fills it with the path it opened,
     // so a diagnostic names the file the parser actually read.
 
-    motionBvh::BvhDocument document;
-    motionBvh::Diagnostic diagnostic;
-    if (!motionBvh::ParseBvhFile(options.inputPath, &document, &diagnostic, parseOptions))
+    openstrata::motion::bvh::BvhDocument document;
+    openstrata::motion::bvh::Diagnostic diagnostic;
+    if (!openstrata::motion::bvh::ParseBvhFile(options.inputPath, &document, &diagnostic, parseOptions))
     {
         PrintDiagnostic(diagnostic);
         return 1;
@@ -273,43 +273,43 @@ main(int argc, char** argv)
     // between two machines in its provenance and nowhere else.
     const std::string sourceId = std::filesystem::path(options.inputPath).filename().string();
 
-    motionSource::SourceSkeleton skeleton;
-    motionSource::SourceAnimation animation;
-    motionBvh::BvhExtractOptions extractOptions;
+    openstrata::motion::SourceSkeleton skeleton;
+    openstrata::motion::SourceAnimation animation;
+    openstrata::motion::bvh::BvhExtractOptions extractOptions;
     extractOptions.sourceId = sourceId;
-    if (!motionBvh::ExtractBvhSource(document, &skeleton, &animation, &diagnostic, extractOptions))
+    if (!openstrata::motion::bvh::ExtractBvhSource(document, &skeleton, &animation, &diagnostic, extractOptions))
     {
         PrintDiagnostic(diagnostic);
         return 1;
     }
 
     // --- the crossing ------------------------------------------------------
-    const motionSource::SourceConversion conversion =
-        motionSource::ConvertSourceToCanonical(skeleton, animation, profile);
+    const openstrata::motion::SourceConversion conversion =
+        openstrata::motion::ConvertSourceToCanonical(skeleton, animation, profile);
     if (!conversion.Converted())
     {
         DiagnosticCode code = DiagnosticCode::ParseFailed;
         std::string subject;
         switch (conversion.refusal)
         {
-        case motionSource::ConversionRefusal::ProfileMismatch:
+        case openstrata::motion::ConversionRefusal::ProfileMismatch:
             code = CodeForProfileRefusal(conversion.match.refusal);
             subject = profile.id;
             break;
-        case motionSource::ConversionRefusal::AnimationInvalid:
+        case openstrata::motion::ConversionRefusal::AnimationInvalid:
             // The animation came out of the document, so this is a fact about
             // the file and takes the closed set's catch-all.
             code = DiagnosticCode::ParseFailed;
             break;
-        case motionSource::ConversionRefusal::UnsupportedRotationForm:
+        case openstrata::motion::ConversionRefusal::UnsupportedRotationForm:
             // Unreachable from this reader -- `ExtractBvhSource` writes angles
             // with an order and never quaternions -- and handled anyway, so
             // that the day a second reader lands behind this same CLI it
             // reports rather than falls through to a wrong code.
             code = DiagnosticCode::ParseFailed;
             break;
-        case motionSource::ConversionRefusal::None:
-        case motionSource::ConversionRefusal::Count:
+        case openstrata::motion::ConversionRefusal::None:
+        case openstrata::motion::ConversionRefusal::Count:
             break;
         }
         PrintDiagnostic(Raise(code, options.inputPath, conversion.detail, std::move(subject)));
@@ -320,7 +320,7 @@ main(int argc, char** argv)
     // it: `Ignore` is silent and `Refuse` already stopped the conversion above
     // (SourceProfile.h). These go to stderr while the report goes to stdout,
     // so a run that is piped somewhere keeps the two apart.
-    if (profile.unmappedJoints == motionSource::UnmappedJointPolicy::Report)
+    if (profile.unmappedJoints == openstrata::motion::UnmappedJointPolicy::Report)
     {
         for (const std::size_t index : conversion.match.unmappedJoints)
         {
@@ -352,10 +352,10 @@ main(int argc, char** argv)
     provenance["droppedTranslationJoints"] =
         std::to_string(conversion.report.droppedTranslationJoints.size());
 
-    if (!motionBvhTool::WriteSemanticClip(options.outputPath, conversion.animation, conversion.rest,
+    if (!motionConvertTool::WriteSemanticClip(options.outputPath, conversion.animation, conversion.rest,
                                           options.clipName, provenance, &error))
     {
-        std::cerr << "motion_bvh_convert: " << error << "\n";
+        std::cerr << "motion_convert: " << error << "\n";
         return 1;
     }
 

@@ -17,21 +17,21 @@
 namespace
 {
 
-using motionSource::FindSourceAngleUnit;
-using motionSource::FindSourceEulerOrder;
-using motionSource::SourceAngleUnit;
-using motionSource::SourceAngleUnitName;
-using motionSource::SourceAnimation;
-using motionSource::SourceEulerAngles;
-using motionSource::SourceEulerAxis;
-using motionSource::SourceEulerOrder;
-using motionSource::SourceEulerOrderName;
-using motionSource::SourceJoint;
-using motionSource::SourceJointTrack;
-using motionSource::SourceQuat;
-using motionSource::SourceSkeleton;
-using motionSource::SourceVec3;
-using motionSource::ValidateSourceAnimation;
+using openstrata::motion::FindSourceAngleUnit;
+using openstrata::motion::FindSourceEulerOrder;
+using openstrata::motion::SourceAngleUnit;
+using openstrata::motion::SourceAngleUnitName;
+using openstrata::motion::SourceAnimation;
+using openstrata::motion::SourceEulerAngles;
+using openstrata::motion::SourceEulerAxis;
+using openstrata::motion::SourceEulerOrder;
+using openstrata::motion::SourceEulerOrderName;
+using openstrata::motion::SourceJoint;
+using openstrata::motion::SourceJointTrack;
+using openstrata::motion::SourceQuat;
+using openstrata::motion::SourceSkeleton;
+using openstrata::motion::SourceVec3;
+using openstrata::motion::ValidateSourceAnimation;
 
 SourceSkeleton
 MakeSkeleton()

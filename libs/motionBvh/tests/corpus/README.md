@@ -39,7 +39,7 @@ application. A `mocopi-*.bvh` sitting among the format shapes is the first place
 one producer's export quietly becomes the format's definition, and the resulting
 assumptions — joint names, unit, axes, root policy — are invisible until a
 second producer disagrees
-([recorded-motion-sources.md §1](../../../../docs/roadmap/recorded-motion-sources.md)).
+([recorded-motion-sources.md §1](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
 
 None of those files carries a real skeleton, a real unit, or a real basis
 either. Joint names are placeholders and offsets are invented proportions,
@@ -66,7 +66,7 @@ beside it — hash, exporting application and version, original file name, captu
 date, frame time, joint and channel counts, **the hierarchy**, the coordinate
 and unit observations, expected diagnostics, redistribution status. That is
 enough for a later reader to tell whether a claim still holds without the file
-([roadmap §8](../../../../docs/roadmap/recorded-motion-sources.md)).
+([roadmap §8](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
 
 `hierarchy` — joint names with their parents, parent before child — is the one
 of those that is load-bearing rather than descriptive, and it is measured rather
@@ -107,7 +107,7 @@ hash moved is a different capture wearing the same name, and every observation
 written about it stops being about the bytes on disk.
 
 Two producers are described here now, which is the release condition
-([roadmap §8](../../../../docs/roadmap/recorded-motion-sources.md)) and is worth
+([roadmap §8](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)) and is worth
 more than the count suggests. The second one disagrees with the first about what
 a root joint is — it puts the locomotion on a reference node and the body's
 orientation on its child — about what an `End Site` holds, and about whether a
@@ -116,7 +116,7 @@ of the format while one export was all anybody here had read.
 
 This is the motion layer's first third-party fixture, not the repository's. The
 importer has vendored real models since its
-[spec samples](../../../../plugins/usdVrmFileFormat/tests/corpus/CORPUS.md),
+[spec samples](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/plugins/usdVrmFileFormat/tests/corpus/CORPUS.md),
 under the same rule: committed only where redistribution is cleared, recorded in
 a manifest either way.
 

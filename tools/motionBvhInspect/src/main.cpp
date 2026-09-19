@@ -5,7 +5,7 @@
 // This is the first thing anyone runs against a file the pipeline has never
 // seen, and its whole job is to answer that with the file's own words. It names
 // no producer, guesses no unit, labels no axis and maps no joint to a
-// `HumanBone`, because a BVH file states none of those — they are facts about
+// `HumanJoint`, because a BVH file states none of those — they are facts about
 // the application that wrote it (roadmap/recorded-motion-sources.md §2).
 //
 // **Reporting a producer's candidate profiles is the other half of this tool,
@@ -37,31 +37,31 @@ main(int argc, char** argv)
 {
     const std::vector<std::string> arguments(argv + 1, argv + argc);
 
-    motionBvhTool::Options options;
+    motionBvhInspectTool::Options options;
     bool showHelp = false;
     std::string error;
-    if (!motionBvhTool::ParseOptions(arguments, &options, &showHelp, &error))
+    if (!motionBvhInspectTool::ParseOptions(arguments, &options, &showHelp, &error))
     {
-        std::cerr << "motion_bvh_inspect: " << error << "\n\n" << motionBvhTool::GetUsage();
+        std::cerr << "motion_bvh_inspect: " << error << "\n\n" << motionBvhInspectTool::GetUsage();
         return 2;
     }
     if (showHelp)
     {
-        std::fputs(motionBvhTool::GetUsage(), stdout);
+        std::fputs(motionBvhInspectTool::GetUsage(), stdout);
         return 0;
     }
 
-    motionBvh::BvhParseOptions parseOptions;
+    openstrata::motion::bvh::BvhParseOptions parseOptions;
     parseOptions.limits = options.limits;
     // Left empty on purpose: `ParseBvhFile` fills it with the path it opened,
     // so the diagnostic names the file the parser actually read rather than a
     // second spelling of it assembled here.
 
-    motionBvh::BvhDocument document;
-    motionBvh::Diagnostic diagnostic;
-    if (!motionBvh::ParseBvhFile(options.inputPath, &document, &diagnostic, parseOptions))
+    openstrata::motion::bvh::BvhDocument document;
+    openstrata::motion::bvh::Diagnostic diagnostic;
+    if (!openstrata::motion::bvh::ParseBvhFile(options.inputPath, &document, &diagnostic, parseOptions))
     {
-        std::cerr << "motion_bvh_inspect: " << motionBvh::FormatDiagnostic(diagnostic) << "\n";
+        std::cerr << "motion_bvh_inspect: " << openstrata::motion::bvh::FormatDiagnostic(diagnostic) << "\n";
         return 1;
     }
 
@@ -78,26 +78,26 @@ main(int argc, char** argv)
     // One fixed order, so two runs over the same file are byte-identical and a
     // reader learns where to look: what the file is, then its shape, then how
     // to read a row, then a row, then what the rows do.
-    motionBvhTool::PrintSummary(std::cout, document, options.inputPath);
+    motionBvhInspectTool::PrintSummary(std::cout, document, options.inputPath);
     if (options.hierarchy)
     {
         std::cout << "\n";
-        motionBvhTool::PrintHierarchy(std::cout, document);
+        motionBvhInspectTool::PrintHierarchy(std::cout, document);
     }
     if (options.channelMap)
     {
         std::cout << "\n";
-        motionBvhTool::PrintChannelMap(std::cout, document);
+        motionBvhInspectTool::PrintChannelMap(std::cout, document);
     }
     if (options.frame)
     {
         std::cout << "\n";
-        motionBvhTool::PrintFrame(std::cout, document, *options.frame);
+        motionBvhInspectTool::PrintFrame(std::cout, document, *options.frame);
     }
     if (options.ranges)
     {
         std::cout << "\n";
-        motionBvhTool::PrintChannelRanges(std::cout, document);
+        motionBvhInspectTool::PrintChannelRanges(std::cout, document);
     }
     return 0;
 }

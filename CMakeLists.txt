@@ -77,6 +77,10 @@ add_subdirectory("libs/motionCore")
 add_subdirectory("libs/motionSampling")
 add_subdirectory("libs/motionRecording")
 add_subdirectory("libs/motionUsd")
+add_subdirectory("libs/motionSource")
+add_subdirectory("libs/motionBvh")
+add_subdirectory("tools/motionBvhInspect")
+add_subdirectory("tools/motionConvert")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
@@ -87,3 +91,12 @@ install(FILES
     LICENSE
     README.md
     DESTINATION "share/doc/usd-motion-plugins")
+
+# The producer profiles are package data, installed where motion_convert's
+# ProfileLocator.cpp looks for them beside its own executable
+# (WORKSPACE.md §1.2). `share/` is spelled out for the reason
+# tools/motionConvert/CMakeLists.txt gives: the path is a contract with the
+# locator, not a packaging preference.
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/profiles/motion/"
+        DESTINATION "share/usd-motion-plugins/profiles/motion"
+        FILES_MATCHING PATTERN "*.yaml")

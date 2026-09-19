@@ -95,9 +95,9 @@ if(EXISTS "${_motion_bvh_recorded}" AND EXISTS "${_motion_bvh_profiles}")
         set(_motion_bvh_conversion_path
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>"
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>/../bin")
-        if(Python3_EXECUTABLE)
+        if(USDMOTION_TEST_PYTHON)
             get_filename_component(_motion_bvh_python_dir
-                                   "${Python3_EXECUTABLE}" DIRECTORY)
+                                   "${USDMOTION_TEST_PYTHON}" DIRECTORY)
             list(APPEND _motion_bvh_conversion_path
                  "PATH=path_list_prepend:${_motion_bvh_python_dir}")
         endif()
@@ -106,7 +106,7 @@ if(EXISTS "${_motion_bvh_recorded}" AND EXISTS "${_motion_bvh_profiles}")
     endif()
 endif()
 
-if(Python3_Interpreter_FOUND)
+if(USDMOTION_TEST_PYTHON)
     # Source only, and no binary argument any more. Until the extractor this
     # also inspected a built executable's imports; the declared edge reaches
     # motionCore's Gf value types, and what that inspection then reports is the
@@ -120,7 +120,7 @@ if(Python3_Interpreter_FOUND)
     # The source rule is platform independent and is what carries the claim now:
     # no OpenUSD name in any file of this library, extractor included.
     add_test(NAME motionBvh_boundaries
-        COMMAND "${Python3_EXECUTABLE}"
+        COMMAND "${USDMOTION_TEST_PYTHON}"
             "${CMAKE_CURRENT_SOURCE_DIR}/check_boundaries.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
@@ -130,7 +130,7 @@ if(Python3_Interpreter_FOUND)
     # one implementation agreeing with itself.
     if(EXISTS "${_motion_bvh_corpus}")
         add_test(NAME motionBvh_corpusManifest
-            COMMAND "${Python3_EXECUTABLE}"
+            COMMAND "${USDMOTION_TEST_PYTHON}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/check_corpus.py"
                 --check --corpus "${CMAKE_CURRENT_SOURCE_DIR}/corpus")
     endif()
@@ -141,7 +141,7 @@ if(Python3_Interpreter_FOUND)
     # different capture wearing the same name.
     if(EXISTS "${_motion_bvh_recorded}")
         add_test(NAME motionBvh_recordedManifest
-            COMMAND "${Python3_EXECUTABLE}"
+            COMMAND "${USDMOTION_TEST_PYTHON}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/check_corpus.py"
                 --check --recorded
                 --corpus "${CMAKE_CURRENT_SOURCE_DIR}/corpus")

@@ -40,7 +40,7 @@
 // declaration would refuse a file that said exactly what it meant.
 //
 // **Rotation channels that cannot form an order are refused, and the code is
-// `VRM_BVH_INVALID_ROTATION_ORDER`.** That code sits in the frozen set's
+// `MOTION_BVH_INVALID_ROTATION_ORDER`.** That code sits in the frozen set's
 // semantic half (Diagnostics.h) and this is the one place outside the syntax
 // layer that may raise it — which is not a hole in the boundary but the
 // boundary being drawn one row further down than the parser: a joint declaring
@@ -74,7 +74,7 @@
 #include <string>
 #include <string_view>
 
-namespace motionBvh
+namespace openstrata::motion::bvh
 {
 
 // This reader's own label for the format it reads, carried into
@@ -103,9 +103,9 @@ struct BvhExtractOptions
 // would be concluding a writer from a file that states none, which is the
 // failure roadmap §3.1 forbids. The converter fills them, holding both.
 MOTIONBVH_API bool ExtractBvhSource(const BvhDocument& document,
-                                    motionSource::SourceSkeleton* skeleton,
-                                    motionSource::SourceAnimation* animation,
+                                    openstrata::motion::SourceSkeleton* skeleton,
+                                    openstrata::motion::SourceAnimation* animation,
                                     Diagnostic* diagnostic = nullptr,
                                     const BvhExtractOptions& options = {});
 
-} // namespace motionBvh
+} // namespace openstrata::motion::bvh

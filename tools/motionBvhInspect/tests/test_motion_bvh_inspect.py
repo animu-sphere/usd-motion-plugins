@@ -326,7 +326,7 @@ def check_limits(tool: str, generated: pathlib.Path,
         refused = inspect(tool, path, flag, value)
         failures.check(refused.returncode == 1,
                        f"{flag} {value} exited {refused.returncode}")
-        failures.check("[VRM_BVH_PARSE_FAILED]" in refused.stderr,
+        failures.check("[MOTION_BVH_PARSE_FAILED]" in refused.stderr,
                        f"{flag} {value} refused with {refused.stderr.strip()!r}")
         # Raised past what the file needs, the same file reads.
         accepted = inspect(tool, path, flag, "4096")
@@ -352,7 +352,7 @@ def check_command_errors(tool: str, generated: pathlib.Path,
             f"{arguments} exited {result.returncode}, expected {code}")
 
     missing = inspect(tool, str(generated / "no-such-file.bvh"))
-    failures.check("[VRM_BVH_PARSE_FAILED]" in missing.stderr,
+    failures.check("[MOTION_BVH_PARSE_FAILED]" in missing.stderr,
                    f"a missing file reported {missing.stderr.strip()!r}")
 
     helped = inspect(tool, "--help")

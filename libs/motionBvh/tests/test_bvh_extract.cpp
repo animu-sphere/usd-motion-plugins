@@ -39,17 +39,17 @@
 namespace
 {
 
-using motionBvh::BvhChannel;
-using motionBvh::BvhDocument;
-using motionBvh::BvhExtractOptions;
-using motionBvh::BvhJoint;
-using motionBvh::Diagnostic;
-using motionBvh::DiagnosticCode;
-using motionBvh::ExtractBvhSource;
-using motionSource::SourceAngleUnit;
-using motionSource::SourceAnimation;
-using motionSource::SourceEulerOrder;
-using motionSource::SourceSkeleton;
+using openstrata::motion::bvh::BvhChannel;
+using openstrata::motion::bvh::BvhDocument;
+using openstrata::motion::bvh::BvhExtractOptions;
+using openstrata::motion::bvh::BvhJoint;
+using openstrata::motion::bvh::Diagnostic;
+using openstrata::motion::bvh::DiagnosticCode;
+using openstrata::motion::bvh::ExtractBvhSource;
+using openstrata::motion::SourceAngleUnit;
+using openstrata::motion::SourceAnimation;
+using openstrata::motion::SourceEulerOrder;
+using openstrata::motion::SourceSkeleton;
 
 // A document assembled the way the parser would assemble one: channel offsets
 // follow declaration order across the whole hierarchy, and `values` is one row
@@ -60,7 +60,7 @@ class DocumentBuilder
   public:
     // Returns the new joint's index.
     std::size_t
-    AddJoint(std::string name, int parent, motionBvh::BvhVec3 offset,
+    AddJoint(std::string name, int parent, openstrata::motion::bvh::BvhVec3 offset,
              std::vector<BvhChannel> channels)
     {
         BvhJoint joint;
@@ -75,7 +75,7 @@ class DocumentBuilder
     }
 
     void
-    SetTip(std::size_t jointIndex, motionBvh::BvhVec3 offset)
+    SetTip(std::size_t jointIndex, openstrata::motion::bvh::BvhVec3 offset)
     {
         _document.joints[jointIndex].endSiteOffset = offset;
     }
@@ -104,10 +104,10 @@ class DocumentBuilder
     BvhDocument _document;
 };
 
-motionBvh::BvhVec3
+openstrata::motion::bvh::BvhVec3
 Vec(float x, float y, float z)
 {
-    motionBvh::BvhVec3 value;
+    openstrata::motion::bvh::BvhVec3 value;
     value.x = x;
     value.y = y;
     value.z = z;
@@ -167,7 +167,7 @@ TestMinimalExtraction()
     assert(animation.frameCount == 2);
     assert(animation.frameTime == 0.5);
     assert(animation.startTime == 0.0);
-    assert(animation.provenance.format == motionBvh::BvhFormatLabel());
+    assert(animation.provenance.format == openstrata::motion::bvh::BvhFormatLabel());
     assert(animation.provenance.sourceId == "fixture");
     // A reader concludes neither, and the two fields are where a caller would
     // otherwise find a guess (BvhExtract.h).
@@ -368,7 +368,7 @@ TestRotationOrderRefusals()
 void
 TestRepeatedPositionChannelIsRefused()
 {
-    // Not in the frozen set, so `VRM_BVH_PARSE_FAILED` with a precise detail
+    // Not in the frozen set, so `MOTION_BVH_PARSE_FAILED` with a precise detail
     // rather than a new code.
     DocumentBuilder builder;
     builder.AddJoint("Root", -1, Vec(0.0f, 0.0f, 0.0f),
@@ -464,7 +464,7 @@ TestParsedTextExtracts()
         "0.0 90.0 0.0 1.0 2.0 3.0 4.0 5.0 6.0\n"
         "0.1 90.5 0.2 7.0 8.0 9.0 10.0 11.0 12.0\n";
     BvhDocument document;
-    assert(motionBvh::ParseBvhText(kText, &document));
+    assert(openstrata::motion::bvh::ParseBvhText(kText, &document));
     SourceSkeleton skeleton;
     SourceAnimation animation;
     assert(Extracts(document, &skeleton, &animation));

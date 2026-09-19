@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace motionSource
+namespace openstrata::motion
 {
 namespace
 {
@@ -930,8 +930,8 @@ BuildProfile(const Node& document, SourceProfile* profile, SourceProfileParseErr
         {
             return false;
         }
-        const std::optional<motion::HumanBone> named = motion::FindHumanBone(bone->scalar);
-        if (!named || !motion::IsValidHumanBone(*named))
+        const std::optional<openstrata::motion::HumanJoint> named = openstrata::motion::FindHumanJoint(bone->scalar);
+        if (!named || !openstrata::motion::IsValidHumanJoint(*named))
         {
             // The one vocabulary whose words are not listed back: fifty-five
             // bone names in a refusal is a wall of text, and the humanoid
@@ -1040,4 +1040,4 @@ ParseSourceProfileFile(const std::filesystem::path& path, SourceProfile* profile
     return ParseSourceProfileText(text, profile, error);
 }
 
-} // namespace motionSource
+} // namespace openstrata::motion

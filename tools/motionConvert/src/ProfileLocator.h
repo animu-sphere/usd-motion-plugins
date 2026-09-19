@@ -36,10 +36,10 @@
 // test happened to be run from. The search order, first hit wins:
 //
 //   1. every `--profile-dir`, in the order given
-//   2. `USDVRM_MOTION_PROFILE_PATH`, a list in the platform's PATH separator
-//   3. `<exe>/../share/usd-vrm-plugins/profiles/motion` — a `cmake --install`
+//   2. `USDMOTION_PROFILE_PATH`, a list in the platform's PATH separator
+//   3. `<exe>/../share/usd-motion-plugins/profiles/motion` — a `cmake --install`
 //      prefix, where the tools land in `<prefix>/bin/`
-//   4. `<exe>/../../../share/usd-vrm-plugins/profiles/motion` — an installed
+//   4. `<exe>/../../../share/usd-motion-plugins/profiles/motion` — an installed
 //      **product**, where `ost plugin product install` lands a tool member in
 //      `<prefix>/tools/<member>/bin/` and the product's own data in
 //      `<prefix>/share/`
@@ -61,12 +61,12 @@
 // from an installed product was performed, and the agreement turned out to be
 // with a layout the product does not use. Which is the whole argument for
 // writing the smoke rather than reasoning about the destination: this file
-// named `<prefix>/share/usd-vrm-plugins/profiles/motion` correctly and looked
+// named `<prefix>/share/usd-motion-plugins/profiles/motion` correctly and looked
 // somewhere else.
 //
 // `share` in the third and the fourth is literal on every platform, and that is
 // the contract rather than an assumption about GNUInstallDirs: WORKSPACE.md §5
-// names `share/usd-vrm-plugins/profiles/motion/`, and every install rule that
+// names `share/usd-motion-plugins/profiles/motion/`, and every install rule that
 // places these files spells it the same way for the same reason. A lookup that
 // followed a configurable data directory while the packager's rule followed
 // another would leave the converter finding nothing — and finding nothing means
@@ -101,7 +101,7 @@
 #include <string>
 #include <vector>
 
-namespace motionBvhTool
+namespace motionConvertTool
 {
 
 // Whether `request` names a file rather than an id. See the header note.
@@ -118,4 +118,4 @@ std::vector<std::filesystem::path> ProfileSearchPath(const std::vector<std::stri
 bool ResolveProfilePath(const std::string& request, const std::vector<std::string>& extraDirs,
                         std::filesystem::path* path, std::string* error);
 
-} // namespace motionBvhTool
+} // namespace motionConvertTool

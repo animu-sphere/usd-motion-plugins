@@ -33,11 +33,11 @@
 namespace
 {
 
-using motionBvh::BvhChannel;
-using motionBvh::BvhDocument;
-using motionBvh::BvhParseOptions;
-using motionBvh::Diagnostic;
-using motionBvh::DiagnosticCode;
+using openstrata::motion::bvh::BvhChannel;
+using openstrata::motion::bvh::BvhDocument;
+using openstrata::motion::bvh::BvhParseOptions;
+using openstrata::motion::bvh::Diagnostic;
+using openstrata::motion::bvh::DiagnosticCode;
 
 constexpr std::string_view kMinimal =
     "HIERARCHY\n"
@@ -65,7 +65,7 @@ bool
 Parses(std::string_view text, BvhDocument* document = nullptr)
 {
     BvhDocument local;
-    return motionBvh::ParseBvhText(text, document ? document : &local);
+    return openstrata::motion::bvh::ParseBvhText(text, document ? document : &local);
 }
 
 Diagnostic
@@ -73,11 +73,11 @@ Refusal(std::string_view text, const BvhParseOptions& options = {})
 {
     BvhDocument document;
     Diagnostic diagnostic;
-    const bool parsed = motionBvh::ParseBvhText(text, &document, &diagnostic, options);
+    const bool parsed = openstrata::motion::bvh::ParseBvhText(text, &document, &diagnostic, options);
     assert(!parsed);
     // Every refusal this layer raises is a syntax code: it does not know what a
     // profile is, so it cannot be the layer that disagrees with one.
-    assert(motionBvh::DiagnosticIsSyntax(diagnostic.code));
+    assert(openstrata::motion::bvh::DiagnosticIsSyntax(diagnostic.code));
     return diagnostic;
 }
 
@@ -86,24 +86,24 @@ TestMinimalDocument()
 {
     BvhDocument document;
     Diagnostic diagnostic;
-    assert(motionBvh::ParseBvhText(kMinimal, &document, &diagnostic));
-    assert(motionBvh::ValidateBvhDocument(document));
+    assert(openstrata::motion::bvh::ParseBvhText(kMinimal, &document, &diagnostic));
+    assert(openstrata::motion::bvh::ValidateBvhDocument(document));
 
     assert(document.joints.size() == 2);
     assert(document.joints[0].name == "Hips");
     assert(document.joints[0].parent == -1);
-    assert(document.joints[0].offset == motionBvh::BvhVec3{});
+    assert(document.joints[0].offset == openstrata::motion::bvh::BvhVec3{});
     assert(document.joints[0].channels.size() == 6);
     assert(document.joints[0].channelOffset == 0);
     assert(!document.joints[0].endSiteOffset);
 
     assert(document.joints[1].name == "Spine");
     assert(document.joints[1].parent == 0);
-    assert((document.joints[1].offset == motionBvh::BvhVec3{0.0f, 10.5f, 0.0f}));
+    assert((document.joints[1].offset == openstrata::motion::bvh::BvhVec3{0.0f, 10.5f, 0.0f}));
     assert(document.joints[1].channels.size() == 3);
     assert(document.joints[1].channelOffset == 6);
     assert(document.joints[1].endSiteOffset);
-    assert((*document.joints[1].endSiteOffset == motionBvh::BvhVec3{0.0f, 5.25f, 0.0f}));
+    assert((*document.joints[1].endSiteOffset == openstrata::motion::bvh::BvhVec3{0.0f, 5.25f, 0.0f}));
 
     assert(document.channelCount == 9);
     assert(document.frameCount == 2);
@@ -132,7 +132,7 @@ TestDeclarationOrderIsRetained()
         "Frame Time: 0.04\n"
         "0 0 0 10 20 30\n";
     BvhDocument document;
-    assert(motionBvh::ParseBvhText(text, &document));
+    assert(openstrata::motion::bvh::ParseBvhText(text, &document));
     const std::vector<BvhChannel>& channels = document.joints[0].channels;
     assert(channels[3] == BvhChannel::Yrotation);
     assert(channels[4] == BvhChannel::Xrotation);
@@ -159,8 +159,8 @@ TestWriterVariation()
     }
     BvhDocument fromCrlf;
     BvhDocument fromLf;
-    assert(motionBvh::ParseBvhText(crlf, &fromCrlf));
-    assert(motionBvh::ParseBvhText(kMinimal, &fromLf));
+    assert(openstrata::motion::bvh::ParseBvhText(crlf, &fromCrlf));
+    assert(openstrata::motion::bvh::ParseBvhText(kMinimal, &fromLf));
     assert(fromCrlf.values == fromLf.values);
     assert(fromCrlf.frameTime == fromLf.frameTime);
     assert(fromCrlf.joints.size() == fromLf.joints.size());
@@ -170,7 +170,7 @@ TestWriterVariation()
     // wrong with.
     const std::string bom = "\xEF\xBB\xBF" + std::string(kMinimal);
     BvhDocument fromBom;
-    assert(motionBvh::ParseBvhText(bom, &fromBom));
+    assert(openstrata::motion::bvh::ParseBvhText(bom, &fromBom));
     assert(fromBom.values == fromLf.values);
 
     const std::string_view lowercase = "hierarchy\n"
@@ -190,7 +190,7 @@ TestWriterVariation()
                                        "   1.0   2.0   3.0   \n"
                                        "\n";
     BvhDocument lowered;
-    assert(motionBvh::ParseBvhText(lowercase, &lowered));
+    assert(openstrata::motion::bvh::ParseBvhText(lowercase, &lowered));
     assert(lowered.joints.size() == 1);
     assert(lowered.joints[0].name == "hips"); // verbatim, never folded
     assert(lowered.joints[0].channels[0] == BvhChannel::Zrotation);
@@ -220,7 +220,7 @@ TestStaticJointAndEmptyMotion()
                                          "Frame Time: 0.04\n"
                                          "1 2 3\n";
     BvhDocument document;
-    assert(motionBvh::ParseBvhText(staticJoint, &document));
+    assert(openstrata::motion::bvh::ParseBvhText(staticJoint, &document));
     assert(document.joints.size() == 2);
     assert(document.joints[1].channels.empty());
     assert(document.joints[1].channelOffset == 3);
@@ -236,7 +236,7 @@ TestStaticJointAndEmptyMotion()
                                    "Frames: 0\n"
                                    "Frame Time: 0.0333333\n";
     BvhDocument none;
-    assert(motionBvh::ParseBvhText(empty, &none));
+    assert(openstrata::motion::bvh::ParseBvhText(empty, &none));
     assert(none.frameCount == 0);
     assert(none.values.empty());
     assert(none.Frame(0) == nullptr);
@@ -415,11 +415,11 @@ void
 TestFailureLeavesTheDocumentUntouched()
 {
     BvhDocument document;
-    assert(motionBvh::ParseBvhText(kMinimal, &document));
+    assert(openstrata::motion::bvh::ParseBvhText(kMinimal, &document));
     const BvhDocument before = document;
 
     Diagnostic diagnostic;
-    assert(!motionBvh::ParseBvhText("HIERARCHY\nROOT Hips\n{\n", &document, &diagnostic));
+    assert(!openstrata::motion::bvh::ParseBvhText("HIERARCHY\nROOT Hips\n{\n", &document, &diagnostic));
     assert(document.joints.size() == before.joints.size());
     assert(document.values == before.values);
     assert(document.frameCount == before.frameCount);
@@ -431,8 +431,8 @@ TestDeterminism()
 {
     BvhDocument first;
     BvhDocument second;
-    assert(motionBvh::ParseBvhText(kMinimal, &first));
-    assert(motionBvh::ParseBvhText(kMinimal, &second));
+    assert(openstrata::motion::bvh::ParseBvhText(kMinimal, &first));
+    assert(openstrata::motion::bvh::ParseBvhText(kMinimal, &second));
     assert(first.values == second.values);
     assert(first.channelCount == second.channelCount);
     assert(first.frameTime == second.frameTime);
@@ -459,7 +459,7 @@ TestDiagnosticSource()
     // widen the frozen set for a failure that is not about BVH.
     BvhDocument document;
     Diagnostic missing;
-    assert(!motionBvh::ParseBvhFile("does-not-exist.bvh", &document, &missing));
+    assert(!openstrata::motion::bvh::ParseBvhFile("does-not-exist.bvh", &document, &missing));
     assert(missing.code == DiagnosticCode::ParseFailed);
     assert(missing.source == "does-not-exist.bvh");
 }
@@ -551,7 +551,7 @@ RunCorpus(const std::filesystem::path& directory, const std::string& half)
 
         BvhDocument document;
         Diagnostic diagnostic;
-        const bool parsed = motionBvh::ParseBvhFile(entry.path(), &document, &diagnostic);
+        const bool parsed = openstrata::motion::bvh::ParseBvhFile(entry.path(), &document, &diagnostic);
         if (parsed != expectation->second.parses)
         {
             std::fprintf(stderr, "%s: expected %s, got %s (%s)\n", name.c_str(),
@@ -568,7 +568,7 @@ RunCorpus(const std::filesystem::path& directory, const std::string& half)
             {
                 std::fprintf(
                     stderr, "%s: expected %s, got %s\n", name.c_str(),
-                    std::string(motionBvh::DiagnosticCodeString(expectation->second.code)).c_str(),
+                    std::string(openstrata::motion::bvh::DiagnosticCodeString(expectation->second.code)).c_str(),
                     FormatDiagnostic(diagnostic).c_str());
                 ++failures;
                 continue;
@@ -618,7 +618,7 @@ RunCorpus(const std::filesystem::path& directory, const std::string& half)
             ok = false;
         }
         Diagnostic validation;
-        if (!motionBvh::ValidateBvhDocument(document, &validation))
+        if (!openstrata::motion::bvh::ValidateBvhDocument(document, &validation))
         {
             std::fprintf(stderr, "%s: %s\n", name.c_str(), FormatDiagnostic(validation).c_str());
             ok = false;
