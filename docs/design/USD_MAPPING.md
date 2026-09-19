@@ -78,6 +78,13 @@ consumer tells them apart by `customData.motion`, not by guessing from names.
   samples, which are kept, and a time code is only where they are written.
 - Sample times are authoritative; a time code is their encoding, never their
   meaning.
+- **`Body` also states the rate as `motion:timeCodesPerSecond`**, written from
+  the same number as the stage metadata. The attribute is a shim: an OpenExec
+  computation cannot read stage metadata in 26.08, and the attribute is retired
+  when a release lets it
+  ([EXEC_CONTRACT.md §5.1](EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)).
+  It is the only evaluation input a motion asset carries. Every other one is
+  the composed scene's (EXEC_CONTRACT §5.6).
 
 ### 4.2 Transforms — `scales` is mandatory
 
