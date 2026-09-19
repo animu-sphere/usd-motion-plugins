@@ -243,6 +243,43 @@ TestRootMotionIntakeModes()
     assert(rootless.GetStats().rootSamplesObserved == 0);
 }
 
+// The rule a session applies, as a pure function: the answer a caller that
+// holds the previous pose itself gets, with no session and no statistics.
+void
+TestRootIntakeIsAPureFunctionTheSessionCalls()
+{
+    using openstrata::motion::ConditionRootMotion;
+    using openstrata::motion::RootMotionIntake;
+    const openstrata::motion::MotionPose prior = MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 0.0f));
+    const openstrata::motion::MotionPose pose = MakeFrame(0.5, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 1.0f));
+
+    const openstrata::motion::RootMotion derived =
+        ConditionRootMotion(prior, pose, RootMotionIntake::DeriveVelocity);
+    assert(derived.hasPosition && derived.hasLinearVelocity);
+    assert(NearlyEqual(derived.linearVelocity, pxr::GfVec3f(0.0f, 0.0f, 2.0f)));
+
+    // Exactly the session's answer for the same two frames.
+    openstrata::motion::LiveCaptureSource source;
+    assert(source.Push(prior));
+    assert(source.Push(pose));
+    assert(source.GetBuffer().GetNewest().root == derived);
+
+    // No previous pose is the pose itself: no time has passed, nothing is derived.
+    assert(!ConditionRootMotion(pose, pose, RootMotionIntake::DeriveVelocity).hasLinearVelocity);
+    // A prior at or after the pose derives nothing either -- the case a
+    // seed-then-push through a session got wrong, because the session refuses it.
+    assert(!ConditionRootMotion(pose, prior, RootMotionIntake::DeriveVelocity).hasLinearVelocity);
+
+    // A reported velocity is kept, not replaced.
+    openstrata::motion::MotionPose reported = pose;
+    reported.root.linearVelocity = pxr::GfVec3f(7.0f, 0.0f, 0.0f);
+    reported.root.hasLinearVelocity = true;
+    assert(ConditionRootMotion(prior, reported, RootMotionIntake::DeriveVelocity) == reported.root);
+
+    assert(ConditionRootMotion(prior, pose, RootMotionIntake::Passthrough) == pose.root);
+    assert(ConditionRootMotion(prior, pose, RootMotionIntake::Ignore) == openstrata::motion::RootMotion());
+}
+
 void
 TestOutOfOrderAndStaleFramesAreSeparated()
 {
@@ -1017,6 +1054,7 @@ main(int argc, char** argv)
     TestConfidenceGateResolvesThroughTheMissingJointPolicy();
     TestConfidenceIsNotGatedWhenTheAdapterReportsNone();
     TestRootMotionIntakeModes();
+    TestRootIntakeIsAPureFunctionTheSessionCalls();
     TestOutOfOrderAndStaleFramesAreSeparated();
     TestClockAlignmentAndSampleStatus();
     TestAnEmptySourceIsUnavailableRatherThanWrong();

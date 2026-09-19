@@ -2,12 +2,15 @@
 #include "motionSampling/Blend.h"
 #include "motionSampling/Filter.h"
 #include "motionSampling/Interpolation.h"
+#include "motionSampling/MotionSource.h"
 #include "motionSampling/PoseBuffer.h"
 #include "motionSampling/Resample.h"
 
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <limits>
+#include <optional>
 
 namespace
 {
@@ -367,15 +370,162 @@ TestBlendWeightsAndUnitLength()
     assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 0.0f).localRotations[hips], RotationX(0.0f)));
     assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 1.0f).localRotations[hips], RotationX(90.0f)));
 
-    const openstrata::motion::MotionPose even = openstrata::motion::BlendPoses({{a, 1.0f}, {b, 1.0f}});
-    assert(SameOrientation(even.localRotations[hips], RotationX(45.0f)));
-    assert(NearlyEqual(even.localRotations[hips].GetLength(), 1.0f));
+    const std::optional<openstrata::motion::MotionPose> even =
+        openstrata::motion::BlendPoses({{a, 1.0f}, {b, 1.0f}});
+    assert(even);
+    assert(SameOrientation(even->localRotations[hips], RotationX(45.0f)));
+    assert(NearlyEqual(even->localRotations[hips].GetLength(), 1.0f));
 
     // Non-positive weights drop out; the surviving pose wins outright.
-    const openstrata::motion::MotionPose skewed = openstrata::motion::BlendPoses({{a, 0.0f}, {b, 2.0f}, {a, -1.0f}});
-    assert(SameOrientation(skewed.localRotations[hips], RotationX(90.0f)));
+    const std::optional<openstrata::motion::MotionPose> skewed =
+        openstrata::motion::BlendPoses({{a, 0.0f}, {b, 2.0f}, {a, -1.0f}});
+    assert(skewed);
+    assert(SameOrientation(skewed->localRotations[hips], RotationX(90.0f)));
+}
 
-    assert(!openstrata::motion::BlendPoses({}).validRotations.any());
+// Nothing weighted is an answer of its own, not a default pose stamped 0.0.
+void
+TestBlendCanSayThereIsNothingToBlend()
+{
+    const openstrata::motion::MotionPose a = MakePose(2.0, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose b = MakePose(2.0, 90.0f, pxr::GfVec3f(0.0f));
+
+    assert(!openstrata::motion::BlendPoses({}));
+    assert(!openstrata::motion::BlendPoses({{a, 0.0f}, {b, -1.0f}}));
+    // A NaN is no weight, like a negative one, rather than a NaN rotation.
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    assert(!openstrata::motion::BlendPoses({{a, nan}}));
+    const std::optional<openstrata::motion::MotionPose> besideNan =
+        openstrata::motion::BlendPoses({{a, nan}, {b, 1.0f}});
+    assert(besideNan);
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
+    assert(SameOrientation(besideNan->localRotations[hips], RotationX(90.0f)));
+}
+
+// Sources combined at one instant are stamped at it, never at a time between
+// two of them: a violated precondition answers the first weighted source's
+// instant, which is at least one somebody sampled.
+void
+TestBlendIsStampedAtTheSourcesInstant()
+{
+    const openstrata::motion::MotionPose a = MakePose(1.0, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose b = MakePose(1.0, 90.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose c = MakePose(1.0, 45.0f, pxr::GfVec3f(0.0f));
+    assert(openstrata::motion::BlendPoses({{a, 1.0f}, {b, 1.0f}, {c, 1.0f}})->timestamp == 1.0);
+
+    // The measured case: clips at 1.0 s and 0.5 s used to be stamped 0.625 s.
+    const openstrata::motion::MotionPose early = MakePose(0.5, 90.0f, pxr::GfVec3f(0.0f));
+    assert(openstrata::motion::BlendPoses({{a, 3.0f}, {early, 1.0f}})->timestamp == 1.0);
+    assert(openstrata::motion::BlendPoses({{a, 0.0f}, {early, 1.0f}, {a, 1.0f}})->timestamp == 0.5);
+}
+
+// The status-carrying answer, from a clip held by reference.
+void
+TestSampleClipCarriesTheStatus()
+{
+    using openstrata::motion::PoseSampleStatus;
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
+
+    const openstrata::motion::PoseSampleResult none =
+        openstrata::motion::SampleClip(openstrata::motion::MotionClip(), 0.0);
+    assert(none.status == PoseSampleStatus::Unavailable);
+    assert(!none.pose);
+    assert(none.lag == 0.0);
+
+    openstrata::motion::MotionClip clip;
+    clip.samples.push_back(MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f)));
+    clip.samples.push_back(MakePose(1.0, 90.0f, pxr::GfVec3f(0.0f)));
+
+    const openstrata::motion::PoseSampleResult inside = openstrata::motion::SampleClip(clip, 0.5);
+    assert(inside.status == PoseSampleStatus::Sampled);
+    assert(SameOrientation(inside.pose->localRotations[hips], RotationX(45.0f)));
+    assert(inside.pose->timestamp == 0.5);
+    assert(inside.lag == -0.5);
+
+    // On a boundary to within the tolerance is a sample, not a hold.
+    assert(openstrata::motion::SampleClip(clip, 1.0 + 1e-7).status == PoseSampleStatus::Sampled);
+
+    const openstrata::motion::PoseSampleResult past = openstrata::motion::SampleClip(clip, 3.0);
+    assert(past.status == PoseSampleStatus::Held);
+    assert(SameOrientation(past.pose->localRotations[hips], RotationX(90.0f)));
+    assert(past.pose->timestamp == 3.0);
+    assert(past.lag == 2.0);
+    assert(openstrata::motion::SampleClip(clip, -1.0).status == PoseSampleStatus::Held);
+
+    // One search: the source, the pose-only function and a buffer holding the
+    // same samples answer the same pose.
+    openstrata::motion::ClipSource source(clip);
+    openstrata::motion::PoseBuffer buffer;
+    assert(buffer.Push(clip.samples[0]) && buffer.Push(clip.samples[1]));
+    for (const double t : {-1.0, 0.0, 0.25, 0.5, 1.0, 3.0})
+    {
+        const openstrata::motion::PoseSampleResult direct = openstrata::motion::SampleClip(clip, t);
+        assert(source.Sample(t) == direct);
+        openstrata::motion::MotionPose pose = openstrata::motion::SampleAnimation(clip, t);
+        pose.timestamp = t;
+        assert(pose == *direct.pose);
+        std::optional<openstrata::motion::MotionPose> buffered = buffer.Sample(t);
+        buffered->timestamp = t;
+        assert(*buffered == *direct.pose);
+    }
+
+    // A source's offset is the same answer on the consumer's clock.
+    source.SetStartOffset(10.0);
+    openstrata::motion::PoseSampleResult shifted = source.Sample(10.5);
+    assert(shifted.pose->timestamp == 10.5);
+    shifted.pose->timestamp = 0.5;
+    assert(shifted == inside);
+}
+
+// The streaming filter as a pure function: carrying the step's state
+// reproduces the stream exactly, and carrying only its pose is the measured
+// dropout loss.
+void
+TestFilterStepCarriesTheStateTheStreamKeeps()
+{
+    using openstrata::motion::PoseFilter;
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
+    PoseFilter::Options options;
+    options.cutoffHz = 1.0f;
+
+    openstrata::motion::MotionPose missing;
+    missing.timestamp = 0.1;
+    const openstrata::motion::MotionPose frames[] = {
+        MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f)),
+        missing,
+        MakePose(0.2, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f)),
+    };
+
+    PoseFilter streamed(options);
+    std::optional<openstrata::motion::MotionPose> state;
+    openstrata::motion::MotionPose lastStreamed;
+    openstrata::motion::MotionPose lastStepped;
+    for (const openstrata::motion::MotionPose& frame : frames)
+    {
+        lastStreamed = streamed.Apply(frame);
+        PoseFilter::StepResult step = PoseFilter::Step(state ? &*state : nullptr, frame, options);
+        lastStepped = step.pose;
+        state = std::move(step.state);
+    }
+    assert(lastStepped == lastStreamed);
+    // The hips came back smoothed against the frame before the dropout.
+    assert(!SameOrientation(lastStepped.localRotations[hips], RotationX(90.0f)));
+
+    // The state is richer than the pose: the dropped joint lives only there.
+    const PoseFilter::StepResult seeded = PoseFilter::Step(nullptr, frames[0], options);
+    assert(seeded.pose == frames[0] && seeded.state == frames[0]);
+    const PoseFilter::StepResult dropped = PoseFilter::Step(&seeded.state, frames[1], options);
+    assert(!dropped.pose.validRotations.test(hips));
+    assert(dropped.state.validRotations.test(hips));
+
+    // Carrying the pose instead of the state loses the history: the joint
+    // passes through unsmoothed.
+    const PoseFilter::StepResult poseCarried = PoseFilter::Step(&dropped.pose, frames[2], options);
+    assert(SameOrientation(poseCarried.pose.localRotations[hips], RotationX(90.0f)));
+
+    // A pose not later than the state reseeds, as the stream does.
+    const PoseFilter::StepResult reseeded = PoseFilter::Step(&frames[2], frames[0], options);
+    assert(reseeded.pose == frames[0] && reseeded.state == frames[0]);
 }
 
 } // namespace
@@ -394,6 +544,10 @@ main()
     TestResampleCoversTheWholeInterval();
     TestFilterIsFrameRateIndependentAndTolerantOfDropouts();
     TestBlendWeightsAndUnitLength();
+    TestBlendCanSayThereIsNothingToBlend();
+    TestBlendIsStampedAtTheSourcesInstant();
+    TestSampleClipCarriesTheStatus();
+    TestFilterStepCarriesTheStateTheStreamKeeps();
     std::puts("motionSampling unit tests passed");
     return 0;
 }

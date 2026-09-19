@@ -87,6 +87,23 @@ separate from the package version
 
 ### Changed
 
+- **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are
+  fixed** (MOTION_CONTRACT.md §8). Each is a pure function, and the streaming
+  class beside it calls it, so each rule has one implementation:
+  - `SampleClip(clip, t)` answers a `PoseSampleResult` from a clip held by
+    reference. Its ordering precondition is written on it. `ClipSource`,
+    `SampleAnimation` and `PoseBuffer::Sample` now share one bracket-and-hold
+    search.
+  - `PoseFilter::Step(state, pose, options)` returns the state beside the pose,
+    so a caller that holds the recurrence keeps a dropped joint's history.
+    `Apply` is `Step` over the object's own state.
+  - The N-way `BlendPoses` now returns `std::optional<MotionPose>`, nullopt
+    when there is nothing to blend. A NaN weight counts as no weight. The
+    result is stamped at the first weighted source's instant, where it used to
+    interpolate the sources' timestamps. The order dependence is stated in the
+    header.
+  - `ConditionRootMotion(prior, pose, intake)` is the root intake rule that
+    used to be private to `LiveCaptureSource`.
 - **A pose's provenance is its non-optional `metadata`** (MOTION_CONTRACT.md
   §5.1, §7), where the imported pose carried an optional `source`. The default
   metadata is how a producer says it recorded nothing, so "unknown" has one

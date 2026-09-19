@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionSampling/Resample.h"
 
-#include "motionSampling/Interpolation.h"
+#include "Bracket.h"
 
-#include <algorithm>
 #include <cmath>
 
 namespace openstrata::motion
@@ -12,36 +11,8 @@ namespace openstrata::motion
 MotionPose
 SampleAnimation(const MotionClip& animation, double timestamp)
 {
-    const std::vector<MotionPose>& samples = animation.samples;
-    if (samples.empty())
-    {
-        return MotionPose();
-    }
-    if (timestamp <= samples.front().timestamp)
-    {
-        return samples.front();
-    }
-    if (timestamp >= samples.back().timestamp)
-    {
-        return samples.back();
-    }
-
-    const auto upper = std::lower_bound(samples.begin(), samples.end(), timestamp,
-                                        [](const MotionPose& sample, double time)
-                                        { return sample.timestamp < time; });
-    if (upper == samples.begin() || upper == samples.end())
-    {
-        return upper == samples.begin() ? samples.front() : samples.back();
-    }
-    const auto lower = std::prev(upper);
-
-    const double span = upper->timestamp - lower->timestamp;
-    if (span <= 0.0)
-    {
-        return *lower;
-    }
-    const float alpha = static_cast<float>((timestamp - lower->timestamp) / span);
-    return LerpPose(*lower, *upper, alpha);
+    return detail::SampleBracketed(animation.samples.begin(), animation.samples.end(), timestamp)
+        .value_or(MotionPose());
 }
 
 MotionClip
