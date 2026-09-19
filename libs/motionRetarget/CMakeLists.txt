@@ -42,13 +42,10 @@ if(NOT pxr_FOUND)
 endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
 
-# In the workspace build these are in-tree targets; a standalone configure
-# resolves their installed packages.
+# In the workspace build motionCore is already an in-tree target; a standalone
+# configure resolves its installed package.
 if(NOT TARGET motionCore::motionCore)
     find_package(motionCore REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling REQUIRED CONFIG)
 endif()
 
 add_library(motionRetarget STATIC
@@ -69,10 +66,9 @@ target_include_directories(motionRetarget
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>")
-target_link_libraries(motionRetarget
-    PUBLIC
-        motionCore::motionCore
-        motionSampling::motionSampling)
+# motionCore alone (WS-O2): the retarget answers at a clip's own times, and a
+# caller that wants another timeline resamples before it retargets.
+target_link_libraries(motionRetarget PUBLIC motionCore::motionCore)
 
 if(MSVC)
     # PUBLIC, not PRIVATE: the installed headers carry UTF-8, so every consumer

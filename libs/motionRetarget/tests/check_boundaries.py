@@ -25,7 +25,7 @@ import sys
 
 LIBRARY = "motionRetarget"
 # WORKSPACE.md §2.1: the repository libraries this one may include.
-ALLOWED_LIBRARIES = {"motionCore", "motionSampling", "motionRetarget"}
+ALLOWED_LIBRARIES = {"motionCore", "motionRetarget"}
 
 
 def _find_dumpbin() -> str | None:

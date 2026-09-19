@@ -807,21 +807,28 @@ TestUnmappedJointsStayAtRestAndAreReported()
     assert((unbound == std::vector<std::string>{"spine", "chest"}));
 }
 
+// WS-O2: the retarget answers at the clip's own times and never resamples. It
+// used to take a rate and resample first, which is what tied it to the
+// sampling library; a caller that wants a uniform timeline resamples before it
+// retargets.
 void
-TestResampleOptionDrivesSampleCount()
+TestAClipIsRetargetedAtItsOwnSampleTimes()
 {
     const openstrata::motion::SkeletonDescriptor skeleton = DesignAvatar();
-    openstrata::motion::RetargetOptions options;
-    options.resampleRate = 4.0;
-    const openstrata::motion::PoseRetargeter retargeter(skeleton, DesignMap(skeleton), DesignSourceRest(),
-                                                 options);
+    const openstrata::motion::PoseRetargeter retargeter(skeleton, DesignMap(skeleton),
+                                                        DesignSourceRest());
 
-    const openstrata::motion::RetargetedAnimation result = retargeter.Retarget(DesignClip());
-    assert(result.samples.size() == 5);
-    assert(NearlyEqual(static_cast<float>(result.frameRate), 4.0f));
-    assert(NearlyEqual(static_cast<float>(result.endTime), 1.0f));
-    // Midpoint of a 0 -> 0.5 m hips advance.
-    assert(NearlyEqual(result.samples[2].translations[1], pxr::GfVec3f(0.0f, 1.0f, 0.25f)));
+    const openstrata::motion::MotionClip clip = DesignClip();
+    const openstrata::motion::RetargetedAnimation result = retargeter.Retarget(clip);
+    assert(result.samples.size() == clip.samples.size());
+    assert(result.frameRate == clip.nominalFrameRate);
+    for (std::size_t i = 0; i < clip.samples.size(); ++i)
+    {
+        assert(result.samples[i].timestamp == clip.samples[i].timestamp);
+    }
+    assert(result.startTime == 0.0 && result.endTime == 1.0);
+    // The hips land where the last sample put them, with nothing in between.
+    assert(NearlyEqual(result.samples[1].translations[1], pxr::GfVec3f(0.0f, 1.0f, 0.5f)));
 }
 
 void
@@ -1140,7 +1147,7 @@ main()
     TestRootMotionModes();
     TestDesignTripletHandOff();
     TestUnmappedJointsStayAtRestAndAreReported();
-    TestResampleOptionDrivesSampleCount();
+    TestAClipIsRetargetedAtItsOwnSampleTimes();
     TestRootJointModeMovesTheReceiver();
     TestTheRetargetCodeTableIsClosedAndStable();
     TestARetargetDiagnosticFormatsOneStableLine();

@@ -67,7 +67,7 @@ It builds as part of the workspace root `CMakeLists.txt`. Standalone:
 
 ```bash
 cmake -S libs/motionRetarget -B build/motionRetarget \
-      -DCMAKE_PREFIX_PATH="<usd-install>;<motionCore-install>;<motionSampling-install>"
+      -DCMAKE_PREFIX_PATH="<usd-install>;<motionCore-install>"
 cmake --build build/motionRetarget
 ctest --test-dir build/motionRetarget --output-on-failure
 ```

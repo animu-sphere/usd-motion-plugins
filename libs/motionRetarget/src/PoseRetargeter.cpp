@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionRetarget/PoseRetargeter.h"
 
-#include "motionSampling/Resample.h"
-
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -352,20 +350,11 @@ PoseRetargeter::Retarget(const openstrata::motion::MotionClip& animation,
         diagnostics->Merge(DiagnoseRig(_skeleton, _map, _options));
     }
 
-    const openstrata::motion::MotionClip* source = &animation;
-    openstrata::motion::MotionClip resampled;
-    if (_options.resampleRate > 0.0)
-    {
-        resampled = openstrata::motion::Resample(animation, _options.resampleRate);
-        result.frameRate = _options.resampleRate;
-        source = &resampled;
-    }
-
-    result.samples.reserve(source->samples.size());
+    result.samples.reserve(animation.samples.size());
     // Every sample reports into one list, which keeps each bone once. Until
     // P1-1 only the first sample was asked, which kept each bone once as well
     // and missed any bone the clip started driving later.
-    for (const openstrata::motion::MotionPose& pose : source->samples)
+    for (const openstrata::motion::MotionPose& pose : animation.samples)
     {
         result.samples.push_back(Retarget(pose, diagnostics));
     }

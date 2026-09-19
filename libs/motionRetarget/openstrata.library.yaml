@@ -10,8 +10,6 @@ requires:
   libraries:
     - id: motionCore
       version: ">=0.1,<0.2"
-    - id: motionSampling
-      version: ">=0.1,<0.2"
 cmake:
   package: motionRetarget
   target: motionRetarget::motionRetarget

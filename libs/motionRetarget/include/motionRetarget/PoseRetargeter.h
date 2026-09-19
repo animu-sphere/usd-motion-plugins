@@ -114,13 +114,13 @@ MOTIONRETARGET_API bool GetJointWorldTransform(const SkeletonDescriptor& skeleto
                                             const RetargetedPose& pose, int jointIndex,
                                             pxr::GfQuatf* orientation, pxr::GfVec3f* position);
 
+// A retarget answers at the clip's own sample times. A caller that wants a
+// uniform timeline resamples the clip first (motionSampling's `Resample`) and
+// retargets what that returns: resampling is sampling's job, and this library
+// depends on motionCore alone (WORKSPACE.md §2.1, WS-O2).
 struct RetargetOptions
 {
     RootMotionOptions rootMotion;
-
-    // Resample onto a uniform timeline at this rate before retargeting. Zero or
-    // negative keeps the source sample times untouched.
-    double resampleRate = 0.0;
 };
 
 // What a rig and its map say about every retarget onto them, before any clip
@@ -171,8 +171,7 @@ class MOTIONRETARGET_API PoseRetargeter
     RetargetedPose Retarget(const openstrata::motion::MotionPose& pose,
                             RetargetDiagnostics* diagnostics = nullptr) const;
 
-    // Expands a whole clip, resampling first when RetargetOptions asks for it.
-    // Reports DiagnoseRig's list and then every sample's, so a bone the clip
+    // Expands a whole clip, one retargeted sample per clip sample. Reports DiagnoseRig's list and then every sample's, so a bone the clip
     // starts driving halfway through is reported like one it drives from the
     // first sample.
     RetargetedAnimation Retarget(const openstrata::motion::MotionClip& animation,
