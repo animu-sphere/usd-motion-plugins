@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "vrmRetarget/RootMotionPolicy.h"
+#include "motionRetarget/RootMotionPolicy.h"
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 pxr::GfVec3f
@@ -22,4 +22,4 @@ ResolveRootTranslation(const RootMotionOptions& options, const pxr::GfVec3f& sou
     return targetRestTranslation + delta;
 }
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

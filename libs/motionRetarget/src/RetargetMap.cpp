@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "vrmRetarget/HumanoidMap.h"
+#include "motionRetarget/RetargetMap.h"
 
 #include <algorithm>
 #include <unordered_map>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
-HumanoidMap::HumanoidMap()
+RetargetMap::RetargetMap()
 {
     _jointIndices.fill(kUnmapped);
 }
 
 bool
-HumanoidMap::SetJointIndex(motion::HumanBone bone, int jointIndex, std::size_t jointCount)
+RetargetMap::SetJointIndex(openstrata::motion::HumanJoint bone, int jointIndex, std::size_t jointCount)
 {
-    if (!motion::IsValidHumanBone(bone))
+    if (!openstrata::motion::IsValidHumanJoint(bone))
     {
         return false;
     }
@@ -34,8 +34,8 @@ HumanoidMap::SetJointIndex(motion::HumanBone bone, int jointIndex, std::size_t j
 }
 
 bool
-HumanoidMap::SetJointToken(motion::HumanBone bone, const std::string& token,
-                           const TargetSkeleton& skeleton)
+RetargetMap::SetJointToken(openstrata::motion::HumanJoint bone, const std::string& token,
+                           const SkeletonDescriptor& skeleton)
 {
     // An unknown token is FindJoint's kNoParent, which SetJointIndex rejects as
     // out of range -- so a failed lookup unmaps the bone exactly as a rejected
@@ -45,16 +45,16 @@ HumanoidMap::SetJointToken(motion::HumanBone bone, const std::string& token,
 }
 
 void
-HumanoidMap::Clear()
+RetargetMap::Clear()
 {
     _jointIndices.fill(kUnmapped);
     _mapped.reset();
 }
 
 int
-HumanoidMap::GetJointIndex(motion::HumanBone bone) const
+RetargetMap::GetJointIndex(openstrata::motion::HumanJoint bone) const
 {
-    if (!motion::IsValidHumanBone(bone))
+    if (!openstrata::motion::IsValidHumanJoint(bone))
     {
         return kUnmapped;
     }
@@ -62,35 +62,35 @@ HumanoidMap::GetJointIndex(motion::HumanBone bone) const
 }
 
 bool
-HumanoidMap::IsMapped(motion::HumanBone bone) const
+RetargetMap::IsMapped(openstrata::motion::HumanJoint bone) const
 {
-    return motion::IsValidHumanBone(bone) && _mapped.test(static_cast<std::size_t>(bone));
+    return openstrata::motion::IsValidHumanJoint(bone) && _mapped.test(static_cast<std::size_t>(bone));
 }
 
-const std::vector<motion::HumanBone>&
-HumanoidMap::GetRequiredBones()
+const std::vector<openstrata::motion::HumanJoint>&
+RetargetMap::GetRequiredBones()
 {
     // VRM 1.0's required humanoid bones. Eyes, jaw, toes, shoulders, fingers,
     // and upperChest are optional and deliberately absent.
-    static const std::vector<motion::HumanBone> required = {
-        motion::HumanBone::Hips,          motion::HumanBone::Spine,
-        motion::HumanBone::Chest,         motion::HumanBone::Neck,
-        motion::HumanBone::Head,          motion::HumanBone::LeftUpperLeg,
-        motion::HumanBone::LeftLowerLeg,  motion::HumanBone::LeftFoot,
-        motion::HumanBone::RightUpperLeg, motion::HumanBone::RightLowerLeg,
-        motion::HumanBone::RightFoot,     motion::HumanBone::LeftUpperArm,
-        motion::HumanBone::LeftLowerArm,  motion::HumanBone::LeftHand,
-        motion::HumanBone::RightUpperArm, motion::HumanBone::RightLowerArm,
-        motion::HumanBone::RightHand,
+    static const std::vector<openstrata::motion::HumanJoint> required = {
+        openstrata::motion::HumanJoint::Hips,          openstrata::motion::HumanJoint::Spine,
+        openstrata::motion::HumanJoint::Chest,         openstrata::motion::HumanJoint::Neck,
+        openstrata::motion::HumanJoint::Head,          openstrata::motion::HumanJoint::LeftUpperLeg,
+        openstrata::motion::HumanJoint::LeftLowerLeg,  openstrata::motion::HumanJoint::LeftFoot,
+        openstrata::motion::HumanJoint::RightUpperLeg, openstrata::motion::HumanJoint::RightLowerLeg,
+        openstrata::motion::HumanJoint::RightFoot,     openstrata::motion::HumanJoint::LeftUpperArm,
+        openstrata::motion::HumanJoint::LeftLowerArm,  openstrata::motion::HumanJoint::LeftHand,
+        openstrata::motion::HumanJoint::RightUpperArm, openstrata::motion::HumanJoint::RightLowerArm,
+        openstrata::motion::HumanJoint::RightHand,
     };
     return required;
 }
 
-std::vector<motion::HumanBone>
-HumanoidMap::FindMissingRequiredBones() const
+std::vector<openstrata::motion::HumanJoint>
+RetargetMap::FindMissingRequiredBones() const
 {
-    std::vector<motion::HumanBone> missing;
-    for (const motion::HumanBone bone : GetRequiredBones())
+    std::vector<openstrata::motion::HumanJoint> missing;
+    for (const openstrata::motion::HumanJoint bone : GetRequiredBones())
     {
         if (!IsMapped(bone))
         {
@@ -101,10 +101,10 @@ HumanoidMap::FindMissingRequiredBones() const
 }
 
 std::vector<int>
-HumanoidMap::FindDuplicateJointIndices() const
+RetargetMap::FindDuplicateJointIndices() const
 {
     std::unordered_map<int, int> counts;
-    for (std::size_t i = 0; i < motion::HumanBoneCount; ++i)
+    for (std::size_t i = 0; i < openstrata::motion::HumanJointCount; ++i)
     {
         if (_mapped.test(i))
         {
@@ -124,7 +124,7 @@ HumanoidMap::FindDuplicateJointIndices() const
 }
 
 bool
-operator==(const HumanoidMap& a, const HumanoidMap& b) noexcept
+operator==(const RetargetMap& a, const RetargetMap& b) noexcept
 {
     // Both halves, although every writer keeps an unmapped slot at kUnmapped
     // and the bitset is therefore implied by the indices today: comparing the
@@ -133,9 +133,9 @@ operator==(const HumanoidMap& a, const HumanoidMap& b) noexcept
 }
 
 bool
-operator!=(const HumanoidMap& a, const HumanoidMap& b) noexcept
+operator!=(const RetargetMap& a, const RetargetMap& b) noexcept
 {
     return !(a == b);
 }
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

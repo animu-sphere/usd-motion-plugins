@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "vrmRetarget/api.h"
+#include "motionRetarget/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include "pxr/base/gf/vec3f.h"
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 // Where a clip's root motion lands on the target rig.
@@ -20,7 +20,7 @@ enum class RootMotionMode
     // translation, so the avatar animates in place.
     Ignore,
 
-    // Apply the root delta to the joint bound to HumanBone::Hips. This is the
+    // Apply the root delta to the joint bound to HumanJoint::Hips. This is the
     // default: it matches how `.vrma` carries body translation, and it keeps
     // the result playable on a rig with no dedicated motion root.
     Hips,
@@ -57,9 +57,9 @@ struct RootMotionOptions
 // the delta rather than the absolute value is what lets a clip authored on a
 // 1.0 m rig drive a 1.6 m one without the avatar jumping to the source's hip
 // height.
-VRMRETARGET_API pxr::GfVec3f ResolveRootTranslation(const RootMotionOptions& options,
+MOTIONRETARGET_API pxr::GfVec3f ResolveRootTranslation(const RootMotionOptions& options,
                                                     const pxr::GfVec3f& sourceTranslation,
                                                     const pxr::GfVec3f& sourceRestTranslation,
                                                     const pxr::GfVec3f& targetRestTranslation);
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

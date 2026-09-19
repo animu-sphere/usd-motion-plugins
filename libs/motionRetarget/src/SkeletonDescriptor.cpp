@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "vrmRetarget/TargetSkeleton.h"
+#include "motionRetarget/SkeletonDescriptor.h"
 
 #include "pxr/base/gf/quatd.h"
 #include "pxr/base/gf/vec3d.h"
 
 #include <unordered_map>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 int
-TargetSkeleton::FindJoint(const std::string& token) const
+SkeletonDescriptor::FindJoint(const std::string& token) const
 {
     for (std::size_t i = 0; i < _joints.size(); ++i)
     {
@@ -23,7 +23,7 @@ TargetSkeleton::FindJoint(const std::string& token) const
 }
 
 void
-TargetSkeleton::ResolveParentsFromTokens()
+SkeletonDescriptor::ResolveParentsFromTokens()
 {
     std::unordered_map<std::string, int> byToken;
     byToken.reserve(_joints.size());
@@ -34,7 +34,7 @@ TargetSkeleton::ResolveParentsFromTokens()
 
     for (std::size_t i = 0; i < _joints.size(); ++i)
     {
-        TargetJoint& joint = _joints[i];
+        SkeletonJoint& joint = _joints[i];
         const std::size_t separator = joint.token.rfind('/');
         if (separator == std::string::npos)
         {
@@ -49,7 +49,7 @@ TargetSkeleton::ResolveParentsFromTokens()
 }
 
 pxr::GfQuatf
-TargetSkeleton::GetWorldRestRotation(int jointIndex) const
+SkeletonDescriptor::GetWorldRestRotation(int jointIndex) const
 {
     static const pxr::GfQuatf identity(1.0f, pxr::GfVec3f(0.0f));
     // world = R_root * ... * R_parent * R_joint, so each ancestor composes on
@@ -61,7 +61,7 @@ TargetSkeleton::GetWorldRestRotation(int jointIndex) const
          depth < _joints.size() && cursor >= 0 && static_cast<std::size_t>(cursor) < _joints.size();
          ++depth)
     {
-        const TargetJoint& joint = _joints[static_cast<std::size_t>(cursor)];
+        const SkeletonJoint& joint = _joints[static_cast<std::size_t>(cursor)];
         world = joint.restRotation.GetNormalized() * world;
         cursor = joint.parent;
     }
@@ -69,7 +69,7 @@ TargetSkeleton::GetWorldRestRotation(int jointIndex) const
 }
 
 bool
-TargetSkeleton::IsTopologicallyOrdered() const
+SkeletonDescriptor::IsTopologicallyOrdered() const
 {
     for (std::size_t i = 0; i < _joints.size(); ++i)
     {
@@ -87,7 +87,7 @@ TargetSkeleton::IsTopologicallyOrdered() const
 }
 
 void
-DecomposeRestTransform(const pxr::GfMatrix4d& matrix, TargetJoint* joint)
+DecomposeRestTransform(const pxr::GfMatrix4d& matrix, SkeletonJoint* joint)
 {
     const pxr::GfVec3d translation = matrix.ExtractTranslation();
     joint->restTranslation =
@@ -108,28 +108,28 @@ DecomposeRestTransform(const pxr::GfMatrix4d& matrix, TargetJoint* joint)
 }
 
 bool
-operator==(const TargetJoint& a, const TargetJoint& b) noexcept
+operator==(const SkeletonJoint& a, const SkeletonJoint& b) noexcept
 {
     return a.token == b.token && a.parent == b.parent && a.restRotation == b.restRotation &&
            a.restTranslation == b.restTranslation && a.restScale == b.restScale;
 }
 
 bool
-operator!=(const TargetJoint& a, const TargetJoint& b) noexcept
+operator!=(const SkeletonJoint& a, const SkeletonJoint& b) noexcept
 {
     return !(a == b);
 }
 
 bool
-operator==(const TargetSkeleton& a, const TargetSkeleton& b) noexcept
+operator==(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept
 {
     return a.GetJoints() == b.GetJoints();
 }
 
 bool
-operator!=(const TargetSkeleton& a, const TargetSkeleton& b) noexcept
+operator!=(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept
 {
     return !(a == b);
 }
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

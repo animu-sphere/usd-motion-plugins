@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "vrmRetarget/RestPose.h"
+#include "motionRetarget/RestPose.h"
 
 #include <cmath>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 namespace
 {
@@ -33,20 +33,20 @@ SourceRestPose::SourceRestPose()
 }
 
 void
-SourceRestPose::SetParent(motion::HumanBone bone, motion::HumanBone parent)
+SourceRestPose::SetParent(openstrata::motion::HumanJoint bone, openstrata::motion::HumanJoint parent)
 {
-    if (!motion::IsValidHumanBone(bone))
+    if (!openstrata::motion::IsValidHumanJoint(bone))
     {
         return;
     }
     parents[static_cast<std::size_t>(bone)] =
-        motion::IsValidHumanBone(parent) ? static_cast<std::size_t>(parent) : kNoParent;
+        openstrata::motion::IsValidHumanJoint(parent) ? static_cast<std::size_t>(parent) : kNoParent;
 }
 
 pxr::GfQuatf
-SourceRestPose::GetWorldRestRotation(motion::HumanBone bone) const
+SourceRestPose::GetWorldRestRotation(openstrata::motion::HumanJoint bone) const
 {
-    if (!motion::IsValidHumanBone(bone))
+    if (!openstrata::motion::IsValidHumanJoint(bone))
     {
         return Identity();
     }
@@ -56,7 +56,7 @@ SourceRestPose::GetWorldRestRotation(motion::HumanBone bone) const
     // bone, so it cannot reach the cap.
     pxr::GfQuatf world = Identity();
     std::size_t cursor = static_cast<std::size_t>(bone);
-    for (std::size_t depth = 0; depth < motion::HumanBoneCount && cursor < motion::HumanBoneCount;
+    for (std::size_t depth = 0; depth < openstrata::motion::HumanJointCount && cursor < openstrata::motion::HumanJointCount;
          ++depth)
     {
         world = localRotations[cursor].GetNormalized() * world;
@@ -73,9 +73,9 @@ RestPoseCorrection::RestPoseCorrection()
 }
 
 pxr::GfQuatf
-RestPoseCorrection::Apply(motion::HumanBone bone, const pxr::GfQuatf& rotation) const
+RestPoseCorrection::Apply(openstrata::motion::HumanJoint bone, const pxr::GfQuatf& rotation) const
 {
-    if (!motion::IsValidHumanBone(bone))
+    if (!openstrata::motion::IsValidHumanJoint(bone))
     {
         return rotation;
     }
@@ -100,15 +100,15 @@ operator!=(const RestPoseCorrection& a, const RestPoseCorrection& b) noexcept
 }
 
 RestPoseCorrection
-ComputeRestPoseCorrection(const SourceRestPose& source, const TargetSkeleton& target,
-                          const HumanoidMap& map)
+ComputeRestPoseCorrection(const SourceRestPose& source, const SkeletonDescriptor& target,
+                          const RetargetMap& map)
 {
     RestPoseCorrection correction;
-    const std::vector<TargetJoint>& joints = target.GetJoints();
+    const std::vector<SkeletonJoint>& joints = target.GetJoints();
 
-    for (std::size_t slot = 0; slot < motion::HumanBoneCount; ++slot)
+    for (std::size_t slot = 0; slot < openstrata::motion::HumanJointCount; ++slot)
     {
-        const auto bone = static_cast<motion::HumanBone>(slot);
+        const auto bone = static_cast<openstrata::motion::HumanJoint>(slot);
         const int jointIndex = map.GetJointIndex(bone);
         if (jointIndex < 0 || static_cast<std::size_t>(jointIndex) >= joints.size())
         {
@@ -122,11 +122,11 @@ ComputeRestPoseCorrection(const SourceRestPose& source, const TargetSkeleton& ta
         const pxr::GfQuatf sourceRest = source.localRotations[slot].GetNormalized();
         const std::size_t sourceParent = source.parents[slot];
         const pxr::GfQuatf sourceParentRest =
-            sourceParent < motion::HumanBoneCount
-                ? source.GetWorldRestRotation(static_cast<motion::HumanBone>(sourceParent))
+            sourceParent < openstrata::motion::HumanJointCount
+                ? source.GetWorldRestRotation(static_cast<openstrata::motion::HumanJoint>(sourceParent))
                 : Identity();
 
-        const TargetJoint& joint = joints[static_cast<std::size_t>(jointIndex)];
+        const SkeletonJoint& joint = joints[static_cast<std::size_t>(jointIndex)];
         const pxr::GfQuatf targetRest = joint.restRotation.GetNormalized();
         const pxr::GfQuatf targetParentRest = target.GetWorldRestRotation(joint.parent);
 
@@ -147,4 +147,4 @@ ComputeRestPoseCorrection(const SourceRestPose& source, const TargetSkeleton& ta
     return correction;
 }
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

@@ -30,7 +30,7 @@
 // clip did not state, an output path that names an input, and a clip that
 // animates scale, which this library never receives: a pose carries no scale.
 // `RetargetDiagnosticIsLibraryRaised` states that boundary in
-// code, and `vrmRetarget_boundaries` checks that this library's sources never
+// code, and `motionRetarget_boundaries` checks that this library's sources never
 // name one of the three.
 //
 // **What is not here.** The expression and look-at resolvers still report in
@@ -40,7 +40,7 @@
 // a driver.
 #pragma once
 
-#include "vrmRetarget/api.h"
+#include "motionRetarget/api.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -49,7 +49,7 @@
 #include <string_view>
 #include <vector>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 // Values are stable array indices; append only before Count, and only with a
@@ -109,27 +109,27 @@ enum class RetargetDiagnosticSeverity : std::uint8_t
     Error,
 };
 
-// The stable string, e.g. "VRM_RETARGET_UNBOUND_DRIVEN_BONE". Empty for a
+// The stable string, e.g. "MOTION_RETARGET_UNBOUND_DRIVEN_BONE". Empty for a
 // value outside the enum, which is what an out-of-range cast produces.
-VRMRETARGET_API std::string_view RetargetDiagnosticCodeString(RetargetDiagnosticCode code) noexcept;
+MOTIONRETARGET_API std::string_view RetargetDiagnosticCodeString(RetargetDiagnosticCode code) noexcept;
 
-VRMRETARGET_API std::optional<RetargetDiagnosticCode>
+MOTIONRETARGET_API std::optional<RetargetDiagnosticCode>
 FindRetargetDiagnosticCode(std::string_view name) noexcept;
 
-VRMRETARGET_API RetargetDiagnosticSeverity
+MOTIONRETARGET_API RetargetDiagnosticSeverity
 RetargetDiagnosticDefaultSeverity(RetargetDiagnosticCode code) noexcept;
 
 // Whether a retarget can continue past this code. Everything the library raises
 // can: each one names what the rig or the clip did not say and what the result
 // did instead. Only a collision cannot, because the answer to it is not to
 // write at all.
-VRMRETARGET_API bool RetargetDiagnosticIsRecoverable(RetargetDiagnosticCode code) noexcept;
+MOTIONRETARGET_API bool RetargetDiagnosticIsRecoverable(RetargetDiagnosticCode code) noexcept;
 
 // Whether this library may raise the code. A caller holding a stage is on the
 // other side of this boundary and may raise either half.
-VRMRETARGET_API bool RetargetDiagnosticIsLibraryRaised(RetargetDiagnosticCode code) noexcept;
+MOTIONRETARGET_API bool RetargetDiagnosticIsLibraryRaised(RetargetDiagnosticCode code) noexcept;
 
-VRMRETARGET_API std::string_view
+MOTIONRETARGET_API std::string_view
 RetargetDiagnosticSeverityString(RetargetDiagnosticSeverity severity) noexcept;
 
 // One reported diagnostic.
@@ -149,25 +149,25 @@ struct RetargetDiagnostic
 // Exact, every field. A diagnostic is a value like the pose it is reported
 // beside, and `ExecTypeRegistry::RegisterType` will not register a type it
 // cannot compare.
-VRMRETARGET_API bool operator==(const RetargetDiagnostic& a, const RetargetDiagnostic& b) noexcept;
-VRMRETARGET_API bool operator!=(const RetargetDiagnostic& a, const RetargetDiagnostic& b) noexcept;
+MOTIONRETARGET_API bool operator==(const RetargetDiagnostic& a, const RetargetDiagnostic& b) noexcept;
+MOTIONRETARGET_API bool operator!=(const RetargetDiagnostic& a, const RetargetDiagnostic& b) noexcept;
 
 // Fills `severity` and `recoverable` from the code's defaults, so a raise site
 // cannot report a code differently from the table.
-VRMRETARGET_API RetargetDiagnostic MakeRetargetDiagnostic(RetargetDiagnosticCode code,
+MOTIONRETARGET_API RetargetDiagnostic MakeRetargetDiagnostic(RetargetDiagnosticCode code,
                                                           std::string subject,
                                                           std::string detail = {});
 
 // A single deterministic line, stable enough for a golden test to compare:
 //
-//     [VRM_RETARGET_UNBOUND_DRIVEN_BONE] warning recoverable
+//     [MOTION_RETARGET_UNBOUND_DRIVEN_BONE] warning recoverable
 //     subject=upperChest: the clip drives it and the target rig binds no joint
 //     for it
 //
 // The field order is fixed, an empty subject or detail is omitted rather than
 // printed empty, and `recoverable` is printed only when it is true -- the
 // convention of the BVH and live adapters' lines, so the three read alike.
-VRMRETARGET_API std::string FormatRetargetDiagnostic(const RetargetDiagnostic& diagnostic);
+MOTIONRETARGET_API std::string FormatRetargetDiagnostic(const RetargetDiagnostic& diagnostic);
 
 // What a retarget reported, in the order it was raised, each code and subject
 // once.
@@ -176,7 +176,7 @@ VRMRETARGET_API std::string FormatRetargetDiagnostic(const RetargetDiagnostic& d
 // rig does not bind is one fact about a clip and a rig, however many samples
 // carry it, and a list that repeated it per sample would compare unequal for
 // two clips that differ only in length.
-struct VRMRETARGET_API RetargetDiagnostics
+struct MOTIONRETARGET_API RetargetDiagnostics
 {
     std::vector<RetargetDiagnostic> reported;
 
@@ -203,9 +203,9 @@ struct VRMRETARGET_API RetargetDiagnostics
 // Exact, entry by entry and in order: two retargets that raised the same
 // diagnostics in a different order reported differently, and that is a fact a
 // comparison should show rather than hide.
-VRMRETARGET_API bool operator==(const RetargetDiagnostics& a,
+MOTIONRETARGET_API bool operator==(const RetargetDiagnostics& a,
                                 const RetargetDiagnostics& b) noexcept;
-VRMRETARGET_API bool operator!=(const RetargetDiagnostics& a,
+MOTIONRETARGET_API bool operator!=(const RetargetDiagnostics& a,
                                 const RetargetDiagnostics& b) noexcept;
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

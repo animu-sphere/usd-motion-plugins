@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Enforce vrmRetarget's dependency boundary.
+"""Enforce motionRetarget's boundary (docs/architecture/WORKSPACE.md §2.1-§2.4).
 
-WORKSPACE.md §2 allows vrmRetarget -> motionCore and vrmRetarget -> motionRuntime
-and nothing else. The load-bearing one is `vrmRetarget -> OpenExec` being
-forbidden: the retarget core must be complete and testable before any exec node
-exists (motion policy §10.1, §18.12). A network protocol is forbidden for the
-same reason live capture must reach this library through motionRuntime's pose
-buffer rather than through a socket of its own.
+motionRetarget takes a rig as plain values and returns plain values
+(RETARGETING_POLICY.md §1): it may depend on the libraries WORKSPACE.md §2.1
+draws for it and OpenUSD's Gf value types, and on nothing else. Five checks: no stage,
+plugin, registration or OpenExec API in the sources; no include from a
+repository library outside its declared edges, and no transport; a link line
+and a binary that import nothing from OpenUSD beyond its foundation value
+types; no product, device or avatar-format name in the code or its string
+literals; and no caller-raised retarget code outside the table that defines
+it. Comments may cite where a rule came from, so they are stripped before
+scanning.
 """
 
 from __future__ import annotations
@@ -18,6 +22,10 @@ import re
 import shutil
 import subprocess
 import sys
+
+LIBRARY = "motionRetarget"
+# WORKSPACE.md §2.1: the repository libraries this one may include.
+ALLOWED_LIBRARIES = {"motionCore", "motionSampling", "motionRetarget"}
 
 
 def _find_dumpbin() -> str | None:
@@ -44,18 +52,33 @@ def _find_dumpbin() -> str | None:
     return None
 
 
-_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
-_LINE_COMMENT = re.compile(r"//[^\n]*")
+def _strip_comments(text: str) -> str:
+    """C++ text with // and /* */ comments blanked, string literals kept.
 
-
-def _code_only(text: str) -> str:
-    """Strip C++ comments before scanning.
-
-    These headers document the boundary in situ, so the prose names the very
-    libraries the code may not depend on. Scanning the comments too would make
-    an accurate explanation indistinguishable from a violation.
+    Line structure is preserved so a finding keeps its line number.
     """
-    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", text))
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("\n" * text.count("\n", i, j))
+            i = j
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] != c:
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def _binary_dependencies(library: pathlib.Path) -> str:
@@ -89,72 +112,80 @@ def main() -> int:
         if path.is_file() and path.name.lower() in forbidden_files:
             errors.append(f"plugin registration file is forbidden: {path}")
 
-    # Gf value types are allowed; stage/composition/registration/exec APIs are
-    # not. Reading a stage is the caller's job -- vrmRetarget takes values.
+    # Gf value types are allowed; stage, composition, registration and OpenExec
+    # APIs are not: motionUsd and the plugin bundles own those. Reading a rig
+    # off a stage is the caller's job -- this library takes values.
     forbidden_source = re.compile(
         r"pxr/(?:usd|base/(?:tf|plug)|imaging|exec)/|PXR_NAMESPACE|"
         r"TF_REGISTRY_FUNCTION|SDF_DEFINE_FILE_FORMAT|"
         r"\b(?:UsdStage|UsdSkel\w*|SdfLayer|PlugRegistry|EsfStage|VdfNode|"
         r"ExecUsd\w*)\b",
         re.IGNORECASE)
-    # `osc` is matched as a namespace qualification or an include path rather
-    # than as a word: three letters that spell a protocol are also three letters
-    # that appear inside other words (motionRuntime's check says the same).
-    forbidden_neighbours = re.compile(
-        r"\b(?:vrmSchema|vrmContainer|usdVrm\w*|execMotion|execVrm|cgltf|"
-        r"mocopi|ardy|liveTransport)\b|"
-        r"\bosc::|\bosc/|"
-        r"\b(?:winsock|sys/socket\.h|asio|curl|websocket)\b",
+    # No transport: a stream receives poses already decoded (MOTION_CONTRACT.md
+    # §9), and a socket here would take the replayability with it.
+    forbidden_transport = re.compile(
+        r"\b(?:winsock2?|sys/socket\.h|asio|curl|websocket)\b", re.IGNORECASE)
+    # Every include of a repository library names its include root; a root
+    # outside ALLOWED_LIBRARIES is an edge WORKSPACE.md §2.1 does not draw.
+    repository_include = re.compile(r'#\s*include\s*[<"](motion[A-Z]\w*)/')
+    # Product, device and avatar-format names (WORKSPACE.md §5, invariant 3).
+    product_names = re.compile(
+        r"(?<![a-z0-9])(?:vrma?|vroid|mtoon|vmc|mocopi|vrchat|unity|mmd|pmx|vmd)"
+        r"(?![a-z0-9])",
         re.IGNORECASE)
     # The retarget code set splits at the layer boundary
-    # (include/vrmRetarget/Diagnostics.h): the last three codes say what a stage
-    # or a file system added, and a library that takes plain values cannot know
-    # any of it. Only the table that defines them may name them.
+    # (include/motionRetarget/Diagnostics.h): the last three codes say what a
+    # stage or a file system added, and a library that takes plain values
+    # cannot know any of it. Only the table that defines them may name them.
     caller_raised = re.compile(
         r"\b(?:NonUnitScale|TimeRangeDerived|OutputCollidesWithInput)\b|"
-        r"VRM_RETARGET_(?:NON_UNIT_SCALE|TIME_RANGE_DERIVED|"
+        r"MOTION_RETARGET_(?:NON_UNIT_SCALE|TIME_RANGE_DERIVED|"
         r"OUTPUT_COLLIDES_WITH_INPUT)")
     code_table = {"Diagnostics.h", "Diagnostics.cpp"}
     for area in (source / "include", source / "src"):
-        for path in area.rglob("*"):
+        for path in sorted(area.rglob("*")):
             if not path.is_file():
                 continue
-            code = _code_only(path.read_text(encoding="utf-8"))
+            code = _strip_comments(path.read_text(encoding="utf-8"))
             if forbidden_source.search(code):
                 errors.append(f"stage/plugin/exec API is forbidden: {path}")
-            if forbidden_neighbours.search(code):
-                errors.append(f"forbidden dependency direction: {path}")
             if path.name not in code_table and caller_raised.search(code):
-                errors.append(
-                    f"a caller-raised retarget code is raised by the library: "
-                    f"{path}")
+                errors.append(f"a caller-raised retarget code is raised by the "
+                              f"library: {path}")
+            if forbidden_transport.search(code):
+                errors.append(f"a transport is forbidden: {path}")
+            for match in repository_include.finditer(code):
+                if match.group(1) not in ALLOWED_LIBRARIES:
+                    errors.append(f"{path}: includes {match.group(1)}, an edge "
+                                  f"{LIBRARY} does not have")
+            for number, line in enumerate(code.splitlines(), 1):
+                match = product_names.search(line)
+                if match:
+                    errors.append(f"{path}:{number}: product name '{match.group(0)}' "
+                                  f"in {LIBRARY}'s code")
 
     cmake = re.sub(r"#[^\n]*", "",
                    (source / "CMakeLists.txt").read_text(encoding="utf-8"))
-    if re.search(r"target_link_libraries\([^)]*(?:\busd\b|\bsdf\b|\bplug\b|"
-                 r"\bar\b|\busdSkel\b|exec)", cmake, re.IGNORECASE):
-        errors.append(
-            "vrmRetarget CMake must link only motionCore, motionRuntime, and "
-            "the OpenUSD gf value library")
+    if re.search(r"(?:target_link_libraries\([^)]*(?:\busd\b|\bsdf\b|\bplug\b|"
+                 r"\bar\b|exec)|pxr::(?:usd|sdf|plug|ar))", cmake, re.IGNORECASE):
+        errors.append(f"{LIBRARY} CMake must link only its declared libraries and "
+                      "the OpenUSD gf value library")
 
     try:
         dependencies = _binary_dependencies(library)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
-        errors.append(f"could not inspect vrmRetarget dependencies: {exc}")
+        errors.append(f"could not inspect {LIBRARY} dependencies: {exc}")
         dependencies = ""
     forbidden_binary = re.compile(
-        r"(?:usd_ms|lib(?:usd|sdf|plug|ar)(?:[._-]|\.(?:dll|dylib|so))|"
-        r"vrmSchema|vrmContainer|execMotion|execVrm)",
+        r"(?:usd_ms|lib(?:usd|sdf|plug|ar)(?:[._-]|\.(?:dll|dylib|so)))",
         re.IGNORECASE)
     if forbidden_binary.search(dependencies):
-        errors.append(
-            "vrmRetarget binary imports an OpenUSD stage/plugin/exec library or "
-            "a sibling bundle")
+        errors.append(f"{LIBRARY} binary imports an OpenUSD stage/plugin library")
 
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print("vrmRetarget boundary check passed")
+    print(f"{LIBRARY} boundary check passed")
     return 0
 
 

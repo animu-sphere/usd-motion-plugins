@@ -1,16 +1,17 @@
-# OpenStrata plain-library descriptor. vrmRetarget is the offline retarget core:
-# complete and testable before any OpenExec node exists (motion policy §18.12).
+# OpenStrata plain-library descriptor. motionRetarget expands a MotionPose onto
+# a target skeleton given as plain values: the map, rest correction, root-motion
+# policy and retarget diagnostics (docs/design/RETARGETING_POLICY.md).
 schema: openstrata.library/v1alpha1
 library:
-  id: vrmRetarget
-  # Mirrors VERSION; release preparation updates this in lockstep.
-  version: 0.9.0
+  id: motionRetarget
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
 requires:
   libraries:
     - id: motionCore
-      version: ">=0.9,<0.10"
-    - id: motionRuntime
-      version: ">=0.9,<0.10"
+      version: ">=0.1,<0.2"
+    - id: motionSampling
+      version: ">=0.1,<0.2"
 cmake:
-  package: vrmRetarget
-  target: vrmRetarget::vrmRetarget
+  package: motionRetarget
+  target: motionRetarget::motionRetarget

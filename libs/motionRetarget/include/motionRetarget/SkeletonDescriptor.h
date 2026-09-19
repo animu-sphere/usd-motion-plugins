@@ -2,13 +2,13 @@
 //
 // A target rig described as plain values.
 //
-// This is deliberately not a UsdSkelSkeleton. vrmRetarget never opens a stage:
+// This is deliberately not a UsdSkelSkeleton. motionRetarget never opens a stage:
 // the caller reads the skeleton off the stage and hands the values in, so the
 // retarget core stays testable without USD composition and reusable by a live
 // source that has no stage at all (WORKSPACE.md §2).
 #pragma once
 
-#include "vrmRetarget/api.h"
+#include "motionRetarget/api.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/quatf.h"
@@ -18,17 +18,17 @@
 #include <string>
 #include <vector>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 // One joint of the target rig, in the rig's own joint order.
-struct TargetJoint
+struct SkeletonJoint
 {
     // The joint's token exactly as it appears in UsdSkelSkeleton.joints — a
     // full joint path such as "Root/Pelvis/SpineA", not the leaf name.
     std::string token;
 
-    // Index into TargetSkeleton::joints, or kNoParent for a root joint.
+    // Index into SkeletonDescriptor::joints, or kNoParent for a root joint.
     int parent = -1;
 
     // Rest transform, decomposed (DecomposeRestTransform below).
@@ -50,19 +50,19 @@ struct TargetJoint
 // basis row. One implementation, because `motion_retarget` and `execVrm` each
 // carried a copy and a parity difference in a normalization step would be one
 // P0-6 has to explain rather than measure. `token` and `parent` are untouched.
-VRMRETARGET_API void DecomposeRestTransform(const pxr::GfMatrix4d& matrix, TargetJoint* joint);
+MOTIONRETARGET_API void DecomposeRestTransform(const pxr::GfMatrix4d& matrix, SkeletonJoint* joint);
 
-class VRMRETARGET_API TargetSkeleton
+class MOTIONRETARGET_API SkeletonDescriptor
 {
   public:
     static constexpr int kNoParent = -1;
 
-    TargetSkeleton() = default;
-    explicit TargetSkeleton(std::vector<TargetJoint> joints) : _joints(std::move(joints))
+    SkeletonDescriptor() = default;
+    explicit SkeletonDescriptor(std::vector<SkeletonJoint> joints) : _joints(std::move(joints))
     {
     }
 
-    const std::vector<TargetJoint>&
+    const std::vector<SkeletonJoint>&
     GetJoints() const noexcept
     {
         return _joints;
@@ -79,7 +79,7 @@ class VRMRETARGET_API TargetSkeleton
     }
 
     void
-    AddJoint(const TargetJoint& joint)
+    AddJoint(const SkeletonJoint& joint)
     {
         _joints.push_back(joint);
     }
@@ -105,7 +105,7 @@ class VRMRETARGET_API TargetSkeleton
     pxr::GfQuatf GetWorldRestRotation(int jointIndex) const;
 
   private:
-    std::vector<TargetJoint> _joints;
+    std::vector<SkeletonJoint> _joints;
 };
 
 // Exact, field by field and joint by joint -- motionCore's "is this the same
@@ -118,12 +118,12 @@ class VRMRETARGET_API TargetSkeleton
 // Exact means a rest rotation and its negation are *different* skeletons here,
 // though they rest identically. Downstream of an exec computation that is the
 // conservative answer -- a flipped sign recomputes what depends on it, which is
-// wasteful and never wrong -- and it is the same one `HumanoidPose` gives. There
+// wasteful and never wrong -- and it is the same one `MotionPose` gives. There
 // is no `NearlyEqual`: nothing yet asks whether two rigs are the same rig, and a
 // parity check compares the poses retargeted onto them.
-VRMRETARGET_API bool operator==(const TargetJoint& a, const TargetJoint& b) noexcept;
-VRMRETARGET_API bool operator!=(const TargetJoint& a, const TargetJoint& b) noexcept;
-VRMRETARGET_API bool operator==(const TargetSkeleton& a, const TargetSkeleton& b) noexcept;
-VRMRETARGET_API bool operator!=(const TargetSkeleton& a, const TargetSkeleton& b) noexcept;
+MOTIONRETARGET_API bool operator==(const SkeletonJoint& a, const SkeletonJoint& b) noexcept;
+MOTIONRETARGET_API bool operator!=(const SkeletonJoint& a, const SkeletonJoint& b) noexcept;
+MOTIONRETARGET_API bool operator==(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept;
+MOTIONRETARGET_API bool operator!=(const SkeletonDescriptor& a, const SkeletonDescriptor& b) noexcept;
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

@@ -44,7 +44,8 @@
 #   * workspace-pr-{windows,macos-arm64,linux}: the root CMake tree and its
 #     CTest suite -- each library's unit and boundary tests (motionCore,
 #     motionSampling, motionRecording, with the trace corpus and its
-#     generator check, motionUsd, motionSource, motionBvh with its corpus),
+#     generator check, motionRetarget, motionUsd, motionSource, motionBvh
+#     with its corpus),
 #     the two BVH tools' suites, the producer-profile check, the docs check and its self-test, and the installed-consumer lane
 #     (workspace_installed_consumer), which installs the tree and configures a
 #     consumer outside the repository.

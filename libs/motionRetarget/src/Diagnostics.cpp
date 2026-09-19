@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#include "vrmRetarget/Diagnostics.h"
+#include "motionRetarget/Diagnostics.h"
 
 #include <array>
 #include <utility>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 namespace
@@ -24,17 +24,17 @@ struct CodeRow
 // recoverability live here and nowhere else, so two raise sites cannot report
 // one code two ways.
 constexpr std::array<CodeRow, RetargetDiagnosticCodeCount> kCodes = {{
-    {"VRM_RETARGET_MISSING_REQUIRED_BONE", RetargetDiagnosticSeverity::Warning, true},
-    {"VRM_RETARGET_UNBOUND_DRIVEN_BONE", RetargetDiagnosticSeverity::Warning, true},
-    {"VRM_RETARGET_DUPLICATE_TARGET", RetargetDiagnosticSeverity::Warning, true},
-    {"VRM_RETARGET_INVALID_HIERARCHY", RetargetDiagnosticSeverity::Warning, true},
-    {"VRM_RETARGET_INVALID_ROOT_JOINT", RetargetDiagnosticSeverity::Warning, true},
-    {"VRM_RETARGET_NON_UNIT_SCALE", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_MISSING_REQUIRED_BONE", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_UNBOUND_DRIVEN_BONE", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_DUPLICATE_TARGET", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_INVALID_HIERARCHY", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_INVALID_ROOT_JOINT", RetargetDiagnosticSeverity::Warning, true},
+    {"MOTION_RETARGET_NON_UNIT_SCALE", RetargetDiagnosticSeverity::Warning, true},
     // Info rather than a warning: a clip holding one pose is a legitimate clip,
     // and the code exists to say which instant the answer was placed at, not
     // that anything is wrong.
-    {"VRM_RETARGET_TIME_RANGE_DERIVED", RetargetDiagnosticSeverity::Info, true},
-    {"VRM_RETARGET_OUTPUT_COLLIDES_WITH_INPUT", RetargetDiagnosticSeverity::Error, false},
+    {"MOTION_RETARGET_TIME_RANGE_DERIVED", RetargetDiagnosticSeverity::Info, true},
+    {"MOTION_RETARGET_OUTPUT_COLLIDES_WITH_INPUT", RetargetDiagnosticSeverity::Error, false},
 }};
 
 const CodeRow*
@@ -210,4 +210,4 @@ operator!=(const RetargetDiagnostics& a, const RetargetDiagnostics& b) noexcept
     return !(a == b);
 }
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

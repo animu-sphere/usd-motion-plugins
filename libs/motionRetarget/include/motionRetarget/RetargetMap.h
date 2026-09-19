@@ -1,50 +1,50 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "vrmRetarget/api.h"
+#include "motionRetarget/api.h"
 
-#include "vrmRetarget/TargetSkeleton.h"
+#include "motionRetarget/SkeletonDescriptor.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <array>
 #include <bitset>
 #include <string>
 #include <vector>
 
-namespace vrmRetarget
+namespace openstrata::motion
 {
 
 // Which target joint each VRM human bone drives.
 //
 // The source of the mapping is the caller's problem: a `.vrm` avatar carries it
 // as `vrm:humanBones:<bone>` under VrmHumanoidAPI, a hand-written rig supplies
-// it as a side file. Either way vrmRetarget receives resolved indices and never
+// it as a side file. Either way motionRetarget receives resolved indices and never
 // guesses from joint names — name heuristics are exactly the kind of silent
 // mis-retarget this contract exists to prevent.
-class VRMRETARGET_API HumanoidMap
+class MOTIONRETARGET_API RetargetMap
 {
   public:
     static constexpr int kUnmapped = -1;
 
-    HumanoidMap();
+    RetargetMap();
 
     // Binds `bone` to a target joint index. Returns false — leaving the bone
     // unmapped — when either the bone or the joint index is out of range, so a
     // rejected binding is never mistaken for a successful one.
-    bool SetJointIndex(motion::HumanBone bone, int jointIndex, std::size_t jointCount);
+    bool SetJointIndex(openstrata::motion::HumanJoint bone, int jointIndex, std::size_t jointCount);
 
     // Resolves `token` against `skeleton` and binds it. Returns false when the
     // skeleton has no such joint, leaving the bone unmapped -- including a
     // bone an earlier call had bound, as SetJointIndex does.
-    bool SetJointToken(motion::HumanBone bone, const std::string& token,
-                       const TargetSkeleton& skeleton);
+    bool SetJointToken(openstrata::motion::HumanJoint bone, const std::string& token,
+                       const SkeletonDescriptor& skeleton);
 
     void Clear();
 
     // kUnmapped when the bone does not drive a joint of this rig.
-    int GetJointIndex(motion::HumanBone bone) const;
-    bool IsMapped(motion::HumanBone bone) const;
+    int GetJointIndex(openstrata::motion::HumanJoint bone) const;
+    bool IsMapped(openstrata::motion::HumanJoint bone) const;
     std::size_t
     GetMappedCount() const noexcept
     {
@@ -53,28 +53,28 @@ class VRMRETARGET_API HumanoidMap
 
     // The bones a VRM 1.0 avatar must define. A rig missing one of these can
     // still be retargeted onto, but the caller should say so.
-    static const std::vector<motion::HumanBone>& GetRequiredBones();
+    static const std::vector<openstrata::motion::HumanJoint>& GetRequiredBones();
 
     // Required bones with no binding, in vocabulary order.
-    std::vector<motion::HumanBone> FindMissingRequiredBones() const;
+    std::vector<openstrata::motion::HumanJoint> FindMissingRequiredBones() const;
 
     // True when two bones resolve to the same joint — always a mapping bug,
     // because the second binding would silently overwrite the first.
     std::vector<int> FindDuplicateJointIndices() const;
 
     // Exact: the same bones bound to the same joint indices. Like
-    // TargetSkeleton's, it exists because `ExecTypeRegistry::RegisterType`
+    // SkeletonDescriptor's, it exists because `ExecTypeRegistry::RegisterType`
     // will not register a type it cannot compare (`execVrm`'s
     // `vrm.computeHumanoidMap`). Two maps are equal as *indices*, so maps built
     // against two different skeletons can compare equal -- the map never says
     // which rig its indices count into, and a consumer holds the skeleton
     // beside it.
-    friend VRMRETARGET_API bool operator==(const HumanoidMap& a, const HumanoidMap& b) noexcept;
-    friend VRMRETARGET_API bool operator!=(const HumanoidMap& a, const HumanoidMap& b) noexcept;
+    friend MOTIONRETARGET_API bool operator==(const RetargetMap& a, const RetargetMap& b) noexcept;
+    friend MOTIONRETARGET_API bool operator!=(const RetargetMap& a, const RetargetMap& b) noexcept;
 
   private:
-    std::array<int, motion::HumanBoneCount> _jointIndices;
-    std::bitset<motion::HumanBoneCount> _mapped;
+    std::array<int, openstrata::motion::HumanJointCount> _jointIndices;
+    std::bitset<openstrata::motion::HumanJointCount> _mapped;
 };
 
-} // namespace vrmRetarget
+} // namespace openstrata::motion

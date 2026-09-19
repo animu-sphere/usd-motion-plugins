@@ -16,6 +16,7 @@ members = [
     "libs/motionCore",
     "libs/motionSampling",
     "libs/motionRecording",
+    "libs/motionRetarget",
     "libs/motionUsd",
     "libs/motionSource",
     "libs/motionBvh",
