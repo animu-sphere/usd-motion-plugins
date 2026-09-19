@@ -21,7 +21,7 @@ authoring a motion stage are implemented** (`motionCore`, `motionSampling`,
 | Authoring a motion stage: `/Animation/{Skeleton,Body}`, 30 time codes per second, identity `scales`, `motion:timeCodesPerSecond`, `customData.motion` | supported — `motionUsd_unit`, which opens each stage through OpenUSD and checks what UsdSkel resolves; channels and look-at targets are reported, not authored (USD-O4) | [USD §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage) | — (imported 2026-09-19 from `usd-vrm-plugins` `motion_capture`) | v0.1.0 |
 | `SkeletonDescriptor`, `RetargetMap`, rest-pose correction, root-motion modes, retarget diagnostics | — | [RETARGET](../design/RETARGETING_POLICY.md) | `usd-vrm-plugins` `vrmRetarget` | v0.2.0 |
 | Reading `UsdSkelAnimation` into a clip; baking onto a target skeleton | — | [USD §6–§7](../design/USD_MAPPING.md#6-motion-on-an-avatar) | `usd-vrm-plugins` `motion_retarget` | v0.2.0 |
-| BVH through producer profiles | — | design policy §27 | `usd-vrm-plugins` `motionSource`, `motionBvh` | v0.4.0 |
+| BVH through producer profiles: parse and extract, match a declared profile, convert to `MotionClip`, author a motion stage with the producer's rest | supported — `motionSource_*` (8), `motionBvh_*` (10, a recorded export among them), `motion_bvh_inspect_*`, `motion_convert_clip`, `workspace_motion_profiles` and its `_absent` pair | design policy §27; [USD §3](../design/USD_MAPPING.md#3-the-skeleton) | — (imported 2026-09-19, ahead of its release) | v0.4.0 |
 | OpenExec motion nodes | — | design policy §21 | `usd-vrm-plugins` `execMotion` | v0.5.0 |
 | Generic NPZ | — | design policy §28 | nowhere | later |
 | IK-assisted retarget, foot locking, contacts | — | design policy §12.2 | nowhere | later |

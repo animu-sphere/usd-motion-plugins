@@ -32,7 +32,7 @@ and `usd-mmd-plugins` as its Phase 9.
 | v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
 | v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half, the reading half of `StageIo` (vrm MIG-2) | C | ⬜ |
 | v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) | E | ⬜ |
-| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 | C | ⬜ |
+| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | 🚧 |
 | v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item | — | ⬜ |
 | later | generic NPZ payload contract, IK-assisted retarget, contacts, blending beyond the imported one, generator interfaces, Python | — | F follows the imports | ⬜ |
 

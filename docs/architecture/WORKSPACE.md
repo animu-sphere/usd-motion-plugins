@@ -27,8 +27,8 @@ beside each component, and two build modes, `ost` and plain CMake.
 | `motionRecording` | `libs/motionRecording/` | stream intake, `MotionRecorder`, the `motion-capture-trace` format, replay | `usd-vrm-plugins` `motionRuntime` (its capture half) | **imported** 2026-09-19, with history |
 | `motionRetarget` | `libs/motionRetarget/` | `SkeletonDescriptor`, `RetargetMap`, rest correction, root-motion policy, retarget diagnostics ([RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md)) | `usd-vrm-plugins` `vrmRetarget`, its generic half | reserved |
 | `motionUsd` | `libs/motionUsd/` | `MotionClip` ↔ `UsdSkelAnimation`, `SkeletonDescriptor` ↔ `UsdSkelSkeleton`, time codes, metadata ([USD_MAPPING.md](../design/USD_MAPPING.md)) | `usd-vrm-plugins`: `motion_capture`'s clip writer (authoring); `motion_retarget`'s `StageIo` (reading, v0.2.0) | **authoring imported** 2026-09-19, with history |
-| `motionSource` | `libs/motionSource/` | the format-neutral recorded-source layer: source skeleton and animation, the producer-profile contract, conversion into `MotionClip` | `usd-vrm-plugins` `motionSource` | reserved |
-| `motionBvh` | `libs/motionBvh/` | BVH syntax and extraction only (design policy §27) | `usd-vrm-plugins` `motionBvh` | reserved |
+| `motionSource` | `libs/motionSource/` | the format-neutral recorded-source layer: source skeleton and animation, the producer-profile contract, conversion into `MotionClip` | `usd-vrm-plugins` `motionSource` | **imported** 2026-09-19, with history (release v0.4.0) |
+| `motionBvh` | `libs/motionBvh/` | BVH syntax and extraction only (design policy §27) | `usd-vrm-plugins` `motionBvh` | **imported** 2026-09-19, with history (release v0.4.0) |
 
 ### 1.2 Bundles, tools and data
 
@@ -36,10 +36,10 @@ beside each component, and two build modes, `ost` and plain CMake.
 | --- | --- | --- | --- | --- | --- |
 | `execMotion` | optional plugin bundle (`usd-exec`) | `plugins/execMotion/` | vendor-neutral OpenExec nodes, each a thin wrapper over a library call (design policy §21) | `usd-vrm-plugins` `execMotion` | reserved |
 | `motion_inspect` | CLI | `tools/motionInspect/` | reports on a motion stage or clip | new | reserved |
-| `motion_convert` | CLI | `tools/motionConvert/` | a recorded source + a named profile → a motion stage | `usd-vrm-plugins` `motion_bvh_convert` | reserved |
-| `motion_bvh_inspect` | CLI | `tools/motionBvhInspect/` | what a BVH file holds, and which profiles fit it | `usd-vrm-plugins` `motion_bvh_inspect` | reserved |
+| `motion_convert` | CLI | `tools/motionConvert/` | a recorded source + a named profile → a motion stage | `usd-vrm-plugins` `motion_bvh_convert` | **imported** 2026-09-19, with history (release v0.4.0); it authors through `motionUsd` |
+| `motion_bvh_inspect` | CLI | `tools/motionBvhInspect/` | what a BVH file holds, and which profiles fit it | `usd-vrm-plugins` `motion_bvh_inspect` | **imported** 2026-09-19, with history (release v0.4.0) |
 | `motion_record` | CLI | `tools/motionRecord/` | a recorded trace → a motion stage | `usd-vrm-plugins` `motion_capture` | reserved |
-| producer profiles | package data | `profiles/motion/` | one declarative file per producer and export preset | `usd-vrm-plugins` `profiles/motion/` | reserved |
+| producer profiles | package data | `profiles/motion/` | one declarative file per producer and export preset | `usd-vrm-plugins` `profiles/motion/` | **imported** 2026-09-19, with history (release v0.4.0); installed to `share/usd-motion-plugins/profiles/motion/` |
 
 Libraries are plain static CMake libraries. Names follow the siblings'
 workspace discipline (WS-O1, decided 2026-09-19;
@@ -84,7 +84,8 @@ motionUsd ───────→ motionCore, motionSampling, OpenUSD (usd, sdf
 motionSource ────→ motionCore
 motionBvh ───────→ motionSource
 execMotion ──────→ motionCore, motionSampling, motionRetarget, OpenExec
-tools/* ─────────→ the libraries they name, OpenUSD stage authoring
+tools/* ─────────→ the libraries they name (motion_convert: motionBvh,
+                   motionSource, motionUsd), OpenUSD stage authoring
 ```
 
 This is the design policy's §24 with the recorded-source pair added.

@@ -1866,7 +1866,8 @@ Initial implementation:
 
 §42.1–§42.6 were taken on 2026-09-17, while `usd-mmd-plugins` and
 `usd-vrm-plugins` aligned their documentation with this policy. §42.7 was taken
-on 2026-09-19, with the scaffold. Each is recorded where it is binding, and
+on 2026-09-19, with the scaffold, and §42.8 the same day, with the first
+imported diagnostic. Each is recorded where it is binding, and
 this section is the index.
 
 ### 42.1 The core is imported from `usd-vrm-plugins`, not rewritten
@@ -1939,3 +1940,15 @@ So the libraries §22 lists are `motionCore`, `motionSampling`,
 the names it already builds with, and `usd-avatar-runtime` composes packages
 that all follow one rule. Binding in
 [WORKSPACE.md §1.2](../architecture/WORKSPACE.md#12-bundles-tools-and-data).
+
+### 42.8 Diagnostic codes are named, and renamed on arrival
+
+§29 proposes numbered codes (`MOTION-E0001`). The code that arrives and both
+sibling repositories use named codes whose name is the event
+(`VRM_RETARGET_UNBOUND_DRIVEN_BONE`, `MMD_MOTION_UNMATCHED_BONE`), and a test
+that asserts a name reads as what happened. So codes here are named,
+`MOTION_<AREA>_<EVENT>`, and an imported code takes this repository's prefix
+on arrival under §42.2, with its event name unchanged: `motionBvh`'s
+`VRM_BVH_*` are `MOTION_BVH_*`. A consumer's own codes still pass through
+unchanged. Binding in
+[DIAGNOSTICS.md](../reference/DIAGNOSTICS.md) (DIAG-O1).
