@@ -73,11 +73,17 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   shape is MC-O5. The trace format and every committed trace are unchanged.
   `usd-vrm-plugins` deletes its copy in its MIG-2, against a release of this
   one, after re-running the parity rows its MIG-0 named.
-- ⬜ `motionUsd`: author the motion stage of
+- ✅ `motionUsd`: author the motion stage of
   [USD_MAPPING.md §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage),
   identity `scales` and the `motion:timeCodesPerSecond` rate included
   ([EXEC_CONTRACT.md §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)),
-  and open it through OpenUSD in a test.
+  and open it through OpenUSD in a test — 2026-09-19. The writer arrived with
+  its history from `usd-vrm-plugins`' `motion_capture`, which is the writer
+  there that authors an avatar-independent clip. `StageIo` reads a clip and
+  bakes onto a VRM, so it is the reading half and arrives with v0.2.0. The
+  writer was adapted to the mapping after the move. The `Channels` prim waits
+  on USD-O4, and until then the channels a clip carries are reported rather
+  than authored.
 - ✅ Fix the sampling findings in their own change
   ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling))
   — 2026-09-19. `SampleClip`, `PoseFilter::Step`, an N-way blend that answers

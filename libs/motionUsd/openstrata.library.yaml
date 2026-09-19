@@ -1,0 +1,15 @@
+# OpenStrata plain-library descriptor. motionUsd turns a MotionClip into the
+# standalone motion stage, standard UsdSkel with nothing that names a target rig
+# (docs/design/USD_MAPPING.md §2-§5).
+schema: openstrata.library/v1alpha1
+library:
+  id: motionUsd
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+requires:
+  libraries:
+    - id: motionCore
+      version: ">=0.1,<0.2"
+cmake:
+  package: motionUsd
+  target: motionUsd::motionUsd

@@ -76,6 +76,7 @@ endif()
 add_subdirectory("libs/motionCore")
 add_subdirectory("libs/motionSampling")
 add_subdirectory("libs/motionRecording")
+add_subdirectory("libs/motionUsd")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
