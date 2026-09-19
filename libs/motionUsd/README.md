@@ -23,7 +23,7 @@ and `customData.motion`.
 
 | Header | Contents |
 | --- | --- |
-| `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions`, `MotionStageReport`, `MotionStageContractVersion`, `MotionStageTimeCodesPerSecond` |
+| `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions` (with a producer's `MotionStageRest` and provenance), `MotionStageReport`, `MotionStageContractVersion`, `MotionStageTimeCodesPerSecond` |
 
 ```text
 /Animation            Scope, the default prim; customData.motion
@@ -34,10 +34,18 @@ and `customData.motion`.
 
 ## Rules the writer keeps
 
-- **Absent is not rest.** A joint no sample observed is not on the skeleton. A
-  joint one sample missed is authored at identity, because holding it is an
-  intake policy. A root position one sample missed is held, because the rest is
-  a place and not a neutral value.
+- **Absent is not rest.** Without a producer rest, a joint no sample observed
+  is not on the skeleton. A joint one sample missed is authored at its rest
+  rotation, because holding it is an intake policy. A root position one sample
+  missed is held, because the rest is a place and not a neutral value.
+- **A producer's rest is the rig.** A recorded file states a rest, and
+  `MotionStageOptions::rest` carries it. Its joints are then the joint set,
+  and every joint holds its rest translation. A capture passes none, and its
+  rest is identity except the hips at the first root position
+  (USD_MAPPING.md §3). `motion_convert` is the caller that passes one.
+- **A refusal touches nothing.** `AuthorMotionStage` checks the clip before it
+  authors, and refuses a stage that already holds `/Animation`.
+  `WriteMotionStage` writes the file only after the clip is accepted.
 - **`scales` is always authored.** Without it UsdSkel resolves every joint to
   its rest while every query still succeeds. `motionUsd_unit` checks what
   UsdSkel resolves, not only what was authored.
