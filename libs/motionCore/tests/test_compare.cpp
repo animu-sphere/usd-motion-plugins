@@ -85,7 +85,9 @@ SamplePose()
     source.provider = "example.sender";
     source.protocol = "vmc";
     source.sourceId = "session-01";
-    pose.source = source;
+    source.sourceTimestamp = 1234.5;
+    source.sequenceNumber = 7;
+    pose.metadata = source;
     return pose;
 }
 
@@ -103,7 +105,9 @@ SampleAnimation()
     animation.startTime = 0.0;
     animation.endTime = 2.0 / 30.0;
     animation.nominalFrameRate = 30.0;
-    animation.source = *animation.samples.front().source;
+    animation.source = animation.samples.front().metadata;
+    animation.source.sourceTimestamp.reset();
+    animation.source.sequenceNumber.reset();
     return animation;
 }
 
@@ -203,14 +207,35 @@ TestValueAndMotionDiverge()
 
     // Provenance: a different value, the same motion.
     MotionPose relabelled = pose;
-    relabelled.source->provider = "other.sender";
+    relabelled.metadata.provider = "other.sender";
     assert(relabelled != pose);
     assert(NearlyEqual(relabelled, pose));
 
+    // A pose that recorded nothing about where it came from carries the
+    // default metadata, which is a value like any other.
     MotionPose anonymous = pose;
-    anonymous.source.reset();
+    anonymous.metadata = SourceMetadata{};
     assert(anonymous != pose);
     assert(NearlyEqual(anonymous, pose));
+
+    // The sample's own stamp and counter are provenance too: a different value,
+    // the same motion. Absent and zero are different values, as everywhere else.
+    MotionPose restamped = pose;
+    restamped.metadata.sourceTimestamp = 1234.75;
+    assert(restamped != pose);
+    assert(NearlyEqual(restamped, pose));
+
+    MotionPose resequenced = pose;
+    resequenced.metadata.sequenceNumber = 8;
+    assert(resequenced != pose);
+    assert(NearlyEqual(resequenced, pose));
+
+    MotionPose unsequenced = pose;
+    unsequenced.metadata.sequenceNumber.reset();
+    MotionPose zeroSequenced = pose;
+    zeroSequenced.metadata.sequenceNumber = 0;
+    assert(unsequenced != zeroSequenced);
+    assert(NearlyEqual(unsequenced, zeroSequenced));
 
     // And on an animation, where the metadata is not optional.
     MotionClip clip = SampleAnimation();

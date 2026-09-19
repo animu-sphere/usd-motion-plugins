@@ -35,6 +35,14 @@ main()
     assert(pose.channels.IsEmpty());
     assert(pose.channels.Find("happy") == nullptr);
 
+    // A fresh pose carries metadata, and it is the default: nothing recorded
+    // about where, and neither a producer stamp nor a counter.
+    const openstrata::motion::SourceMetadata unrecorded;
+    assert(pose.metadata == unrecorded);
+    assert(pose.metadata.kind == openstrata::motion::MotionSourceKind::Clip);
+    assert(pose.metadata.provider.empty() && pose.metadata.sourceId.empty());
+    assert(!pose.metadata.sourceTimestamp && !pose.metadata.sequenceNumber);
+
     openstrata::motion::MotionChannelSet weights;
     assert(weights.Set("happy", 0.5f));
     assert(weights.Set("aa", 0.25f));

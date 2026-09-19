@@ -59,10 +59,12 @@ MotionRecorder::Take()
     {
         clip.startTime = clip.samples.front().timestamp;
         clip.endTime = clip.samples.back().timestamp;
-        if (clip.samples.front().source)
-        {
-            clip.source = *clip.samples.front().source;
-        }
+        // The clip names its source; a stamp and a counter are one sample's,
+        // and the first sample's would describe the clip no better than any
+        // other's, so they stay on the samples.
+        clip.source = clip.samples.front().metadata;
+        clip.source.sourceTimestamp.reset();
+        clip.source.sequenceNumber.reset();
     }
     return clip;
 }

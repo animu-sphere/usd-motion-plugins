@@ -131,12 +131,30 @@ enum class MotionSourceKind : std::uint8_t
     Simulated,
 };
 
+// Where a sample came from (docs/design/MOTION_CONTRACT.md §7). Recorded and
+// reported, and never a branch condition: a consumer that cannot tell a
+// tracker-driven pose from a clip-driven one is reading the value correctly.
+//
+// The first four fields name the source and are the same for every sample it
+// produced. The last two are the sample's own, and both are optional because
+// not every producer has them: a file has no sequence, and a sender that stamps
+// nothing has no clock of its own to report.
 struct SourceMetadata
 {
     MotionSourceKind kind = MotionSourceKind::Clip;
     std::string provider;
     std::string protocol;
     std::string sourceId;
+
+    // The producer's own stamp on this sample, in seconds, exactly as it
+    // arrived -- its clock, its epoch. `MotionPose::timestamp` is the time the
+    // motion layer samples on; this is the evidence the two can be compared
+    // against, and nothing here converts one into the other.
+    std::optional<double> sourceTimestamp;
+
+    // The producer's counter for this sample. A gap is a sample that never
+    // arrived, which is how a drop is told apart from a slow sender.
+    std::optional<std::uint64_t> sequenceNumber;
 };
 
 // Exact value equality, on the aggregates that cross a boundary: the two
@@ -302,7 +320,14 @@ struct MotionPose
     // value of the target.
     std::optional<pxr::GfVec3f> lookAtTarget;
 
-    std::optional<SourceMetadata> source;
+    // Where this sample came from (MOTION_CONTRACT.md §5.1, §7). Always
+    // present: a sample always came from somewhere, and a default value --
+    // kind `Clip`, every string empty, no stamp and no sequence -- is how a
+    // producer says it recorded nothing about where. An `optional` here gave
+    // "unknown" two spellings, an empty metadata and no metadata, and two
+    // samples of one motion could differ over which one a producer happened
+    // to use.
+    SourceMetadata metadata;
 };
 
 MOTIONCORE_API bool operator==(const MotionPose& a, const MotionPose& b) noexcept;

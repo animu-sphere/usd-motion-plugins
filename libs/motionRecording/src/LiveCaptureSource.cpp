@@ -45,6 +45,10 @@ LiveCaptureSource::SetSourceMetadata(const SourceMetadata& metadata)
     // The kind is not the connector's to choose: anything arriving through this
     // class is a live capture by construction (MOTION_CONTRACT.md §7).
     _metadata.kind = MotionSourceKind::LiveCapture;
+    // Nor is a stamp or a counter the stream's: they belong to each sample, and
+    // arrive on the pose a connector pushes (step 5 of Condition keeps them).
+    _metadata.sourceTimestamp.reset();
+    _metadata.sequenceNumber.reset();
 }
 
 MotionPose
@@ -131,8 +135,15 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
     }
 
     // 5. Provenance is stamped on every buffered pose, so a pose that outlives
-    //    this object still says where it came from.
-    conditioned.source = _metadata;
+    //    this object still says where it came from. The stream names the
+    //    source; the stamp and the counter are the sample's own, so the ones
+    //    the connector pushed are kept rather than overwritten.
+    {
+        const SourceMetadata pushed = conditioned.metadata;
+        conditioned.metadata = _metadata;
+        conditioned.metadata.sourceTimestamp = pushed.sourceTimestamp;
+        conditioned.metadata.sequenceNumber = pushed.sequenceNumber;
+    }
 
     // 6. Smoothing runs last, on the fully resolved frame, so a held joint is
     //    smoothed on the same terms as an observed one.

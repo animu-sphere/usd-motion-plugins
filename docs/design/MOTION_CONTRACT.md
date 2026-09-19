@@ -227,6 +227,28 @@ Provenance is recorded and **never a branch condition** (design policy §4.1).
 A consumer that cannot tell a tracker-driven pose from a clip-driven one is
 reading the value correctly.
 
+Every pose carries it (`MotionPose::metadata` is not optional): a sample
+always came from somewhere, and the default value — kind `Clip`, every string
+empty, no stamp, no counter — is how a producer says it recorded nothing about
+where. The fields split in two, and each layer keeps the split:
+
+- **The source's name** — `kind`, `provider`, `protocol`, `sourceId` — is the
+  same for every sample one source produced. A stream sets it once
+  (`LiveCaptureSource` forces `kind` to `LiveCapture`), a recorded clip carries
+  it as its own metadata, and a trace writes it once, in its header.
+- **The sample's own** — `sourceTimestamp`, the producer's stamp in seconds on
+  its own clock, and `sequenceNumber`, its counter — is per sample and
+  optional, because a file has no counter and a sender may stamp nothing.
+  Intake keeps the ones a connector pushed; an interpolated, held or
+  extrapolated pose answers with the nearest observation's, because it was
+  never observed itself; a recorder leaves them on the samples and off the
+  clip. Neither replaces `MotionPose::timestamp`, the time the motion is
+  sampled on, and nothing here converts one into the other.
+
+The clip's own metadata is still spelled `MotionClip::source`, and carries only
+the name: the design policy sketches a separate `ClipMetadata` for the clip
+(its §7), and a rename that would decide it waits for that.
+
 ### 7.1 A recorded source's provenance is a neighbour, not a superset
 
 A recorded file carries its own provenance: the format, the file's identity,
@@ -317,7 +339,8 @@ counts with it, so a clip baked from a laggy session keeps the evidence of the
 lag. It writes no external format (design policy §14).
 
 The persistent trace, `motion-capture-trace`, is line-oriented text with fixed
-six-decimal precision, versioned (version 2 added channels), read in every
+six-decimal precision, versioned (version 2 added channels, 3 the look-at
+target, 4 each sample's counter and stamp), read in every
 earlier version, written only in the current one, and **byte-identical on
 round-trip** for traces the current writer produced. It stores capture order,
 not arrival order; delivery timing is reproduced by a replay schedule. Anything

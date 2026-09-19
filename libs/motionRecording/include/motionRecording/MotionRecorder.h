@@ -62,8 +62,9 @@ class MOTIONRECORDING_API MotionRecorder
         return _animation.samples.size();
     }
 
-    // Stamps the time range, the nominal rate, and the provenance of the first
-    // recorded pose onto the clip, and hands it over. The frames are gone
+    // Stamps the time range, the nominal rate, and the source the first
+    // recorded pose names -- not its stamp or counter, which stay on each
+    // sample -- onto the clip, and hands it over. The frames are gone
     // afterwards; the report is not, so a caller can take the clip and still
     // say how the session that produced it went. Clear() drops both.
     MotionClip Take();

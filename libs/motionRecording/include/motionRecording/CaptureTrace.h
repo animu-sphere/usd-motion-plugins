@@ -15,13 +15,15 @@
 // what lets a golden trace be compared rather than merely parsed.
 //
 //     # a comment
-//     !motion-capture-trace 3
+//     !motion-capture-trace 4
 //     provider   example.replay
 //     protocol   replay
 //     sourceId   walk-01
 //     frameRate  30
 //
 //     t 0.000000
+//     sequence 41
+//     sourceTime 1789795161.033333
 //     root pos 0.000000 0.900000 0.000000
 //     root rot 1.000000 0.000000 0.000000 0.000000
 //     root vel 0.000000 0.000000 0.000000
@@ -42,6 +44,15 @@
 // are `w x y z`; the trailing number on a `b` line is an optional confidence
 // in [0, 1]. Contact values are `unknown`, `contact`, or `free`. Joint names are
 // the joint vocabulary spelled as `openstrata::motion::HumanJointName` spells it.
+//
+// `sequence` and `sourceTime` are the sample's own provenance (format 4 on):
+// the producer's counter, a decimal integer, and its stamp in seconds on its
+// own clock (`SourceMetadata::sequenceNumber`, `::sourceTimestamp`). Each is
+// written only when the sample carries it, at most once per frame, and neither
+// replaces `t` -- which is the time the motion is sampled on. The stamp is
+// written at six decimals like every other number, so a stamp finer than a
+// microsecond is quantised on the way out. The three header keys, by contrast,
+// name the source and apply to every frame.
 //
 // `lookat` is the point the frame said the character is looking at (format 3
 // on), in the same space as `root pos`. At most one per frame, like `contacts`
@@ -81,7 +92,7 @@
 namespace openstrata::motion
 {
 
-inline constexpr int CaptureTraceFormatVersion = 3;
+inline constexpr int CaptureTraceFormatVersion = 4;
 
 // The oldest format the reader accepts. A trace is a recording, and a recording
 // that stops being readable because the format moved on is a recording lost.
@@ -92,6 +103,10 @@ inline constexpr int CaptureTraceChannelsVersion = 2;
 
 // The format version that introduced the `lookat` target line.
 inline constexpr int CaptureTraceLookAtVersion = 3;
+
+// The format version that introduced the per-frame `sequence` and `sourceTime`
+// lines.
+inline constexpr int CaptureTraceSampleMetadataVersion = 4;
 
 // The format writes six decimals, so a timestamp read back from a trace can sit
 // up to half of this away from the exact instant it was meant to represent --
@@ -129,9 +144,9 @@ MOTIONRECORDING_API bool ReadCaptureTraceFile(const std::string& path, MotionCli
 // only some joints is normalised to annotate all of them on the way back out.)
 //
 // Returns false without writing anything when a value cannot be spelled in this
-// format: a channel name that is empty or carries whitespace, or a
-// provenance string carrying a line break or padded with whitespace at either
-// end. Refusing is the point: emitting it would produce a file that reads back
+// format: a channel name that is empty or carries whitespace, a provenance
+// string carrying a line break or padded with whitespace at either end, or a
+// sample stamp that is not finite. Refusing is the point: emitting it would produce a file that reads back
 // as a different animation, or as none. The check runs before the first byte,
 // so a caller that is refused still has an untouched stream.
 //

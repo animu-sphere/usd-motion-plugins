@@ -84,3 +84,19 @@ separate from the package version
   - The rendered `ost` workflow is **not** included, because `ost` 0.22.10
     refuses a workspace graph with no member
     ([roadmap](docs/roadmap/current.md)).
+
+### Changed
+
+- **A pose's provenance is its non-optional `metadata`** (MOTION_CONTRACT.md
+  §5.1, §7), where the imported pose carried an optional `source`. The default
+  metadata is how a producer says it recorded nothing, so "unknown" has one
+  spelling instead of two. `SourceMetadata` gains the sample's own
+  `sourceTimestamp` and `sequenceNumber`, both optional and both part of
+  `==` but not of `NearlyEqual`. The stream names the source and each sample
+  keeps its own stamp and counter: `LiveCaptureSource` keeps the ones a
+  connector pushed, interpolation takes the nearer observation's whole, and
+  `MotionRecorder` leaves them off the clip.
+- **`motion-capture-trace` is version 4**: a frame may carry `sequence` and
+  `sourceTime` lines. Versions 1–3 still read; the writer refuses a
+  non-finite stamp, as the reader does. The seven corpus traces changed in
+  their version line only.

@@ -389,7 +389,7 @@ ComparePose(const Policy& policy, const MotionPose& a, const MotionPose& b,
     }
     if constexpr (Policy::ReadsProvenance)
     {
-        if (a.source.has_value() != b.source.has_value() || (a.source && *a.source != *b.source))
+        if (a.metadata != b.metadata)
         {
             Report(difference, [] { return std::string("source metadata differs"); });
             return false;
@@ -530,7 +530,8 @@ bool
 operator==(const SourceMetadata& a, const SourceMetadata& b) noexcept
 {
     return a.kind == b.kind && a.provider == b.provider && a.protocol == b.protocol &&
-           a.sourceId == b.sourceId;
+           a.sourceId == b.sourceId && a.sourceTimestamp == b.sourceTimestamp &&
+           a.sequenceNumber == b.sequenceNumber;
 }
 
 bool

@@ -193,6 +193,36 @@ TestRootMotionFlagsSurviveInterpolation()
     assert(!mid.hasLinearVelocity);
 }
 
+// Metadata is discrete and always present, so an interpolated pose takes the
+// nearer observation's whole, its stamp and counter included -- never a stamp
+// averaged into one no producer sent, and never the default because one side
+// "had none".
+void
+TestMetadataSnapsToTheNearerEndpoint()
+{
+    using openstrata::motion::MotionPose;
+    MotionPose a = MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f));
+    MotionPose b = MakePose(1.0, 10.0f, pxr::GfVec3f(1.0f));
+    a.metadata.provider = "example.sender";
+    a.metadata.sourceTimestamp = 100.0;
+    a.metadata.sequenceNumber = 41;
+    b.metadata.provider = "example.sender";
+    b.metadata.sourceTimestamp = 100.5;
+    b.metadata.sequenceNumber = 42;
+
+    const MotionPose early = openstrata::motion::LerpPose(a, b, 0.25f);
+    assert(early.metadata == a.metadata);
+    const MotionPose late = openstrata::motion::LerpPose(a, b, 0.75f);
+    assert(late.metadata == b.metadata);
+
+    // A default metadata is a value, not an absence: the nearer side's default
+    // wins over the farther side's stamp.
+    MotionPose unrecorded = a;
+    unrecorded.metadata = openstrata::motion::SourceMetadata{};
+    const MotionPose held = openstrata::motion::LerpPose(unrecorded, b, 0.25f);
+    assert(held.metadata == openstrata::motion::SourceMetadata{});
+}
+
 void
 TestPoseBufferOrderingAndSampling()
 {
@@ -358,6 +388,7 @@ main()
     TestChannelsAreHeldNotFaded();
     TestLookAtTargetIsHeldNotFaded();
     TestRootMotionFlagsSurviveInterpolation();
+    TestMetadataSnapsToTheNearerEndpoint();
     TestPoseBufferOrderingAndSampling();
     TestPoseBufferExtrapolatesPositionOnly();
     TestResampleCoversTheWholeInterval();
