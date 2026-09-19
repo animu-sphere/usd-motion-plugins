@@ -29,11 +29,12 @@ MOTIONSAMPLING_API RootMotion LerpRootMotion(const RootMotion& a, const RootMoti
 // slerped; a joint valid in exactly one is copied from that endpoint; a joint
 // valid in neither stays absent. The result's timestamp is interpolated.
 //
-// Optional fields (confidence, channels, contacts, source) follow the same
+// Optional fields (confidence, channels, contacts) follow the same
 // hold-not-fade rule: confidence is interpolated only where both endpoints
 // carry it, channels are interpolated per name and a name only one endpoint
 // reports is held at that weight rather than faded toward zero, and
-// contacts/source are taken from the nearer endpoint because they are discrete.
+// contacts are taken from the nearer endpoint because they are discrete. The
+// metadata, which every pose carries, is the nearer endpoint's.
 MOTIONSAMPLING_API MotionPose LerpPose(const MotionPose& a, const MotionPose& b, float t);
 
 } // namespace openstrata::motion

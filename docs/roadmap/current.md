@@ -49,9 +49,14 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   rename is one commit after the move, and the boundary check gained the
   product-name scan. `usd-vrm-plugins` switches to the installed package and
   deletes its copy in its MIG-1, against a release of this one.
-- ⬜ Fix the pose's shape to the contract's after the move: `source` becomes
+- ✅ Fix the pose's shape to the contract's after the move: `source` becomes
   the non-optional `metadata` (§5.1), and `SourceMetadata` gains
-  `sourceTimestamp` and `sequenceNumber` (§7).
+  `sourceTimestamp` and `sequenceNumber` (§7) — 2026-09-19, after the
+  runtime arrived, so intake, sampling, the recorder and the trace carry the
+  two new fields in the same change
+  ([MOTION_CONTRACT.md §10](../design/MOTION_CONTRACT.md#10-recording-and-the-trace-format)):
+  the trace format is version 4, and the corpus was regenerated for its header
+  line alone.
 - ✅ Receive the evidence `usd-vrm-plugins`' MIG-0 hands over — 2026-09-19.
   The OpenExec driver contract and the producer conventions are
   [EXEC_CONTRACT.md](../design/EXEC_CONTRACT.md) (proposed); the v0.9.0 scale

@@ -2,7 +2,9 @@
 #include "motionRecording/CaptureTrace.h"
 
 #include <array>
+#include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <istream>
@@ -504,6 +506,62 @@ ReadCaptureTrace(std::istream& input, MotionClip* animation, CaptureTraceError* 
             continue;
         }
 
+        if (keyword == "sequence" || keyword == "sourceTime")
+        {
+            if (formatVersion < CaptureTraceSampleMetadataVersion)
+            {
+                return Fail(error, lineNumber,
+                            "'" + keyword + "' needs format version " +
+                                std::to_string(CaptureTraceSampleMetadataVersion) +
+                                "; this trace declares " + std::to_string(formatVersion));
+            }
+            std::string token;
+            if (!(stream >> token))
+            {
+                return Fail(error, lineNumber, "'" + keyword + "' needs a value");
+            }
+            if (!FullyConsumed(stream, error, lineNumber, "the '" + keyword + "' value"))
+            {
+                return false;
+            }
+            SourceMetadata& metadata = frame->pose.metadata;
+            if (keyword == "sequence")
+            {
+                // Digits only: a stream extraction into an unsigned type would
+                // read "-1" as the largest counter there is.
+                std::uint64_t value = 0;
+                const char* first = token.data();
+                const char* last = first + token.size();
+                const auto [end, status] = std::from_chars(first, last, value);
+                if (status != std::errc() || end != last)
+                {
+                    return Fail(error, lineNumber,
+                                "'sequence' needs a non-negative integer counter");
+                }
+                if (metadata.sequenceNumber)
+                {
+                    return Fail(error, lineNumber, "'sequence' appears twice in a frame");
+                }
+                metadata.sequenceNumber = value;
+            }
+            else
+            {
+                std::istringstream number(token);
+                number.imbue(std::locale::classic());
+                double value = 0.0;
+                if (!(number >> value) || !number.eof() || !std::isfinite(value))
+                {
+                    return Fail(error, lineNumber, "'sourceTime' needs a finite time in seconds");
+                }
+                if (metadata.sourceTimestamp)
+                {
+                    return Fail(error, lineNumber, "'sourceTime' appears twice in a frame");
+                }
+                metadata.sourceTimestamp = value;
+            }
+            continue;
+        }
+
         if (keyword == "e")
         {
             if (formatVersion < CaptureTraceChannelsVersion)
@@ -572,9 +630,14 @@ ReadCaptureTrace(std::istream& input, MotionClip* animation, CaptureTraceError* 
         result.nominalFrameRate =
             (span > 0.0 && intervals > 0) ? static_cast<double>(intervals) / span : 30.0;
     }
+    // The header names the source of every frame; a frame's own stamp and
+    // counter, read above, are kept.
     for (MotionPose& sample : result.samples)
     {
-        sample.source = result.source;
+        sample.metadata.kind = result.source.kind;
+        sample.metadata.provider = result.source.provider;
+        sample.metadata.protocol = result.source.protocol;
+        sample.metadata.sourceId = result.source.sourceId;
     }
 
     *animation = std::move(result);
@@ -614,6 +677,12 @@ WriteCaptureTrace(std::ostream& output, const MotionClip& animation)
     }
     for (const MotionPose& pose : animation.samples)
     {
+        // The reader refuses a non-finite stamp, so writing one would produce
+        // a file this format's own reader cannot open.
+        if (pose.metadata.sourceTimestamp && !std::isfinite(*pose.metadata.sourceTimestamp))
+        {
+            return false;
+        }
         for (const MotionChannel& entry : pose.channels.entries)
         {
             if (!IsWritableChannelName(entry.name))
@@ -644,6 +713,15 @@ WriteCaptureTrace(std::ostream& output, const MotionClip& animation)
     for (const MotionPose& pose : animation.samples)
     {
         output << '\n' << "t " << pose.timestamp << '\n';
+
+        if (pose.metadata.sequenceNumber)
+        {
+            output << "sequence " << *pose.metadata.sequenceNumber << '\n';
+        }
+        if (pose.metadata.sourceTimestamp)
+        {
+            output << "sourceTime " << *pose.metadata.sourceTimestamp << '\n';
+        }
 
         if (pose.root.hasPosition)
         {

@@ -200,7 +200,13 @@ LerpPose(const MotionPose& a, const MotionPose& b, float t)
     const MotionPose& nearer = (alpha < 0.5f) ? a : b;
     const MotionPose& farther = (alpha < 0.5f) ? b : a;
     result.contacts = nearer.contacts ? nearer.contacts : farther.contacts;
-    result.source = nearer.source ? nearer.source : farther.source;
+
+    // Provenance is always present, so there is no absent side to fall back
+    // from: the nearer endpoint's metadata is taken whole, its stamp and
+    // sequence number included. An interpolated pose was never observed, so it
+    // is not given a stamp or a counter of its own; it answers with those of
+    // the observation it is closest to.
+    result.metadata = nearer.metadata;
 
     return result;
 }

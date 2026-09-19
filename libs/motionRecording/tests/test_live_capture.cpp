@@ -129,7 +129,16 @@ MakeTrace(std::size_t frames = 12)
         {
             pose.lookAtTarget = pxr::GfVec3f(0.0f, 1.4f, -2.0f + static_cast<float>(index) * 0.01f);
         }
-        pose.source = trace.source;
+        // The sample's own provenance: a counter on every frame, and a stamp
+        // on some -- so the round trip keeps "stamped nothing" distinct from a
+        // stamp. The stamps are exact at six decimals, so a round trip can be
+        // held to `==` rather than to a tolerance.
+        pose.metadata = trace.source;
+        pose.metadata.sequenceNumber = 100 + index;
+        if (index % 2 == 1)
+        {
+            pose.metadata.sourceTimestamp = 5000.25 + 0.5 * static_cast<double>(index);
+        }
         trace.samples.push_back(pose);
     }
     trace.startTime = trace.samples.front().timestamp;
@@ -421,6 +430,10 @@ TestCaptureTraceRoundTripsByteIdentically()
         {
             assert(NearlyEqual(*a.lookAtTarget, *b.lookAtTarget));
         }
+        // The header names every frame's source, and each frame keeps its own
+        // counter and stamp -- and a frame that stamped nothing still stamps
+        // nothing.
+        assert(a.metadata == b.metadata);
     }
 
     // The byte-level claim: a trace this writer produced survives a read and a
@@ -498,6 +511,31 @@ TestCaptureTraceRejectsMalformedInput()
          "!motion-capture-trace 3\nt 0.0\nb hips 1 0 0 0\nlookat 0 1 -2 extra\n"},
         {"non-finite look-at target",
          "!motion-capture-trace 3\nt 0.0\nb hips 1 0 0 0\nlookat 0 nan -2\n"},
+        {"sequence number in a format 3 trace",
+         "!motion-capture-trace 3\nt 0.0\nsequence 1\nb hips 1 0 0 0\n"},
+        {"source time in a format 3 trace",
+         "!motion-capture-trace 3\nt 0.0\nsourceTime 1.0\nb hips 1 0 0 0\n"},
+        // A counter is a non-negative integer. An unsigned stream extraction
+        // would read "-1" as the largest counter there is.
+        {"negative sequence number",
+         "!motion-capture-trace 4\nt 0.0\nsequence -1\nb hips 1 0 0 0\n"},
+        {"signed sequence number",
+         "!motion-capture-trace 4\nt 0.0\nsequence +1\nb hips 1 0 0 0\n"},
+        {"fractional sequence number",
+         "!motion-capture-trace 4\nt 0.0\nsequence 1.5\nb hips 1 0 0 0\n"},
+        {"sequence number past 64 bits",
+         "!motion-capture-trace 4\nt 0.0\nsequence 18446744073709551616\nb hips 1 0 0 0\n"},
+        {"sequence with no value", "!motion-capture-trace 4\nt 0.0\nsequence\nb hips 1 0 0 0\n"},
+        {"trailing text after a sequence number",
+         "!motion-capture-trace 4\nt 0.0\nsequence 1 2\nb hips 1 0 0 0\n"},
+        {"duplicate sequence number",
+         "!motion-capture-trace 4\nt 0.0\nsequence 1\nsequence 2\nb hips 1 0 0 0\n"},
+        {"non-finite source time",
+         "!motion-capture-trace 4\nt 0.0\nsourceTime inf\nb hips 1 0 0 0\n"},
+        {"source time that is not a number",
+         "!motion-capture-trace 4\nt 0.0\nsourceTime 1.0s\nb hips 1 0 0 0\n"},
+        {"duplicate source time",
+         "!motion-capture-trace 4\nt 0.0\nsourceTime 1.0\nsourceTime 2.0\nb hips 1 0 0 0\n"},
     };
 
     for (const Case& testCase : cases)
@@ -531,12 +569,47 @@ TestCaptureTraceVersioningAndUnwritableNames()
     assert(old.samples.front().channels.IsEmpty());
 
     // The writer only ever emits the current version, so a format 1 file read
-    // back out is a format 3 file. That is why the committed corpus was
+    // back out is a format 4 file. That is why the committed corpus was
     // regenerated rather than left alone: byte-identity is a property of traces
     // this writer produced, not of every trace it can read.
     std::ostringstream rewritten;
     assert(openstrata::motion::WriteCaptureTrace(rewritten, old));
-    assert(rewritten.str().rfind("!motion-capture-trace 3", 0) == 0);
+    assert(rewritten.str().rfind("!motion-capture-trace 4", 0) == 0);
+
+    // A format 3 recording has no per-frame provenance and reads as such: the
+    // header's source on every frame, and no counter or stamp.
+    openstrata::motion::MotionClip unstamped;
+    std::istringstream format3(
+        "!motion-capture-trace 3\nprovider x\nt 0.0\nb hips 1 0 0 0\nt 0.1\nb hips 1 0 0 0\n");
+    assert(openstrata::motion::ReadCaptureTrace(format3, &unstamped, &error));
+    for (const openstrata::motion::MotionPose& sample : unstamped.samples)
+    {
+        assert(sample.metadata.provider == "x");
+        assert(!sample.metadata.sequenceNumber && !sample.metadata.sourceTimestamp);
+    }
+
+    // The largest counter there is round-trips, and so does zero -- which is a
+    // counter, not the absence of one.
+    openstrata::motion::MotionClip counted = MakeTrace(2);
+    counted.samples[0].metadata.sequenceNumber = 0;
+    counted.samples[1].metadata.sequenceNumber = 18446744073709551615ull;
+    std::ostringstream countedText;
+    assert(openstrata::motion::WriteCaptureTrace(countedText, counted));
+    openstrata::motion::MotionClip countedBack;
+    std::istringstream countedInput(countedText.str());
+    assert(openstrata::motion::ReadCaptureTrace(countedInput, &countedBack, &error));
+    assert(countedBack.samples[0].metadata.sequenceNumber == std::uint64_t{0});
+    assert(countedBack.samples[1].metadata.sequenceNumber == 18446744073709551615ull);
+
+    // A stamp the reader would refuse is never written.
+    for (const double unwritable : {std::nan(""), HUGE_VAL})
+    {
+        openstrata::motion::MotionClip broken = MakeTrace(3);
+        broken.samples[1].metadata.sourceTimestamp = unwritable;
+        std::ostringstream refused;
+        assert(!openstrata::motion::WriteCaptureTrace(refused, broken));
+        assert(refused.str().empty());
+    }
 
     // The one value this format cannot spell. A name is written as a single
     // token, so whitespace in one would read back as a different animation --
@@ -767,6 +840,58 @@ TestRecorderCountsWhatItCouldNotSample()
     assert(NearlyEqual(static_cast<float>(clip.nominalFrameRate), 30.0f));
 }
 
+// The stream names the source; the stamp and the counter are each sample's.
+// Intake keeps the ones a connector pushed, sampling answers with the nearest
+// observation's, and the recorder leaves them on the samples rather than on
+// the clip.
+void
+TestSampleStampsSurviveIntakeAndRecording()
+{
+    openstrata::motion::LiveCaptureSource source;
+    openstrata::motion::SourceMetadata stream;
+    stream.provider = "example.sender";
+    stream.sourceId = "session-01";
+    // A stamp handed to the stream itself is not the stream's to keep.
+    stream.sourceTimestamp = 1.0;
+    stream.sequenceNumber = 1;
+    source.SetSourceMetadata(stream);
+    assert(source.GetSourceMetadata().kind == openstrata::motion::MotionSourceKind::LiveCapture);
+    assert(!source.GetSourceMetadata().sourceTimestamp);
+    assert(!source.GetSourceMetadata().sequenceNumber);
+
+    for (std::uint64_t index = 0; index < 3; ++index)
+    {
+        openstrata::motion::MotionPose frame =
+            MakeFrame(static_cast<double>(index) / 30.0, 0.0f, pxr::GfVec3f(0.0f));
+        // A connector says nothing about the source's name -- the stream does.
+        frame.metadata.provider = "overwritten";
+        frame.metadata.sequenceNumber = 40 + index;
+        frame.metadata.sourceTimestamp = 700.0 + static_cast<double>(index);
+        assert(source.Push(frame));
+    }
+
+    openstrata::motion::MotionRecorder recorder(30.0);
+    for (std::uint64_t index = 0; index < 3; ++index)
+    {
+        const openstrata::motion::PoseSampleResult result =
+            source.Sample(static_cast<double>(index) / 30.0);
+        assert(result.IsValid());
+        const openstrata::motion::SourceMetadata& metadata = result.pose->metadata;
+        assert(metadata.kind == openstrata::motion::MotionSourceKind::LiveCapture);
+        assert(metadata.provider == "example.sender");
+        assert(metadata.sourceId == "session-01");
+        assert(metadata.sequenceNumber == 40 + index);
+        assert(metadata.sourceTimestamp == 700.0 + static_cast<double>(index));
+        assert(recorder.Record(result));
+    }
+
+    const openstrata::motion::MotionClip clip = recorder.Take();
+    assert(clip.source.provider == "example.sender");
+    assert(!clip.source.sequenceNumber && !clip.source.sourceTimestamp);
+    assert(clip.samples.size() == 3);
+    assert(clip.samples[2].metadata.sequenceNumber == std::uint64_t{42});
+}
+
 void
 TestSmoothingIsOptionalAndDoesNotInventJoints()
 {
@@ -903,6 +1028,7 @@ main(int argc, char** argv)
     TestReplayIsDeterministicAndFeedsTheSameInterface();
     TestAQuantisedTraceStillSamplesOnItsOwnTicks();
     TestRecorderCountsWhatItCouldNotSample();
+    TestSampleStampsSurviveIntakeAndRecording();
     TestSmoothingIsOptionalAndDoesNotInventJoints();
     std::puts("motionRecording live-capture tests passed");
     return 0;
