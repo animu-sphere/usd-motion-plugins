@@ -100,6 +100,19 @@ def main() -> int:
     parser.add_argument("--generator")
     parser.add_argument("--make-program")
     parser.add_argument("--cxx-compiler")
+    # The Python the consumer's find_package(pxr) needs. The first package
+    # that depends on OpenUSD made this necessary (motionCore, through gf):
+    # pxrConfig.cmake re-finds Python3 with its Development component, and the
+    # runtime's pxrConfig.cmake names the interpreter of the machine that built
+    # it -- a home directory on Windows, a container's /usr on Linux -- guarded
+    # only by `if(NOT DEFINED ...)`. `ost build`'s toolchain sets these three
+    # before find_package(pxr), so every other lane is blind to it; a consumer
+    # outside the repository has to supply them, and so does this one. Three
+    # variables and not a root, because they are set() before FindPython3 is
+    # reached (usd-vrm-plugins measured this, its PKG-4).
+    parser.add_argument("--python-executable")
+    parser.add_argument("--python-library")
+    parser.add_argument("--python-include-dir")
     parser.add_argument("--keep", type=pathlib.Path,
                         help="work here instead of a deleted temporary directory")
     args = parser.parse_args()
@@ -145,6 +158,11 @@ def main() -> int:
             configure.append(f"-DCMAKE_MAKE_PROGRAM={args.make_program}")
         if args.cxx_compiler:
             configure.append(f"-DCMAKE_CXX_COMPILER={args.cxx_compiler}")
+        configure += [f"-D{name}={value}" for name, value in (
+            ("Python3_EXECUTABLE", args.python_executable),
+            ("Python3_LIBRARY", args.python_library),
+            ("Python3_INCLUDE_DIR", args.python_include_dir),
+        ) if value]
         run(configure)
         run(["cmake", "--build", build, "--config", args.config])
 

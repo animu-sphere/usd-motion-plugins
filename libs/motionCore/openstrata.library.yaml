@@ -1,0 +1,11 @@
+# OpenStrata plain-library descriptor. motionCore is the value-type contract
+# every motion library, connector and format repository shares
+# (docs/design/MOTION_CONTRACT.md).
+schema: openstrata.library/v1alpha1
+library:
+  id: motionCore
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+cmake:
+  package: motionCore
+  target: motionCore::motionCore

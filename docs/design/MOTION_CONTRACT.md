@@ -54,7 +54,9 @@ rule, no VRM node binding — and a format repository maps its skeleton onto
 it (design policy §5.2).
 
 The design policy's §5.2 lists 22 joints as an example; version 1 is a
-superset of it (MC-O1).
+superset of it. That was MC-O1, decided on 2026-09-19 before `motionCore`
+arrived: every producer already mapped the 55, so a compact version 1 would
+only have cut what they deliver. `libs/motionCore` holds it as `HumanJoint`.
 
 ### 2.2 Rules
 
@@ -201,8 +203,13 @@ expression weights, and later gaze targets and contacts beyond the feet
   belongs to whoever applies the weight to a rig.
 
 The design policy sketches a channel as `{TfToken semantic; VtValue value;
-float confidence}`. Every channel measured so far is a scalar weight; whether
-the value is a `VtValue` or a small closed variant is MC-O4.
+float confidence}`. Every channel measured so far is a scalar weight, so a
+channel's value is a **`float`** (decided 2026-09-19): `MotionChannel` is a
+name and a value, and `motionCore` takes no `vt` dependency for it. Whether
+the first non-scalar channel makes the value a `VtValue` or a small closed
+variant is what remains of MC-O4. Until then gaze stays a pose field
+(`MotionPose::lookAtTarget`, a point), because it is exactly such a channel
+and moving it would decide MC-O4 by accident.
 
 ## 7. `SourceMetadata`
 
@@ -314,11 +321,13 @@ constraint.
 
 ## 13. Open questions
 
+MC-O1, the joint vocabulary, was decided on 2026-09-19 (§2.1); MC-O4 was
+narrowed the same day (§6).
+
 | Id | Question | Resolve by |
 | --- | --- | --- |
-| MC-O1 | Is version 1 the 55-joint vocabulary (§2.1), or the design policy's compact set with fingers, eyes and jaw as a later version? Every shipped producer already maps the 55 | the first import of `motionCore` |
 | MC-O2 | Per-joint translations beyond the hips: which producer needs them, and whether they are optional arrays as design policy §5.1 sketches | a producer that delivers them |
 | MC-O3 | Root motion for producers with two translation channels (VMC root position vs hips offset) | one recorded session from each of two VMC senders — operator work in `motion-connectors` |
-| MC-O4 | A channel's value: `VtValue`, or a closed variant of scalar, vector and point | the first non-scalar channel |
+| MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
 | MC-O5 | `MotionStream`'s public shape: pull, push, or the imported buffer with both wrappers | `motion-connectors`' first consumer |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |

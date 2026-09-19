@@ -1,18 +1,19 @@
 # Current — the scaffold, then v0.1.0
 
 Status: 🚧 documentation baseline done (2026-09-17); scaffold done
-(2026-09-19) except its rendered CI; v0.1.0 ⬜, and no longer blocked.
+(2026-09-19), its CI rendered with the first import; v0.1.0 🚧 — `motionCore`
+imported (2026-09-19).
 
 Migration Phase A is *define the public contracts*
 ([DESIGN_POLICY.md §37](../design/DESIGN_POLICY.md#37-migration-from-usd-vrm-plugins)).
 Its documents exist — the design policy, the motion contract, the retargeting
 policy, the USD mapping and the workspace contract — as **proposed**
 contracts written from `usd-vrm-plugins`' measured implementation. The tree
-can now receive code. What remains is the first import.
+has received its first code: `motionCore`, with its history.
 
 ## What remains
 
-### The scaffold ✅ (2026-09-19), except the rendered CI
+### The scaffold ✅ (2026-09-19)
 
 The names are decided (WS-O1:
 [WORKSPACE.md §1.2](../architecture/WORKSPACE.md#12-bundles-tools-and-data)).
@@ -21,13 +22,13 @@ the installed-consumer lane runs over an empty package list, and the community
 files are in place. What landed is in the [changelog](../../CHANGELOG.md), and
 how to build it is in the [building guide](../guides/building.md).
 
-- ⛔ **The rendered `ost` CI workflow.** `openstrata.ci.yaml` holds the three
-  workspace cells. Under `ost` 0.22.10, though, every rendered job runs
-  `ost plugin test --workspace --graph-only`, and that refuses a workspace with
-  no member, so the workflow is rendered in the first import's change, together
-  with the graph cell. Until then the cells are run by hand with `ost build` and
-  `ost test`. An `ost` that let an empty workspace's graph step pass or skip
-  would unblock it, and that is an upstream request.
+- ✅ **The rendered `ost` CI workflow** (2026-09-19, with `motionCore`).
+  Under `ost` 0.22.10 every rendered job runs
+  `ost plugin test --workspace --graph-only`, which refuses a workspace with no
+  member, so the scaffold could not render it; the first member made it
+  renderable, and the graph cell arrived with it. An `ost` that let an empty
+  workspace's graph step pass or skip is still an upstream request, for the
+  next repository that starts empty.
 
 ### v0.1.0 — the core contract ⬜
 
@@ -37,11 +38,19 @@ has drawn the line through `vrmRetarget` and lists, in a checked ledger, every
 VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
 §9.5).
 
-- ⬜ Resolve **MC-O1** (joint vocabulary), **USD-O1** (prim names), **USD-O2**
-  (time codes) and **MC-O4** (channel value type) — each before the code that
-  would freeze it.
-- ⬜ Import `motionCore` as `motionCore`, with history, renamed
-  ([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in)).
+- ✅ Resolve **MC-O1** (55 joints), **USD-O1** (`Skeleton` / `Body` /
+  `Channels`), **USD-O2** (always 30) and **MC-O4** (scalar channels; the
+  non-scalar case stays open) — 2026-09-19, before the code that would freeze
+  them.
+- ✅ Import `motionCore` as `motionCore`, with history, renamed
+  ([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in)) —
+  2026-09-19. 23 commits of history arrived through `git filter-repo`; the
+  rename is one commit after the move, and the boundary check gained the
+  product-name scan. `usd-vrm-plugins` switches to the installed package and
+  deletes its copy in its MIG-1, against a release of this one.
+- ⬜ Fix the pose's shape to the contract's after the move: `source` becomes
+  the non-optional `metadata` (§5.1), and `SourceMetadata` gains
+  `sourceTimestamp` and `sequenceNumber` (§7).
 - ⬜ Import `motionRuntime` as `motionSampling` and `motionRecording`.
 - ⬜ `motionUsd`: author the motion stage of
   [USD_MAPPING.md §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage),

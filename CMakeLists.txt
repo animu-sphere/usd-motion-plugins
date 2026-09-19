@@ -12,7 +12,7 @@
 #       cmake --build build --config Release
 #       ctest --test-dir build -C Release
 #
-# The scaffold holds no component yet. Each identity WORKSPACE.md §1 reserves
+# Each identity WORKSPACE.md §1 reserves
 # arrives as a self-contained CMake project (so `ost` can build it standalone)
 # that is also add_subdirectory()-able from here, and is named below in full,
 # in the dependency order of WORKSPACE.md §2.1.
@@ -72,8 +72,8 @@ if(USDMOTION_BUILD_TESTS)
     endif()
 endif()
 
-# Components, in dependency order, as each import lands:
-#   add_subdirectory("libs/motionCore")
+# Components, in dependency order (WORKSPACE.md §2.1), as each import lands.
+add_subdirectory("libs/motionCore")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
