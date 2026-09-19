@@ -39,6 +39,20 @@ if(CMAKE_GENERATOR MATCHES "Ninja|Makefiles")
         --make-program "${CMAKE_MAKE_PROGRAM}"
         --cxx-compiler "${CMAKE_CXX_COMPILER}")
 endif()
+# The Python this configure handed OpenUSD, forwarded so the consumer's
+# find_package(pxr) resolves the same one (scripts/check_installed_consumer.py
+# says why it cannot find it alone). Only what is set is forwarded: under
+# `ost build` the toolchain sets all three, and a plain configure that found
+# Python by itself needs none.
+foreach(_python_var Python3_EXECUTABLE Python3_LIBRARY Python3_INCLUDE_DIR)
+    if(${_python_var})
+        string(TOLOWER "${_python_var}" _python_arg)
+        string(REPLACE "python3_" "--python-" _python_arg "${_python_arg}")
+        string(REPLACE "_" "-" _python_arg "${_python_arg}")
+        list(APPEND _consumer_toolchain "${_python_arg}" "${${_python_var}}")
+    endif()
+endforeach()
+
 add_test(NAME workspace_installed_consumer
     COMMAND "${USDMOTION_TEST_PYTHON}"
         "${PROJECT_SOURCE_DIR}/scripts/check_installed_consumer.py"
