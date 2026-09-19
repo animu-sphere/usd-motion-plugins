@@ -7,6 +7,13 @@
 # than the committed golden (usd-vrm-plugins, PR #42).
 *.usda text eol=lf
 
+# Capture traces check out with LF everywhere. motionRecording_corpus re-emits
+# each committed trace through the writer -- which always writes LF -- and
+# compares raw bytes, and motionRecording_traceGen compares them with the
+# generator's output, so a CRLF smudge on a Windows checkout would fail both for
+# every trace while the data itself was fine.
+*.trace text eol=lf
+
 # Recorded motion and packet captures are compared byte for byte.
 *.bvh binary
 *.vrma binary

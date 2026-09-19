@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Enforce motionSampling's boundary (docs/architecture/WORKSPACE.md §2.1-§2.4).
+"""Enforce motionRecording's boundary (docs/architecture/WORKSPACE.md §2.1-§2.4).
 
-motionSampling sits one level above motionCore: it may depend on motionCore
-and OpenUSD's Gf value types, and on nothing else. Four checks: no stage,
-plugin, registration or OpenExec API in the sources; no include from a
-repository library outside its declared edges, and no transport; a link line
+motionRecording sits above motionSampling: it may depend on motionCore,
+motionSampling and OpenUSD's Gf value types, and on nothing else. Four checks:
+no stage, plugin, registration or OpenExec API in the sources; no include from
+a repository library outside its declared edges, and no transport; a link line
 and a binary that import nothing from OpenUSD beyond its foundation value
 types; and no product, device or avatar-format name in the code or its string
 literals. Comments may cite where a rule came from, so they are stripped before
@@ -21,9 +21,9 @@ import shutil
 import subprocess
 import sys
 
-LIBRARY = "motionSampling"
+LIBRARY = "motionRecording"
 # WORKSPACE.md §2.1: the repository libraries this one may include.
-ALLOWED_LIBRARIES = {"motionCore", "motionSampling"}
+ALLOWED_LIBRARIES = {"motionCore", "motionSampling", "motionRecording"}
 
 
 def _find_dumpbin() -> str | None:

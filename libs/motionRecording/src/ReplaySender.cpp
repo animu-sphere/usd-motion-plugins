@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/ReplaySender.h"
+#include "motionRecording/ReplaySender.h"
 
 #include <utility>
 
-namespace motion
+namespace openstrata::motion
 {
 
 namespace
@@ -17,7 +17,7 @@ constexpr double kArrivalTolerance = PoseSampleTimeTolerance;
 
 } // namespace
 
-ReplaySender::ReplaySender(HumanoidAnimation trace, LiveCaptureSource* sink)
+ReplaySender::ReplaySender(MotionClip trace, LiveCaptureSource* sink)
     : _trace(std::move(trace)), _sink(sink)
 {
 }
@@ -60,4 +60,4 @@ ReplaySender::Flush()
     return accepted;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

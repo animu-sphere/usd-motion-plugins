@@ -3,11 +3,11 @@
 // Motion Phase D: the live-capture intake, the recorded trace format, and the
 // replay driver. Every test here is deterministic by construction -- no wall
 // clock is read anywhere in this file or in the code it exercises.
-#include "motionRuntime/CaptureTrace.h"
-#include "motionRuntime/LiveCaptureSource.h"
-#include "motionRuntime/MotionSource.h"
-#include "motionRuntime/Recorder.h"
-#include "motionRuntime/ReplaySender.h"
+#include "motionRecording/CaptureTrace.h"
+#include "motionRecording/LiveCaptureSource.h"
+#include "motionSampling/MotionSource.h"
+#include "motionRecording/MotionRecorder.h"
+#include "motionRecording/ReplaySender.h"
 
 #include <algorithm>
 #include <array>
@@ -25,9 +25,9 @@ namespace
 
 constexpr float kEpsilon = 1e-4f;
 
-constexpr std::size_t kHips = static_cast<std::size_t>(motion::HumanBone::Hips);
-constexpr std::size_t kSpine = static_cast<std::size_t>(motion::HumanBone::Spine);
-constexpr std::size_t kLeftHand = static_cast<std::size_t>(motion::HumanBone::LeftHand);
+constexpr std::size_t kHips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
+constexpr std::size_t kSpine = static_cast<std::size_t>(openstrata::motion::HumanJoint::Spine);
+constexpr std::size_t kLeftHand = static_cast<std::size_t>(openstrata::motion::HumanJoint::LeftHand);
 
 bool
 NearlyEqual(float a, float b)
@@ -64,10 +64,10 @@ RotationX(float degrees)
 
 // A frame as an adapter would hand it over: already decoded, already in the
 // canonical basis, stamped in the capture system's own clock.
-motion::HumanoidPose
+openstrata::motion::MotionPose
 MakeFrame(double timestamp, float hipsDegrees, const pxr::GfVec3f& rootPosition)
 {
-    motion::HumanoidPose pose;
+    openstrata::motion::MotionPose pose;
     pose.timestamp = timestamp;
     pose.localRotations[kHips] = RotationX(hipsDegrees);
     pose.validRotations.set(kHips);
@@ -79,25 +79,25 @@ MakeFrame(double timestamp, float hipsDegrees, const pxr::GfVec3f& rootPosition)
 }
 
 void
-SetConfidence(motion::HumanoidPose* pose, std::size_t bone, float score)
+SetConfidence(openstrata::motion::MotionPose* pose, std::size_t joint, float score)
 {
     if (!pose->confidence)
     {
-        std::array<float, motion::HumanBoneCount> scores{};
+        std::array<float, openstrata::motion::HumanJointCount> scores{};
         scores.fill(1.0f);
         pose->confidence = scores;
     }
-    (*pose->confidence)[bone] = score;
+    (*pose->confidence)[joint] = score;
 }
 
 // A short synthetic walk: the hips swing, the root advances at a constant
 // 1 m/s, and both feet report contact state. 30 Hz.
-motion::HumanoidAnimation
+openstrata::motion::MotionClip
 MakeTrace(std::size_t frames = 12)
 {
-    motion::HumanoidAnimation trace;
+    openstrata::motion::MotionClip trace;
     trace.nominalFrameRate = 30.0;
-    trace.source.kind = motion::MotionSourceKind::LiveCapture;
+    trace.source.kind = openstrata::motion::MotionSourceKind::LiveCapture;
     trace.source.provider = "example.replay";
     trace.source.protocol = "replay";
     trace.source.sourceId = "walk-01";
@@ -105,22 +105,22 @@ MakeTrace(std::size_t frames = 12)
     for (std::size_t index = 0; index < frames; ++index)
     {
         const double timestamp = static_cast<double>(index) / 30.0;
-        motion::HumanoidPose pose =
+        openstrata::motion::MotionPose pose =
             MakeFrame(timestamp, 10.0f * std::sin(static_cast<float>(index) * 0.5f),
                       pxr::GfVec3f(0.0f, 0.9f, static_cast<float>(timestamp)));
-        motion::ContactState contacts;
+        openstrata::motion::ContactState contacts;
         contacts.leftFoot =
-            (index % 2 == 0) ? motion::FootContact::InContact : motion::FootContact::NotInContact;
+            (index % 2 == 0) ? openstrata::motion::FootContact::InContact : openstrata::motion::FootContact::NotInContact;
         contacts.rightFoot =
-            (index % 2 == 0) ? motion::FootContact::NotInContact : motion::FootContact::InContact;
+            (index % 2 == 0) ? openstrata::motion::FootContact::NotInContact : openstrata::motion::FootContact::InContact;
         pose.contacts = contacts;
         // A face channel on the same timeline, and one name that only some
         // frames report -- so the round trip below covers both an expression
         // that is always there and the absent/zero distinction.
-        pose.expressions.Set("happy", 0.25f);
+        pose.channels.Set("happy", 0.25f);
         if (index % 3 == 0)
         {
-            pose.expressions.Set("blink", 1.0f);
+            pose.channels.Set("blink", 1.0f);
         }
         // A gaze on some frames and not others, for the same reason: the round
         // trip has to keep "looked nowhere" distinct from "looked at the
@@ -138,47 +138,47 @@ MakeTrace(std::size_t frames = 12)
 }
 
 void
-TestConfidenceGateResolvesThroughTheMissingBonePolicy()
+TestConfidenceGateResolvesThroughTheMissingJointPolicy()
 {
-    motion::LiveCaptureConfig config;
+    openstrata::motion::LiveCaptureConfig config;
     config.confidenceFloor = 0.5f;
-    config.missingBones = motion::MissingBonePolicy::HoldLast;
-    motion::LiveCaptureSource source(config);
+    config.missingJoints = openstrata::motion::MissingJointPolicy::HoldLast;
+    openstrata::motion::LiveCaptureSource source(config);
 
-    motion::HumanoidPose first = MakeFrame(0.0, 30.0f, pxr::GfVec3f(0.0f));
+    openstrata::motion::MotionPose first = MakeFrame(0.0, 30.0f, pxr::GfVec3f(0.0f));
     SetConfidence(&first, kHips, 0.9f);
     SetConfidence(&first, kSpine, 0.9f);
     assert(source.Push(first));
 
     // The spine drops below the floor: it must not be believed, and it must not
     // snap back to rest either -- the previous rotation is carried forward.
-    motion::HumanoidPose second = MakeFrame(1.0, 60.0f, pxr::GfVec3f(0.0f));
+    openstrata::motion::MotionPose second = MakeFrame(1.0, 60.0f, pxr::GfVec3f(0.0f));
     SetConfidence(&second, kHips, 0.9f);
     SetConfidence(&second, kSpine, 0.1f);
     assert(source.Push(second));
 
-    const motion::PoseSampleResult result = source.Sample(1.0);
+    const openstrata::motion::PoseSampleResult result = source.Sample(1.0);
     assert(result.IsValid());
     assert(result.pose->validRotations.test(kSpine));
     assert(SameOrientation(result.pose->localRotations[kSpine], RotationX(15.0f)));
     assert(SameOrientation(result.pose->localRotations[kHips], RotationX(60.0f)));
-    assert(source.GetStats().bonesGatedByConfidence == 1);
-    assert(source.GetStats().bonesHeld >= 1);
+    assert(source.GetStats().jointsGatedByConfidence == 1);
+    assert(source.GetStats().jointsHeld >= 1);
 
-    // A bone the rig never solves is never "observed", however many frames
+    // A joint the rig never solves is never "observed", however many frames
     // arrive. This is the coverage diagnostic Phase D reports.
-    assert(source.GetObservedBones().test(kHips));
-    assert(source.GetObservedBones().test(kSpine));
-    assert(!source.GetObservedBones().test(kLeftHand));
+    assert(source.GetObservedJoints().test(kHips));
+    assert(source.GetObservedJoints().test(kSpine));
+    assert(!source.GetObservedJoints().test(kLeftHand));
 
-    // Under LeaveUnbound the same gated bone is reported missing instead, so
+    // Under LeaveUnbound the same gated joint is reported missing instead, so
     // downstream can fall back to the target rig's rest pose.
-    motion::LiveCaptureConfig unbound = config;
-    unbound.missingBones = motion::MissingBonePolicy::LeaveUnbound;
-    motion::LiveCaptureSource strict(unbound);
+    openstrata::motion::LiveCaptureConfig unbound = config;
+    unbound.missingJoints = openstrata::motion::MissingJointPolicy::LeaveUnbound;
+    openstrata::motion::LiveCaptureSource strict(unbound);
     assert(strict.Push(first));
     assert(strict.Push(second));
-    const motion::PoseSampleResult strictResult = strict.Sample(1.0);
+    const openstrata::motion::PoseSampleResult strictResult = strict.Sample(1.0);
     assert(strictResult.IsValid());
     assert(!strictResult.pose->validRotations.test(kSpine));
 }
@@ -186,27 +186,27 @@ TestConfidenceGateResolvesThroughTheMissingBonePolicy()
 void
 TestConfidenceIsNotGatedWhenTheAdapterReportsNone()
 {
-    motion::LiveCaptureConfig config;
+    openstrata::motion::LiveCaptureConfig config;
     config.confidenceFloor = 0.9f;
-    motion::LiveCaptureSource source(config);
+    openstrata::motion::LiveCaptureSource source(config);
 
     // No confidence array at all: an adapter that cannot measure confidence
-    // must not lose every bone for saying so.
+    // must not lose every joint for saying so.
     assert(source.Push(MakeFrame(0.0, 30.0f, pxr::GfVec3f(0.0f))));
-    assert(source.GetStats().bonesGatedByConfidence == 0);
-    assert(source.GetObservedBones().test(kHips));
+    assert(source.GetStats().jointsGatedByConfidence == 0);
+    assert(source.GetObservedJoints().test(kHips));
 }
 
 void
 TestRootMotionIntakeModes()
 {
-    motion::LiveCaptureConfig derive;
-    derive.rootMotion = motion::RootMotionIntake::DeriveVelocity;
-    motion::LiveCaptureSource source(derive);
+    openstrata::motion::LiveCaptureConfig derive;
+    derive.rootMotion = openstrata::motion::RootMotionIntake::DeriveVelocity;
+    openstrata::motion::LiveCaptureSource source(derive);
     assert(source.Push(MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 0.0f))));
     assert(source.Push(MakeFrame(0.5, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 1.0f))));
 
-    const motion::PoseSampleResult derived = source.Sample(0.5);
+    const openstrata::motion::PoseSampleResult derived = source.Sample(0.5);
     assert(derived.IsValid());
     assert(derived.pose->root.hasLinearVelocity);
     assert(NearlyEqual(derived.pose->root.linearVelocity, pxr::GfVec3f(0.0f, 0.0f, 2.0f)));
@@ -214,20 +214,20 @@ TestRootMotionIntakeModes()
     assert(source.GetStats().rootSamplesObserved == 2);
 
     // Passthrough records exactly what arrived and invents nothing.
-    motion::LiveCaptureConfig passthrough;
-    passthrough.rootMotion = motion::RootMotionIntake::Passthrough;
-    motion::LiveCaptureSource plain(passthrough);
+    openstrata::motion::LiveCaptureConfig passthrough;
+    passthrough.rootMotion = openstrata::motion::RootMotionIntake::Passthrough;
+    openstrata::motion::LiveCaptureSource plain(passthrough);
     assert(plain.Push(MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 0.0f))));
     assert(plain.Push(MakeFrame(0.5, 0.0f, pxr::GfVec3f(0.0f, 0.9f, 1.0f))));
     assert(!plain.Sample(0.5).pose->root.hasLinearVelocity);
     assert(plain.GetStats().rootVelocitiesDerived == 0);
 
     // Ignore drops the root entirely; the joint hierarchy still arrives.
-    motion::LiveCaptureConfig ignore;
-    ignore.rootMotion = motion::RootMotionIntake::Ignore;
-    motion::LiveCaptureSource rootless(ignore);
+    openstrata::motion::LiveCaptureConfig ignore;
+    ignore.rootMotion = openstrata::motion::RootMotionIntake::Ignore;
+    openstrata::motion::LiveCaptureSource rootless(ignore);
     assert(rootless.Push(MakeFrame(0.0, 45.0f, pxr::GfVec3f(0.0f, 0.9f, 0.0f))));
-    const motion::PoseSampleResult ignored = rootless.Sample(0.0);
+    const openstrata::motion::PoseSampleResult ignored = rootless.Sample(0.0);
     assert(ignored.IsValid());
     assert(!ignored.pose->root.hasPosition);
     assert(ignored.pose->validRotations.test(kHips));
@@ -237,9 +237,9 @@ TestRootMotionIntakeModes()
 void
 TestOutOfOrderAndStaleFramesAreSeparated()
 {
-    motion::LiveCaptureConfig config;
+    openstrata::motion::LiveCaptureConfig config;
     config.staleFrameSeconds = 0.5;
-    motion::LiveCaptureSource source(config);
+    openstrata::motion::LiveCaptureSource source(config);
 
     assert(source.Push(MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f))));
     assert(source.Push(MakeFrame(1.0, 0.0f, pxr::GfVec3f(0.0f))));
@@ -255,8 +255,8 @@ TestOutOfOrderAndStaleFramesAreSeparated()
     assert(source.GetStats().framesRejectedOutOfOrder == 1);
     assert(source.GetStats().framesRejectedStale == 1);
 
-    // A frame carrying neither a bone nor a root is refused outright.
-    motion::HumanoidPose empty;
+    // A frame carrying neither a joint nor a root is refused outright.
+    openstrata::motion::MotionPose empty;
     empty.timestamp = 2.0;
     assert(!source.Push(empty));
     assert(source.GetStats().framesRejectedEmpty == 1);
@@ -266,9 +266,9 @@ TestOutOfOrderAndStaleFramesAreSeparated()
 void
 TestClockAlignmentAndSampleStatus()
 {
-    motion::LiveCaptureConfig config;
+    openstrata::motion::LiveCaptureConfig config;
     config.maxExtrapolationSeconds = 0.1;
-    motion::LiveCaptureSource source(config);
+    openstrata::motion::LiveCaptureSource source(config);
     assert(!source.AlignClock(0.0)); // nothing buffered yet
 
     for (std::size_t index = 0; index < 4; ++index)
@@ -281,21 +281,21 @@ TestClockAlignmentAndSampleStatus()
     // The capture clock starts at 100 s; the consumer's starts at 0. Aligning
     // pins the newest frame to the current evaluation time.
     assert(source.AlignClock(0.0));
-    const motion::PoseSampleResult head = source.Sample(0.0);
-    assert(head.status == motion::PoseSampleStatus::Sampled);
+    const openstrata::motion::PoseSampleResult head = source.Sample(0.0);
+    assert(head.status == openstrata::motion::PoseSampleStatus::Sampled);
     assert(NearlyEqual(static_cast<float>(head.lag), 0.0f));
     assert(NearlyEqual(head.pose->timestamp, 0.0));
 
     // Inside the buffered window: a real interpolation.
-    assert(source.Sample(-1.0 / 60.0).status == motion::PoseSampleStatus::Sampled);
+    assert(source.Sample(-1.0 / 60.0).status == openstrata::motion::PoseSampleStatus::Sampled);
 
     // Before the window: the oldest pose is held, never extrapolated backwards.
-    const motion::PoseSampleResult before = source.Sample(-10.0);
-    assert(before.status == motion::PoseSampleStatus::Held);
+    const openstrata::motion::PoseSampleResult before = source.Sample(-10.0);
+    assert(before.status == openstrata::motion::PoseSampleStatus::Held);
 
     // Just past the head, within the lead budget: the root carries forward.
-    const motion::PoseSampleResult ahead = source.Sample(0.05);
-    assert(ahead.status == motion::PoseSampleStatus::Extrapolated);
+    const openstrata::motion::PoseSampleResult ahead = source.Sample(0.05);
+    assert(ahead.status == openstrata::motion::PoseSampleStatus::Extrapolated);
     assert(ahead.lag > 0.0);
     assert(ahead.pose->root.worldPosition[2] > 3.0f);
 
@@ -304,16 +304,16 @@ TestClockAlignmentAndSampleStatus()
     assert(NearlyEqual(ahead.pose->timestamp, 0.05));
 
     // With extrapolation disabled the same request holds instead.
-    motion::LiveCaptureConfig held = config;
+    openstrata::motion::LiveCaptureConfig held = config;
     held.maxExtrapolationSeconds = 0.0;
     source.SetConfig(held);
-    assert(source.Sample(0.05).status == motion::PoseSampleStatus::Held);
+    assert(source.Sample(0.05).status == openstrata::motion::PoseSampleStatus::Held);
 
     assert(source.GetStats().peakLagSeconds > 0.0);
 
     // One counter per PoseSampleStatus and nothing else, so the four sum to the
     // number of Sample() calls made above -- five.
-    const motion::LiveCaptureStats& stats = source.GetStats();
+    const openstrata::motion::LiveCaptureStats& stats = source.GetStats();
     assert(stats.samplesSampled + stats.samplesHeld + stats.samplesExtrapolated +
                stats.samplesUnavailable ==
            5);
@@ -322,10 +322,10 @@ TestClockAlignmentAndSampleStatus()
 void
 TestAnEmptySourceIsUnavailableRatherThanWrong()
 {
-    motion::LiveCaptureSource source;
-    const motion::PoseSampleResult result = source.Sample(0.0);
+    openstrata::motion::LiveCaptureSource source;
+    const openstrata::motion::PoseSampleResult result = source.Sample(0.0);
     assert(!result.IsValid());
-    assert(result.status == motion::PoseSampleStatus::Unavailable);
+    assert(result.status == openstrata::motion::PoseSampleStatus::Unavailable);
     assert(source.GetStats().samplesUnavailable == 1);
     assert(!source.GetTimeRange(nullptr, nullptr));
 }
@@ -338,29 +338,29 @@ TestAnEmptySourceIsUnavailableRatherThanWrong()
 void
 TestASampleResultComparesOnEveryField()
 {
-    motion::HumanoidAnimation clip;
+    openstrata::motion::MotionClip clip;
     for (const double t : {0.0, 1.0})
     {
-        motion::HumanoidPose pose;
+        openstrata::motion::MotionPose pose;
         pose.timestamp = t;
         pose.validRotations.set(kHips);
         pose.root.worldPosition = pxr::GfVec3f(0.0f, 0.0f, float(t));
         pose.root.hasPosition = true;
         clip.samples.push_back(pose);
     }
-    motion::ClipSource source(clip);
+    openstrata::motion::ClipSource source(clip);
 
-    const motion::PoseSampleResult sampled = source.Sample(0.5);
+    const openstrata::motion::PoseSampleResult sampled = source.Sample(0.5);
     assert(sampled == source.Sample(0.5));
     assert(!(sampled != source.Sample(0.5)));
 
     // The same pose, resolved differently: only the status differs.
-    motion::PoseSampleResult relabelled = sampled;
-    relabelled.status = motion::PoseSampleStatus::Held;
+    openstrata::motion::PoseSampleResult relabelled = sampled;
+    relabelled.status = openstrata::motion::PoseSampleStatus::Held;
     assert(relabelled != sampled);
 
     // The same pose and status, a different lag.
-    motion::PoseSampleResult later = sampled;
+    openstrata::motion::PoseSampleResult later = sampled;
     later.lag += 0.25;
     assert(later != sampled);
 
@@ -369,23 +369,23 @@ TestASampleResultComparesOnEveryField()
 
     // Two unavailable answers are the same answer, and neither is an answer
     // that carries a pose.
-    assert(motion::PoseSampleResult{} == motion::PoseSampleResult{});
-    assert(motion::PoseSampleResult{} != sampled);
+    assert(openstrata::motion::PoseSampleResult{} == openstrata::motion::PoseSampleResult{});
+    assert(openstrata::motion::PoseSampleResult{} != sampled);
 }
 
 void
 TestCaptureTraceRoundTripsByteIdentically()
 {
-    const motion::HumanoidAnimation trace = MakeTrace();
+    const openstrata::motion::MotionClip trace = MakeTrace();
 
     std::ostringstream first;
-    assert(motion::WriteCaptureTrace(first, trace));
+    assert(openstrata::motion::WriteCaptureTrace(first, trace));
     const std::string text = first.str();
 
-    motion::HumanoidAnimation parsed;
-    motion::CaptureTraceError error;
+    openstrata::motion::MotionClip parsed;
+    openstrata::motion::CaptureTraceError error;
     std::istringstream input(text);
-    if (!motion::ReadCaptureTrace(input, &parsed, &error))
+    if (!openstrata::motion::ReadCaptureTrace(input, &parsed, &error))
     {
         std::fprintf(stderr, "trace parse failed at line %zu: %s\n", error.line,
                      error.message.c_str());
@@ -396,13 +396,13 @@ TestCaptureTraceRoundTripsByteIdentically()
     assert(parsed.source.provider == "example.replay");
     assert(parsed.source.protocol == "replay");
     assert(parsed.source.sourceId == "walk-01");
-    assert(parsed.source.kind == motion::MotionSourceKind::LiveCapture);
+    assert(parsed.source.kind == openstrata::motion::MotionSourceKind::LiveCapture);
     assert(NearlyEqual(static_cast<float>(parsed.nominalFrameRate), 30.0f));
 
     for (std::size_t index = 0; index < trace.samples.size(); ++index)
     {
-        const motion::HumanoidPose& a = trace.samples[index];
-        const motion::HumanoidPose& b = parsed.samples[index];
+        const openstrata::motion::MotionPose& a = trace.samples[index];
+        const openstrata::motion::MotionPose& b = parsed.samples[index];
         assert(NearlyEqual(static_cast<float>(a.timestamp), static_cast<float>(b.timestamp)));
         assert(a.validRotations == b.validRotations);
         assert(SameOrientation(a.localRotations[kHips], b.localRotations[kHips]));
@@ -413,7 +413,7 @@ TestCaptureTraceRoundTripsByteIdentically()
         assert(a.contacts->rightFoot == b.contacts->rightFoot);
         // The expression channel survives with the same names, and a frame that
         // reported no `blink` still reports none -- rather than a zero.
-        assert(a.expressions == b.expressions);
+        assert(a.channels == b.channels);
         // And a frame that named no target still names none, rather than the
         // origin.
         assert(a.lookAtTarget.has_value() == b.lookAtTarget.has_value());
@@ -427,7 +427,7 @@ TestCaptureTraceRoundTripsByteIdentically()
     // rewrite unchanged, which is what lets a fixture be compared rather than
     // merely parsed.
     std::ostringstream second;
-    assert(motion::WriteCaptureTrace(second, parsed));
+    assert(openstrata::motion::WriteCaptureTrace(second, parsed));
     assert(second.str() == text);
 }
 
@@ -443,8 +443,8 @@ TestCaptureTraceRejectsMalformedInput()
     const Case cases[] = {
         {"no magic", "provider x\nt 0.0\nb hips 1 0 0 0\n"},
         {"wrong version", "!motion-capture-trace 99\nt 0.0\nb hips 1 0 0 0\n"},
-        {"unknown bone", "!motion-capture-trace 1\nt 0.0\nb elbow 1 0 0 0\n"},
-        {"duplicate bone", "!motion-capture-trace 1\nt 0.0\nb hips 1 0 0 0\nb hips 1 0 0 0\n"},
+        {"unknown joint", "!motion-capture-trace 1\nt 0.0\nb elbow 1 0 0 0\n"},
+        {"duplicate joint", "!motion-capture-trace 1\nt 0.0\nb hips 1 0 0 0\nb hips 1 0 0 0\n"},
         {"non-increasing time", "!motion-capture-trace 1\nt 1.0\nb hips 1 0 0 0\nt 0.5\n"
                                 "b hips 1 0 0 0\n"},
         {"zero-length rotation", "!motion-capture-trace 1\nt 0.0\nb hips 0 0 0 0\n"},
@@ -477,7 +477,7 @@ TestCaptureTraceRejectsMalformedInput()
         // header is what a reader dispatches on.
         {"expression in a format 1 trace",
          "!motion-capture-trace 1\nt 0.0\nb hips 1 0 0 0\ne happy 0.5\n"},
-        // The same defect a repeated bone is: two values for one channel in one
+        // The same defect a repeated joint is: two values for one channel in one
         // frame, with no rule saying which wins.
         {"duplicate expression", "!motion-capture-trace 2\nt 0.0\nb hips 1 0 0 0\ne happy 0.5\n"
                                  "e happy 0.25\n"},
@@ -502,10 +502,10 @@ TestCaptureTraceRejectsMalformedInput()
 
     for (const Case& testCase : cases)
     {
-        motion::HumanoidAnimation parsed;
-        motion::CaptureTraceError error;
+        openstrata::motion::MotionClip parsed;
+        openstrata::motion::CaptureTraceError error;
         std::istringstream input(testCase.text);
-        const bool ok = motion::ReadCaptureTrace(input, &parsed, &error);
+        const bool ok = openstrata::motion::ReadCaptureTrace(input, &parsed, &error);
         if (ok)
         {
             std::fprintf(stderr, "malformed trace was accepted: %s\n", testCase.name);
@@ -523,19 +523,19 @@ TestCaptureTraceVersioningAndUnwritableNames()
 {
     // A recording that stops being readable because the format moved on is a
     // recording lost, so format 1 still parses -- it simply carries no `e`.
-    motion::HumanoidAnimation old;
-    motion::CaptureTraceError error;
+    openstrata::motion::MotionClip old;
+    openstrata::motion::CaptureTraceError error;
     std::istringstream input("!motion-capture-trace 1\nprovider x\nt 0.0\nb hips 1 0 0 0\n");
-    assert(motion::ReadCaptureTrace(input, &old, &error));
+    assert(openstrata::motion::ReadCaptureTrace(input, &old, &error));
     assert(old.samples.size() == 1);
-    assert(old.samples.front().expressions.IsEmpty());
+    assert(old.samples.front().channels.IsEmpty());
 
     // The writer only ever emits the current version, so a format 1 file read
     // back out is a format 3 file. That is why the committed corpus was
     // regenerated rather than left alone: byte-identity is a property of traces
     // this writer produced, not of every trace it can read.
     std::ostringstream rewritten;
-    assert(motion::WriteCaptureTrace(rewritten, old));
+    assert(openstrata::motion::WriteCaptureTrace(rewritten, old));
     assert(rewritten.str().rfind("!motion-capture-trace 3", 0) == 0);
 
     // The one value this format cannot spell. A name is written as a single
@@ -545,10 +545,10 @@ TestCaptureTraceVersioningAndUnwritableNames()
     // holding the frames that happened to come first.
     for (const char* unwritable : {"pursed lips", "", "tab\there"})
     {
-        motion::HumanoidAnimation broken = MakeTrace(3);
-        broken.samples[1].expressions.Set(unwritable, 0.5f);
+        openstrata::motion::MotionClip broken = MakeTrace(3);
+        broken.samples[1].channels.Set(unwritable, 0.5f);
         std::ostringstream refused;
-        assert(!motion::WriteCaptureTrace(refused, broken));
+        assert(!openstrata::motion::WriteCaptureTrace(refused, broken));
         assert(refused.str().empty());
     }
 }
@@ -561,18 +561,18 @@ TestCaptureTraceCarriesProvenanceWithSpaces()
     // somebody typed. The writer emitted it verbatim and the reader then
     // refused the file the writer had just produced -- a round trip that failed
     // on a value neither side had any reason to reject.
-    motion::HumanoidAnimation animation = MakeTrace(3);
+    openstrata::motion::MotionClip animation = MakeTrace(3);
     animation.source.provider = "Studio Example, Inc.";
     animation.source.protocol = "vmc";
     animation.source.sourceId = "Example Avatar";
 
     std::ostringstream first;
-    assert(motion::WriteCaptureTrace(first, animation));
+    assert(openstrata::motion::WriteCaptureTrace(first, animation));
 
-    motion::HumanoidAnimation parsed;
-    motion::CaptureTraceError error;
+    openstrata::motion::MotionClip parsed;
+    openstrata::motion::CaptureTraceError error;
     std::istringstream input(first.str());
-    if (!motion::ReadCaptureTrace(input, &parsed, &error))
+    if (!openstrata::motion::ReadCaptureTrace(input, &parsed, &error))
     {
         std::fprintf(stderr, "provenance round trip failed at line %zu: %s\n", error.line,
                      error.message.c_str());
@@ -584,7 +584,7 @@ TestCaptureTraceCarriesProvenanceWithSpaces()
     // And it still diffs: a second write of what was read is byte-identical,
     // which is the property the whole format exists for.
     std::ostringstream second;
-    assert(motion::WriteCaptureTrace(second, parsed));
+    assert(openstrata::motion::WriteCaptureTrace(second, parsed));
     assert(first.str() == second.str());
 
     // What no line-oriented format can carry, refused before the first byte for
@@ -593,42 +593,42 @@ TestCaptureTraceCarriesProvenanceWithSpaces()
     // recorded provenance, which is worse than a refusal for being invisible.
     for (const char* unwritable : {"two\nlines", " leading", "trailing ", "carriage\rreturn"})
     {
-        motion::HumanoidAnimation broken = MakeTrace(3);
+        openstrata::motion::MotionClip broken = MakeTrace(3);
         broken.source.sourceId = unwritable;
         std::ostringstream refused;
-        assert(!motion::WriteCaptureTrace(refused, broken));
+        assert(!openstrata::motion::WriteCaptureTrace(refused, broken));
         assert(refused.str().empty());
     }
 
     // A header key with nothing after it is still an error: the value is
     // rest-of-line, and rest-of-line can be empty.
-    motion::HumanoidAnimation empty;
+    openstrata::motion::MotionClip empty;
     std::istringstream blank("!motion-capture-trace 2\nsourceId   \n"
                              "t 0.0\nb hips 1 0 0 0\n");
-    assert(!motion::ReadCaptureTrace(blank, &empty, &error));
+    assert(!openstrata::motion::ReadCaptureTrace(blank, &empty, &error));
     assert(error.message.find("sourceId") != std::string::npos);
 }
 
 void
 TestReplayIsDeterministicAndFeedsTheSameInterface()
 {
-    const motion::HumanoidAnimation trace = MakeTrace(24);
+    const openstrata::motion::MotionClip trace = MakeTrace(24);
 
     // A tick schedule that deliberately runs the consumer slightly ahead of
     // delivery, so holds and extrapolations actually occur.
-    const auto replay = [&trace](motion::HumanoidAnimation* recorded, motion::RecordReport* report)
+    const auto replay = [&trace](openstrata::motion::MotionClip* recorded, openstrata::motion::RecordReport* report)
     {
-        motion::LiveCaptureConfig config;
+        openstrata::motion::LiveCaptureConfig config;
         config.maxExtrapolationSeconds = 0.05;
-        motion::LiveCaptureSource source(config);
-        motion::MotionSourceMetadata metadata;
+        openstrata::motion::LiveCaptureSource source(config);
+        openstrata::motion::SourceMetadata metadata;
         metadata.provider = "example.replay";
         metadata.protocol = "replay";
         metadata.sourceId = "walk-01";
         source.SetSourceMetadata(metadata);
 
-        motion::ReplaySender sender(trace, &source);
-        motion::CaptureRecorder recorder(60.0);
+        openstrata::motion::ReplaySender sender(trace, &source);
+        openstrata::motion::MotionRecorder recorder(60.0);
 
         for (std::size_t tick = 0; tick < 40; ++tick)
         {
@@ -645,12 +645,12 @@ TestReplayIsDeterministicAndFeedsTheSameInterface()
         *recorded = recorder.Take();
     };
 
-    motion::HumanoidAnimation firstRun;
-    motion::RecordReport firstReport;
+    openstrata::motion::MotionClip firstRun;
+    openstrata::motion::RecordReport firstReport;
     replay(&firstRun, &firstReport);
 
-    motion::HumanoidAnimation secondRun;
-    motion::RecordReport secondReport;
+    openstrata::motion::MotionClip secondRun;
+    openstrata::motion::RecordReport secondReport;
     replay(&secondRun, &secondReport);
 
     assert(!firstRun.samples.empty());
@@ -662,8 +662,8 @@ TestReplayIsDeterministicAndFeedsTheSameInterface()
 
     for (std::size_t index = 0; index < firstRun.samples.size(); ++index)
     {
-        const motion::HumanoidPose& a = firstRun.samples[index];
-        const motion::HumanoidPose& b = secondRun.samples[index];
+        const openstrata::motion::MotionPose& a = firstRun.samples[index];
+        const openstrata::motion::MotionPose& b = secondRun.samples[index];
         assert(a.timestamp == b.timestamp);
         assert(a.validRotations == b.validRotations);
         assert(a.localRotations[kHips] == b.localRotations[kHips]);
@@ -672,20 +672,20 @@ TestReplayIsDeterministicAndFeedsTheSameInterface()
 
     // Provenance survives the whole path: intake stamps it, the recorder
     // promotes it onto the clip.
-    assert(firstRun.source.kind == motion::MotionSourceKind::LiveCapture);
+    assert(firstRun.source.kind == openstrata::motion::MotionSourceKind::LiveCapture);
     assert(firstRun.source.provider == "example.replay");
 
     // The recorded session is a clip like any other, and a ClipSource over it
     // answers the same interface the live source did. From here nothing
     // downstream can tell the two apart -- which is the point of Phase D.
-    motion::ClipSource clip(firstRun);
-    motion::IMotionSource& asInterface = clip;
-    const motion::PoseSampleResult sampled = asInterface.Sample(firstRun.samples.front().timestamp);
+    openstrata::motion::ClipSource clip(firstRun);
+    openstrata::motion::IMotionSource& asInterface = clip;
+    const openstrata::motion::PoseSampleResult sampled = asInterface.Sample(firstRun.samples.front().timestamp);
     assert(sampled.IsValid());
-    assert(sampled.status == motion::PoseSampleStatus::Sampled);
+    assert(sampled.status == openstrata::motion::PoseSampleStatus::Sampled);
     assert(SameOrientation(sampled.pose->localRotations[kHips],
                            firstRun.samples.front().localRotations[kHips]));
-    assert(clip.GetSourceMetadata().kind == motion::MotionSourceKind::LiveCapture);
+    assert(clip.GetSourceMetadata().kind == openstrata::motion::MotionSourceKind::LiveCapture);
 }
 
 void
@@ -701,7 +701,7 @@ TestAQuantisedTraceStillSamplesOnItsOwnTicks()
     // sampled, not extrapolated. It regressed exactly once, and the only symptom
     // was a statistic -- the output still animated, just from extrapolated
     // poses.
-    motion::HumanoidAnimation trace;
+    openstrata::motion::MotionClip trace;
     trace.nominalFrameRate = 30.0;
     for (std::size_t index = 0; index < 30; ++index)
     {
@@ -714,9 +714,9 @@ TestAQuantisedTraceStillSamplesOnItsOwnTicks()
     trace.startTime = trace.samples.front().timestamp;
     trace.endTime = trace.samples.back().timestamp;
 
-    motion::LiveCaptureSource source;
-    motion::ReplaySender sender(trace, &source);
-    motion::CaptureRecorder recorder(30.0);
+    openstrata::motion::LiveCaptureSource source;
+    openstrata::motion::ReplaySender sender(trace, &source);
+    openstrata::motion::MotionRecorder recorder(30.0);
 
     for (std::size_t tick = 0; tick < trace.samples.size(); ++tick)
     {
@@ -729,7 +729,7 @@ TestAQuantisedTraceStillSamplesOnItsOwnTicks()
         recorder.Record(source.Sample(now));
     }
 
-    const motion::RecordReport report = recorder.GetReport();
+    const openstrata::motion::RecordReport report = recorder.GetReport();
     assert(report.ticks == trace.samples.size());
     assert(report.sampled == trace.samples.size());
     assert(report.extrapolated == 0);
@@ -739,8 +739,8 @@ TestAQuantisedTraceStillSamplesOnItsOwnTicks()
 void
 TestRecorderCountsWhatItCouldNotSample()
 {
-    motion::LiveCaptureSource source;
-    motion::CaptureRecorder recorder(30.0);
+    openstrata::motion::LiveCaptureSource source;
+    openstrata::motion::MotionRecorder recorder(30.0);
 
     // Three ticks before any frame arrives: recorded as unavailable, and no
     // pose is invented to paper over them.
@@ -760,7 +760,7 @@ TestRecorderCountsWhatItCouldNotSample()
     assert(!recorder.Record(source.Sample(4.0)));
     assert(recorder.GetReport().rejected == 1);
 
-    const motion::HumanoidAnimation clip = recorder.Take();
+    const openstrata::motion::MotionClip clip = recorder.Take();
     assert(clip.samples.size() == 2);
     assert(NearlyEqual(static_cast<float>(clip.startTime), 3.0f));
     assert(NearlyEqual(static_cast<float>(clip.endTime), 4.0f));
@@ -768,24 +768,24 @@ TestRecorderCountsWhatItCouldNotSample()
 }
 
 void
-TestSmoothingIsOptionalAndDoesNotInventBones()
+TestSmoothingIsOptionalAndDoesNotInventJoints()
 {
-    motion::LiveCaptureConfig config;
+    openstrata::motion::LiveCaptureConfig config;
     config.smoothingCutoffHz = 4.0f;
-    config.missingBones = motion::MissingBonePolicy::LeaveUnbound;
-    motion::LiveCaptureSource source(config);
+    config.missingJoints = openstrata::motion::MissingJointPolicy::LeaveUnbound;
+    openstrata::motion::LiveCaptureSource source(config);
 
-    motion::HumanoidPose first = MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f));
+    openstrata::motion::MotionPose first = MakeFrame(0.0, 0.0f, pxr::GfVec3f(0.0f));
     assert(source.Push(first));
 
     // A frame carrying only the hips: smoothing must not resurrect the spine.
-    motion::HumanoidPose second;
+    openstrata::motion::MotionPose second;
     second.timestamp = 0.1;
     second.localRotations[kHips] = RotationX(90.0f);
     second.validRotations.set(kHips);
     assert(source.Push(second));
 
-    const motion::PoseSampleResult result = source.Sample(0.1);
+    const openstrata::motion::PoseSampleResult result = source.Sample(0.1);
     assert(result.IsValid());
     assert(!result.pose->validRotations.test(kSpine));
     // Smoothed, so the hips lag the raw 90 degrees rather than snapping to it.
@@ -835,10 +835,10 @@ CheckCorpus(const std::filesystem::path& directory)
         buffer << file.rdbuf();
         const std::string original = buffer.str();
 
-        motion::HumanoidAnimation parsed;
-        motion::CaptureTraceError error;
+        openstrata::motion::MotionClip parsed;
+        openstrata::motion::CaptureTraceError error;
         std::istringstream input(original);
-        if (!motion::ReadCaptureTrace(input, &parsed, &error))
+        if (!openstrata::motion::ReadCaptureTrace(input, &parsed, &error))
         {
             std::fprintf(stderr, "%s:%zu: %s\n", path.filename().string().c_str(), error.line,
                          error.message.c_str());
@@ -847,7 +847,7 @@ CheckCorpus(const std::filesystem::path& directory)
         }
 
         std::ostringstream rewritten;
-        if (!motion::WriteCaptureTrace(rewritten, parsed) || rewritten.str() != original)
+        if (!openstrata::motion::WriteCaptureTrace(rewritten, parsed) || rewritten.str() != original)
         {
             std::fprintf(stderr, "%s: does not round trip byte-identically\n",
                          path.filename().string().c_str());
@@ -856,8 +856,8 @@ CheckCorpus(const std::filesystem::path& directory)
         }
 
         // A trace nothing can be driven from is not a fixture.
-        motion::LiveCaptureSource source;
-        motion::ReplaySender sender(parsed, &source);
+        openstrata::motion::LiveCaptureSource source;
+        openstrata::motion::ReplaySender sender(parsed, &source);
         if (sender.Flush() != parsed.samples.size())
         {
             std::fprintf(stderr, "%s: replay did not accept every frame\n",
@@ -889,7 +889,7 @@ main(int argc, char** argv)
         return CheckCorpus(std::filesystem::path(argv[1]));
     }
 
-    TestConfidenceGateResolvesThroughTheMissingBonePolicy();
+    TestConfidenceGateResolvesThroughTheMissingJointPolicy();
     TestConfidenceIsNotGatedWhenTheAdapterReportsNone();
     TestRootMotionIntakeModes();
     TestOutOfOrderAndStaleFramesAreSeparated();
@@ -903,7 +903,7 @@ main(int argc, char** argv)
     TestReplayIsDeterministicAndFeedsTheSameInterface();
     TestAQuantisedTraceStillSamplesOnItsOwnTicks();
     TestRecorderCountsWhatItCouldNotSample();
-    TestSmoothingIsOptionalAndDoesNotInventBones();
-    std::puts("motionRuntime live-capture tests passed");
+    TestSmoothingIsOptionalAndDoesNotInventJoints();
+    std::puts("motionRecording live-capture tests passed");
     return 0;
 }

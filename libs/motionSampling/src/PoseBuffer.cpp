@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/PoseBuffer.h"
+#include "motionSampling/PoseBuffer.h"
 
-#include "motionRuntime/Interpolation.h"
+#include "motionSampling/Interpolation.h"
 
 #include <algorithm>
 
-namespace motion
+namespace openstrata::motion
 {
 
 PoseBuffer::PoseBuffer(std::size_t capacity) : _capacity(capacity > 0 ? capacity : DefaultCapacity)
@@ -27,7 +27,7 @@ PoseBuffer::SetCapacity(std::size_t capacity)
 }
 
 bool
-PoseBuffer::Push(const HumanoidPose& pose)
+PoseBuffer::Push(const MotionPose& pose)
 {
     if (!_samples.empty() && pose.timestamp <= _samples.back().timestamp)
     {
@@ -65,7 +65,7 @@ PoseBuffer::GetTimeRange(double* startTime, double* endTime) const
     return true;
 }
 
-std::optional<HumanoidPose>
+std::optional<MotionPose>
 PoseBuffer::Sample(double timestamp) const
 {
     if (_samples.empty())
@@ -84,7 +84,7 @@ PoseBuffer::Sample(double timestamp) const
     // Timestamps are strictly increasing (Push enforces it), so the first
     // sample at or after `timestamp` is the upper bracket.
     const auto upper = std::lower_bound(_samples.begin(), _samples.end(), timestamp,
-                                        [](const HumanoidPose& sample, double time)
+                                        [](const MotionPose& sample, double time)
                                         { return sample.timestamp < time; });
     if (upper == _samples.begin())
     {
@@ -101,21 +101,21 @@ PoseBuffer::Sample(double timestamp) const
     return LerpPose(*lower, *upper, alpha);
 }
 
-std::optional<HumanoidPose>
+std::optional<MotionPose>
 PoseBuffer::SampleExtrapolated(double timestamp, double maxLeadSeconds) const
 {
     if (_samples.empty())
     {
         return std::nullopt;
     }
-    const HumanoidPose& newest = _samples.back();
+    const MotionPose& newest = _samples.back();
     if (timestamp <= newest.timestamp)
     {
         return Sample(timestamp);
     }
 
     const double lead = std::min(timestamp - newest.timestamp, std::max(maxLeadSeconds, 0.0));
-    HumanoidPose result = newest;
+    MotionPose result = newest;
     result.timestamp = newest.timestamp + lead;
     if (lead <= 0.0)
     {
@@ -133,7 +133,7 @@ PoseBuffer::SampleExtrapolated(double timestamp, double maxLeadSeconds) const
     }
     else if (_samples.size() >= 2 && newest.root.hasPosition)
     {
-        const HumanoidPose& previous = _samples[_samples.size() - 2];
+        const MotionPose& previous = _samples[_samples.size() - 2];
         const double delta = newest.timestamp - previous.timestamp;
         if (previous.root.hasPosition && delta > 0.0)
         {
@@ -150,4 +150,4 @@ PoseBuffer::SampleExtrapolated(double timestamp, double maxLeadSeconds) const
     return result;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

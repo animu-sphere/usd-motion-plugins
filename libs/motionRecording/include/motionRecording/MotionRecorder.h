@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Turns a stream back into a clip (motion policy §5: "a recorder accumulates
-// [HumanoidPose] into a HumanoidAnimation when needed").
+// Turns a stream back into a clip (design policy §14; MOTION_CONTRACT.md §10).
 //
 // This is the join between the live half of the motion layer and the offline
 // half. A live source answers one evaluation time at a time; the retarget core,
-// the `.vrma` writer, and every bake want a finished `HumanoidAnimation`. The
+// a clip writer, and every bake want a finished `MotionClip`. The
 // recorder is what makes the two the same pipeline rather than two pipelines --
 // and because it records the *status* of every tick alongside the pose, a clip
 // baked from a laggy session carries the evidence of that lag instead of
 // quietly looking fine.
 #pragma once
 
-#include "motionRuntime/MotionSource.h"
-#include "motionRuntime/api.h"
+#include "motionSampling/MotionSource.h"
+#include "motionRecording/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <cstddef>
 
-namespace motion
+namespace openstrata::motion
 {
 
 struct RecordReport
@@ -41,10 +40,10 @@ struct RecordReport
     }
 };
 
-class MOTIONRUNTIME_API CaptureRecorder
+class MOTIONRECORDING_API MotionRecorder
 {
   public:
-    explicit CaptureRecorder(double frameRate = 30.0);
+    explicit MotionRecorder(double frameRate = 30.0);
 
     // Appends the pose the result carries. A tick the source could not answer
     // is counted and dropped, not padded with an invented pose. Returns false
@@ -67,14 +66,14 @@ class MOTIONRUNTIME_API CaptureRecorder
     // recorded pose onto the clip, and hands it over. The frames are gone
     // afterwards; the report is not, so a caller can take the clip and still
     // say how the session that produced it went. Clear() drops both.
-    HumanoidAnimation Take();
+    MotionClip Take();
 
     void Clear();
 
   private:
-    HumanoidAnimation _animation;
+    MotionClip _animation;
     RecordReport _report;
     double _frameRate;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

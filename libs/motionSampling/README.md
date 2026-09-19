@@ -1,64 +1,64 @@
-# motionRuntime
+# motionSampling
 
-The OpenExec-independent humanoid motion runtime: a bounded pose history,
-interpolation, resampling, smoothing, and blending over the `motionCore` value
-types — and, since v0.5.0, the live-capture intake that feeds them.
+`motionSampling` answers *what is the pose at this time?* over the
+`motionCore` values, and says how it answered: a bounded pose history,
+interpolation, resampling, smoothing and blending, and the sampling interface
+that reports a status beside every pose
+([MOTION_CONTRACT.md §8](../../docs/design/MOTION_CONTRACT.md#8-motionclip-and-sampling)).
 
-`motionRuntime` is a **plain static CMake library**, not a plugin bundle. It has
-no `plugInfo.json`, no `openstrata.plugin.yaml`, and no USD stage, `Sdf`, `Plug`,
-or file-format dependency — only OpenUSD's `Gf` value types, inherited through
-`motionCore`. See [WORKSPACE.md](../../docs/architecture/WORKSPACE.md) §1–2 for
-the identity and dependency rules, enforced by
-[`tests/check_boundaries.py`](tests/check_boundaries.py).
+It is a **plain static CMake library**, not a plugin bundle. It has no
+`plugInfo.json`, no `openstrata.plugin.yaml`, no USD stage, `Sdf`, `Plug` or
+file-format dependency, and no transport — only OpenUSD's `Gf` value types,
+inherited through `motionCore`. See
+[WORKSPACE.md §2](../../docs/architecture/WORKSPACE.md#2-dependency-directions)
+for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.py).
 
-Workspace Phase: **6b** (bootstrapped in v0.4.0 alongside
-[`vrmRetarget`](../vrmRetarget/)); Motion Phase **D** filled it in v0.5.0
-without needing a new boundary.
+It arrived from `usd-vrm-plugins` on 2026-09-19 with its history, as the
+sampling half of that repository's `motionRuntime`; the capture half is
+[`motionRecording`](../motionRecording/README.md). Both were renamed on
+arrival ([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-are-this-policys-applied-on-arrival)).
 
 ## What it provides
 
 | Header | Contents |
 | --- | --- |
-| `motionRuntime/PoseBuffer.h` | `PoseBuffer` — bounded, strictly ordered pose history with bracketed sampling and capped position extrapolation |
-| `motionRuntime/Interpolation.h` | `SlerpShortest`, `LerpRootMotion`, `LerpPose` |
-| `motionRuntime/Resample.h` | `Resample`, `SampleAnimation` |
-| `motionRuntime/Filter.h` | `PoseFilter` — frame-rate independent exponential smoothing |
-| `motionRuntime/Blend.h` | `BlendPoses` (two-pose and weighted N-pose) |
-| `motionRuntime/MotionSource.h` | `IMotionSource`, `PoseSampleResult` / `PoseSampleStatus` (with an exact `operator==`, so OpenExec can register the result), `ClipSource` |
-| `motionRuntime/LiveCaptureSource.h` | `LiveCaptureSource` — timestamped intake, confidence gating, missing-bone policy, root-motion intake, statistics |
-| `motionRuntime/CaptureTrace.h` | The `motion-capture-trace` text format: reader, writer, error reporting |
-| `motionRuntime/ReplaySender.h` | `ReplaySender` — pushes a recorded trace as a caller-driven clock advances |
-| `motionRuntime/Recorder.h` | `CaptureRecorder` — accumulates evaluated poses back into a `HumanoidAnimation` |
+| `motionSampling/PoseBuffer.h` | `PoseBuffer` — bounded, strictly ordered pose history with bracketed sampling and capped position extrapolation |
+| `motionSampling/Interpolation.h` | `SlerpShortest`, `LerpRootMotion`, `LerpPose` |
+| `motionSampling/Resample.h` | `Resample`, `SampleAnimation` |
+| `motionSampling/Filter.h` | `PoseFilter` — frame-rate independent exponential smoothing |
+| `motionSampling/Blend.h` | `BlendPoses` (two-pose and weighted N-pose) |
+| `motionSampling/MotionSource.h` | `IMotionSource`, `PoseSampleResult` / `PoseSampleStatus` (with an exact `operator==`, so OpenExec can register the result), `ClipSource` |
 
-## Three rules the whole library obeys
+The API findings `usd-vrm-plugins`' OpenExec layer measured against this code
+— a status-carrying `SampleClip`, a stateless filter step, an N-way blend that
+can answer *nothing to blend* — are fixed in a change of their own after the
+move (MOTION_CONTRACT.md §8).
+
+## Two rules the whole library obeys
 
 - **A missing sample is not a zero sample.** Every operation preserves
-  `HumanoidPose::validRotations` and the `RootMotion` presence flags. Where one
-  input carries a bone and the other does not, the value is *held*, never faded
-  toward identity. A live source that drops a bone for a frame does not snap the
-  avatar.
+  `MotionPose::validRotations`, the `RootMotion` presence flags and the channel
+  names each pose reported. Where one input carries a joint or a channel and
+  the other does not, the value is *held*, never faded toward identity or zero.
 - **Orientations stay unit quaternions and take the short arc.** `q` and `-q`
   are the same rotation, so every interpolation picks the representative on the
   near hemisphere first. N-pose blending folds inputs in pairwise for the same
   reason — a component-wise weighted sum of quaternions is not a rotation.
-- **No transport, no wall clock.** Live capture arrives through
-  `LiveCaptureSource::Push` as an already-decoded pose stamped in the capture
-  system's own clock; protocol decode and coordinate conversion belong to an
-  adapter, and the caller drives every tick. That is what makes a recorded
-  session replay identically on every run and every OS, and it is enforced by
-  the boundary check, which forbids socket and HTTP headers outright.
-
-The recorded traces the Phase D tests replay live in
-[`tests/corpus/`](tests/corpus/README.md) and are generated by
-[`tools/generate_traces.py`](tools/generate_traces.py).
 
 ## Building
 
-It builds as part of the workspace root `CMakeLists.txt`. Standalone:
+It builds as part of the repository root `CMakeLists.txt`. Standalone:
 
-```bash
-cmake -S libs/motionRuntime -B build/motionRuntime \
+```sh
+cmake -S libs/motionSampling -B build/motion-sampling \
       -DCMAKE_PREFIX_PATH="<usd-install>;<motionCore-install>"
-cmake --build build/motionRuntime
-ctest --test-dir build/motionRuntime --output-on-failure
+cmake --build build/motion-sampling --config Release
+ctest --test-dir build/motion-sampling -C Release --output-on-failure
+```
+
+Consumers use the installed package contract:
+
+```cmake
+find_package(motionSampling CONFIG REQUIRED)
+target_link_libraries(consumer PRIVATE motionSampling::motionSampling)
 ```

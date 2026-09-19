@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The observation/playback interface every motion producer resolves to
-// (motion policy §6.1). A clip, a live capture, and a generated animation all
+// (design policy §6, MOTION_CONTRACT.md §8). A clip, a live capture, and a generated animation all
 // answer the same question — "what is the pose at this evaluation time?" — so
 // from retarget onward nothing downstream distinguishes them.
 //
-// Provenance travels as metadata (motion policy §9), never as a type
-// distinction: `MotionSourceMetadata::provider` is recorded and reported, and
+// Provenance travels as metadata (design policy §4.1), never as a type
+// distinction: `SourceMetadata::provider` is recorded and reported, and
 // it is never a branch condition here.
 #pragma once
 
-#include "motionRuntime/api.h"
+#include "motionSampling/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <cstdint>
 #include <optional>
 
-namespace motion
+namespace openstrata::motion
 {
 
 // How a sample was resolved. The caller needs this to tell a real observation
@@ -36,7 +36,7 @@ enum class PoseSampleStatus : std::uint8_t
     Extrapolated,
 };
 
-MOTIONRUNTIME_API const char* PoseSampleStatusName(PoseSampleStatus status) noexcept;
+MOTIONSAMPLING_API const char* PoseSampleStatusName(PoseSampleStatus status) noexcept;
 
 // How close to an observed sample a request must be to count as landing on it.
 //
@@ -59,7 +59,7 @@ inline constexpr double PoseSampleTimeTolerance = 5e-7;
 struct PoseSampleResult
 {
     PoseSampleStatus status = PoseSampleStatus::Unavailable;
-    std::optional<HumanoidPose> pose;
+    std::optional<MotionPose> pose;
 
     // Seconds between the request and the newest sample the source holds, in
     // the source's own clock. Positive means the source is behind the request
@@ -79,18 +79,18 @@ struct PoseSampleResult
     }
 };
 
-// Exact, field by field, with the pose compared by `HumanoidPose`'s own exact
+// Exact, field by field, with the pose compared by `MotionPose`'s own exact
 // `operator==` -- the same "is this the same recorded value?" question motionCore
-// answers for its aggregates (motion contract, comparison semantics). It exists
-// for the same caller those did: `ExecTypeRegistry::RegisterType` will not
-// register a type it cannot compare, and `execMotion`'s `motion.interpolatePose`
-// hands this value back whole rather than dropping the status the contract says
+// answers for its aggregates (MOTION_CONTRACT.md §5.2). It exists for the
+// same caller those did: `ExecTypeRegistry::RegisterType` will not register a
+// type it cannot compare, and the OpenExec node that interpolates a pose
+// (`motion.interpolatePose`, arriving with execMotion) hands this value back whole rather than dropping the status the contract says
 // is part of the answer. There is no `NearlyEqual`: nothing yet asks whether two
 // sample results are the same motion, and a parity check compares the poses.
-MOTIONRUNTIME_API bool operator==(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
-MOTIONRUNTIME_API bool operator!=(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
+MOTIONSAMPLING_API bool operator==(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
+MOTIONSAMPLING_API bool operator!=(const PoseSampleResult& a, const PoseSampleResult& b) noexcept;
 
-class MOTIONRUNTIME_API IMotionSource
+class MOTIONSAMPLING_API IMotionSource
 {
   public:
     virtual ~IMotionSource();
@@ -102,7 +102,7 @@ class MOTIONRUNTIME_API IMotionSource
     // clock (a live capture) is responsible for the mapping.
     virtual PoseSampleResult Sample(double evaluationTime) = 0;
 
-    virtual MotionSourceMetadata GetSourceMetadata() const = 0;
+    virtual SourceMetadata GetSourceMetadata() const = 0;
 
     // False when the source holds nothing; otherwise writes the oldest and
     // newest times it can answer for, in the consumer's clock. Either pointer
@@ -113,18 +113,18 @@ class MOTIONRUNTIME_API IMotionSource
     IMotionSource() = default;
 };
 
-// A finished `HumanoidAnimation` served through the same interface. This is
-// what a `.vrma` clip, a recorded trace, and a generated animation all become
-// once they are complete (motion policy §6.2) — the retarget core cannot tell
+// A finished `MotionClip` served through the same interface. This is
+// what an animation file, a recorded trace, and a generated animation all
+// become once they are complete (design policy §7) — the retarget core cannot tell
 // them apart, which is the point.
-class MOTIONRUNTIME_API ClipSource final : public IMotionSource
+class MOTIONSAMPLING_API ClipSource final : public IMotionSource
 {
   public:
     ClipSource() = default;
-    explicit ClipSource(HumanoidAnimation animation);
+    explicit ClipSource(MotionClip animation);
 
-    void SetAnimation(HumanoidAnimation animation);
-    const HumanoidAnimation&
+    void SetAnimation(MotionClip animation);
+    const MotionClip&
     GetAnimation() const noexcept
     {
         return _animation;
@@ -145,12 +145,12 @@ class MOTIONRUNTIME_API ClipSource final : public IMotionSource
     }
 
     PoseSampleResult Sample(double evaluationTime) override;
-    MotionSourceMetadata GetSourceMetadata() const override;
+    SourceMetadata GetSourceMetadata() const override;
     bool GetTimeRange(double* startTime, double* endTime) const override;
 
   private:
-    HumanoidAnimation _animation;
+    MotionClip _animation;
     double _startOffset = 0.0;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

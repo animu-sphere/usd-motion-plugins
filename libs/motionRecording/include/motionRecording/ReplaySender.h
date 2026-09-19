@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The replay half of Motion Phase D (motion policy §16-D).
+// Replay: a recorded trace driven back through live intake (MOTION_CONTRACT.md
+// §10).
 //
-// A `ReplaySender` stands where a capture adapter stands: it pushes recorded
+// A `ReplaySender` stands where a connector stands: it pushes recorded
 // frames into a `LiveCaptureSource` in order, as a clock advances. Nothing here
 // reads a wall clock -- the caller drives the time -- so a replay is a pure
 // function of the trace and the tick schedule. That is what makes a live
@@ -17,23 +18,23 @@
 // sample.
 #pragma once
 
-#include "motionRuntime/LiveCaptureSource.h"
-#include "motionRuntime/api.h"
+#include "motionRecording/LiveCaptureSource.h"
+#include "motionRecording/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <cstddef>
 
-namespace motion
+namespace openstrata::motion
 {
 
-class MOTIONRUNTIME_API ReplaySender
+class MOTIONRECORDING_API ReplaySender
 {
   public:
     // `sink` must outlive the sender. The trace is copied: a replay is
     // restartable, and a caller that mutates its animation mid-replay would
     // otherwise silently change history.
-    ReplaySender(HumanoidAnimation trace, LiveCaptureSource* sink);
+    ReplaySender(MotionClip trace, LiveCaptureSource* sink);
 
     // Pushes every not-yet-sent frame whose timestamp is at or before
     // `captureTime`, in recorded order. Returns how many the sink accepted.
@@ -64,7 +65,7 @@ class MOTIONRUNTIME_API ReplaySender
         return _trace.samples.size();
     }
 
-    const HumanoidAnimation&
+    const MotionClip&
     GetTrace() const noexcept
     {
         return _trace;
@@ -79,9 +80,9 @@ class MOTIONRUNTIME_API ReplaySender
     }
 
   private:
-    HumanoidAnimation _trace;
+    MotionClip _trace;
     LiveCaptureSource* _sink;
     std::size_t _next = 0;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

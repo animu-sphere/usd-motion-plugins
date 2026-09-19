@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/LiveCaptureSource.h"
+#include "motionRecording/LiveCaptureSource.h"
 
 #include <algorithm>
 #include <array>
 #include <utility>
 
-namespace motion
+namespace openstrata::motion
 {
 
 namespace
 {
 
 bool
-CarriesAnything(const HumanoidPose& pose)
+CarriesAnything(const MotionPose& pose)
 {
     return pose.validRotations.any() || pose.root.hasPosition || pose.root.hasOrientation;
 }
@@ -39,65 +39,65 @@ LiveCaptureSource::SetConfig(const LiveCaptureConfig& config)
 }
 
 void
-LiveCaptureSource::SetSourceMetadata(const MotionSourceMetadata& metadata)
+LiveCaptureSource::SetSourceMetadata(const SourceMetadata& metadata)
 {
     _metadata = metadata;
-    // The kind is not the adapter's to choose: anything arriving through this
-    // class is a live capture by construction (motion policy §9).
+    // The kind is not the connector's to choose: anything arriving through this
+    // class is a live capture by construction (MOTION_CONTRACT.md §7).
     _metadata.kind = MotionSourceKind::LiveCapture;
 }
 
-HumanoidPose
-LiveCaptureSource::_Condition(const HumanoidPose& pose)
+MotionPose
+LiveCaptureSource::_Condition(const MotionPose& pose)
 {
-    HumanoidPose conditioned = pose;
+    MotionPose conditioned = pose;
 
     // 1. Confidence gate. A frame that reports no confidence at all is trusted
-    //    as given -- an adapter that cannot measure confidence must not lose
-    //    its bones for saying so.
+    //    as given -- a connector that cannot measure confidence must not lose
+    //    its joints for saying so.
     if (conditioned.confidence && _config.confidenceFloor > 0.0f)
     {
-        const std::array<float, HumanBoneCount>& scores = *conditioned.confidence;
-        for (std::size_t bone = 0; bone < HumanBoneCount; ++bone)
+        const std::array<float, HumanJointCount>& scores = *conditioned.confidence;
+        for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
         {
-            if (conditioned.validRotations.test(bone) && scores[bone] < _config.confidenceFloor)
+            if (conditioned.validRotations.test(joint) && scores[joint] < _config.confidenceFloor)
             {
-                conditioned.validRotations.reset(bone);
-                ++_stats.bonesGatedByConfidence;
+                conditioned.validRotations.reset(joint);
+                ++_stats.jointsGatedByConfidence;
             }
         }
     }
 
     // 2. Whatever survived the gate is a real observation.
-    for (std::size_t bone = 0; bone < HumanBoneCount; ++bone)
+    for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
     {
-        if (conditioned.validRotations.test(bone))
+        if (conditioned.validRotations.test(joint))
         {
-            _observedBones.set(bone);
-            ++_stats.bonesObserved;
+            _observedJoints.set(joint);
+            ++_stats.jointsObserved;
         }
     }
 
-    // 3. Resolve what is still missing. Holding is per bone and comes from the
+    // 3. Resolve what is still missing. Holding is per joint and comes from the
     //    last accepted frame, so a dropout freezes one limb rather than
     //    reverting it toward rest -- the same invariant PoseBuffer keeps for a
     //    missing sample.
-    for (std::size_t bone = 0; bone < HumanBoneCount; ++bone)
+    for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
     {
-        if (conditioned.validRotations.test(bone))
+        if (conditioned.validRotations.test(joint))
         {
             continue;
         }
-        if (_config.missingBones == MissingBonePolicy::HoldLast && _lastAccepted &&
-            _lastAccepted->validRotations.test(bone))
+        if (_config.missingJoints == MissingJointPolicy::HoldLast && _lastAccepted &&
+            _lastAccepted->validRotations.test(joint))
         {
-            conditioned.localRotations[bone] = _lastAccepted->localRotations[bone];
-            conditioned.validRotations.set(bone);
-            ++_stats.bonesHeld;
+            conditioned.localRotations[joint] = _lastAccepted->localRotations[joint];
+            conditioned.validRotations.set(joint);
+            ++_stats.jointsHeld;
         }
         else
         {
-            ++_stats.bonesUnbound;
+            ++_stats.jointsUnbound;
         }
     }
 
@@ -134,7 +134,7 @@ LiveCaptureSource::_Condition(const HumanoidPose& pose)
     //    this object still says where it came from.
     conditioned.source = _metadata;
 
-    // 6. Smoothing runs last, on the fully resolved frame, so a held bone is
+    // 6. Smoothing runs last, on the fully resolved frame, so a held joint is
     //    smoothed on the same terms as an observed one.
     if (_config.smoothingCutoffHz > 0.0f)
     {
@@ -144,7 +144,7 @@ LiveCaptureSource::_Condition(const HumanoidPose& pose)
 }
 
 bool
-LiveCaptureSource::Push(const HumanoidPose& pose)
+LiveCaptureSource::Push(const MotionPose& pose)
 {
     if (!CarriesAnything(pose))
     {
@@ -169,7 +169,7 @@ LiveCaptureSource::Push(const HumanoidPose& pose)
         }
     }
 
-    const HumanoidPose conditioned = _Condition(pose);
+    const MotionPose conditioned = _Condition(pose);
     if (!_buffer.Push(conditioned))
     {
         // Unreachable while _lastAccepted tracks the buffer head, but the
@@ -212,7 +212,7 @@ LiveCaptureSource::Sample(double evaluationTime)
     result.lag = captureTime - newest;
     _stats.peakLagSeconds = std::max(_stats.peakLagSeconds, result.lag);
 
-    std::optional<HumanoidPose> pose =
+    std::optional<MotionPose> pose =
         _config.maxExtrapolationSeconds > 0.0
             ? _buffer.SampleExtrapolated(captureTime, _config.maxExtrapolationSeconds)
             : _buffer.Sample(captureTime);
@@ -285,7 +285,7 @@ LiveCaptureSource::Reset()
     _buffer.Clear();
     _filter.Reset();
     _lastAccepted.reset();
-    _observedBones.reset();
+    _observedJoints.reset();
 }
 
-} // namespace motion
+} // namespace openstrata::motion

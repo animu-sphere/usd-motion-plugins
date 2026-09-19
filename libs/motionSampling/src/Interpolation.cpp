@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Interpolation.h"
+#include "motionSampling/Interpolation.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace motion
+namespace openstrata::motion
 {
 namespace
 {
@@ -106,15 +106,15 @@ LerpRootMotion(const RootMotion& a, const RootMotion& b, float t)
     return result;
 }
 
-HumanoidPose
-LerpPose(const HumanoidPose& a, const HumanoidPose& b, float t)
+MotionPose
+LerpPose(const MotionPose& a, const MotionPose& b, float t)
 {
     const float alpha = Clamp01(t);
-    HumanoidPose result;
+    MotionPose result;
     result.timestamp = a.timestamp + (b.timestamp - a.timestamp) * alpha;
     result.root = LerpRootMotion(a.root, b.root, alpha);
 
-    for (std::size_t i = 0; i < HumanBoneCount; ++i)
+    for (std::size_t i = 0; i < HumanJointCount; ++i)
     {
         const bool inA = a.validRotations.test(i);
         const bool inB = b.validRotations.test(i);
@@ -140,8 +140,8 @@ LerpPose(const HumanoidPose& a, const HumanoidPose& b, float t)
 
     if (a.confidence && b.confidence)
     {
-        std::array<float, HumanBoneCount> blended{};
-        for (std::size_t i = 0; i < HumanBoneCount; ++i)
+        std::array<float, HumanJointCount> blended{};
+        for (std::size_t i = 0; i < HumanJointCount; ++i)
         {
             blended[i] = (*a.confidence)[i] + ((*b.confidence)[i] - (*a.confidence)[i]) * alpha;
         }
@@ -156,24 +156,24 @@ LerpPose(const HumanoidPose& a, const HumanoidPose& b, float t)
         result.confidence = b.confidence;
     }
 
-    // Expressions follow the bones' rule rather than confidence's, because they
+    // Channels follow the joints' rule rather than confidence's, because they
     // are keyed by name and the two endpoints need not carry the same names: a
     // weight reported by both is interpolated, one reported by a single
     // endpoint is held at that value, and a name neither reported stays absent.
     // Fading a one-sided weight toward zero would invent a channel closing that
-    // no producer described -- the same reason a missing bone is held rather
+    // no producer described -- the same reason a missing joint is held rather
     // than eased to identity.
-    for (const ExpressionWeight& entry : a.expressions.entries)
+    for (const MotionChannel& entry : a.channels.entries)
     {
-        const float* other = b.expressions.Find(entry.name);
-        result.expressions.Set(entry.name, other ? entry.weight + (*other - entry.weight) * alpha
-                                                 : entry.weight);
+        const float* other = b.channels.Find(entry.name);
+        result.channels.Set(entry.name, other ? entry.value + (*other - entry.value) * alpha
+                                                 : entry.value);
     }
-    for (const ExpressionWeight& entry : b.expressions.entries)
+    for (const MotionChannel& entry : b.channels.entries)
     {
-        if (!a.expressions.Find(entry.name))
+        if (!a.channels.Find(entry.name))
         {
-            result.expressions.Set(entry.name, entry.weight);
+            result.channels.Set(entry.name, entry.value);
         }
     }
 
@@ -197,12 +197,12 @@ LerpPose(const HumanoidPose& a, const HumanoidPose& b, float t)
 
     // Contact state and provenance are discrete, so they snap to the nearer
     // endpoint instead of being averaged into a value neither side reported.
-    const HumanoidPose& nearer = (alpha < 0.5f) ? a : b;
-    const HumanoidPose& farther = (alpha < 0.5f) ? b : a;
+    const MotionPose& nearer = (alpha < 0.5f) ? a : b;
+    const MotionPose& farther = (alpha < 0.5f) ? b : a;
     result.contacts = nearer.contacts ? nearer.contacts : farther.contacts;
     result.source = nearer.source ? nearer.source : farther.source;
 
     return result;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

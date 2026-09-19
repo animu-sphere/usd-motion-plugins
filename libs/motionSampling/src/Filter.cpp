@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Filter.h"
+#include "motionSampling/Filter.h"
 
-#include "motionRuntime/Interpolation.h"
+#include "motionSampling/Interpolation.h"
 
 #include <cmath>
 
-namespace motion
+namespace openstrata::motion
 {
 namespace
 {
@@ -27,8 +27,8 @@ SmoothingAlpha(float cutoffHz, double dt)
 
 } // namespace
 
-HumanoidPose
-PoseFilter::Apply(const HumanoidPose& pose)
+MotionPose
+PoseFilter::Apply(const MotionPose& pose)
 {
     if (_options.cutoffHz <= 0.0f || !_state)
     {
@@ -44,15 +44,15 @@ PoseFilter::Apply(const HumanoidPose& pose)
     }
 
     const float alpha = SmoothingAlpha(_options.cutoffHz, dt);
-    HumanoidPose result = pose;
+    MotionPose result = pose;
 
-    for (std::size_t i = 0; i < HumanBoneCount; ++i)
+    for (std::size_t i = 0; i < HumanJointCount; ++i)
     {
         if (!pose.validRotations.test(i))
         {
-            // A dropout leaves both the output bone and the retained state
+            // A dropout leaves both the output joint and the retained state
             // alone, so the filter resumes from the last real sample instead of
-            // restarting when the bone comes back.
+            // restarting when the joint comes back.
             continue;
         }
         if (!_state->validRotations.test(i))
@@ -74,10 +74,10 @@ PoseFilter::Apply(const HumanoidPose& pose)
             SlerpShortest(_state->root.worldOrientation, pose.root.worldOrientation, alpha);
     }
 
-    // Carry forward the bones this pose did not report so their history
+    // Carry forward the joints this pose did not report so their history
     // survives the dropout.
-    HumanoidPose nextState = result;
-    for (std::size_t i = 0; i < HumanBoneCount; ++i)
+    MotionPose nextState = result;
+    for (std::size_t i = 0; i < HumanJointCount; ++i)
     {
         if (!pose.validRotations.test(i) && _state->validRotations.test(i))
         {
@@ -89,4 +89,4 @@ PoseFilter::Apply(const HumanoidPose& pose)
     return result;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

@@ -1,44 +1,46 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The vendor-neutral live-capture intake (motion policy §6.1, §8.2).
+// The vendor-neutral live-capture intake (MOTION_CONTRACT.md §9; design policy
+// §6).
 //
 // A capture system's pipeline is
 //
 //     capture device -> protocol decode -> coordinate conversion
-//                    -> LiveCaptureSource -> HumanoidPose
+//                    -> LiveCaptureSource -> MotionPose
 //
-// and everything left of this class is an adapter's job. This class therefore
-// owns no transport: it neither opens a socket nor reads a clock. An adapter
+// and everything left of this class is a connector's job. This class therefore
+// owns no transport: it neither opens a socket nor reads a clock. A connector
 // decodes a frame, converts it into the canonical humanoid basis, and calls
 // Push(). That boundary is what makes a live source replayable — the same
 // recorded frames pushed in the same order produce byte-identical results,
-// which is what the Phase D tests depend on.
+// which is what the replay tests depend on.
 //
 // Product names (a capture vendor, an SDK, a research model) are forbidden
-// here and appear only under adapters/ (WORKSPACE.md §1, motion policy §8.1).
+// here and belong to `motion-connectors` (WORKSPACE.md §1.3, design policy
+// §3.1).
 #pragma once
 
-#include "motionRuntime/Filter.h"
-#include "motionRuntime/MotionSource.h"
-#include "motionRuntime/PoseBuffer.h"
-#include "motionRuntime/api.h"
+#include "motionSampling/Filter.h"
+#include "motionSampling/MotionSource.h"
+#include "motionSampling/PoseBuffer.h"
+#include "motionRecording/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 
-namespace motion
+namespace openstrata::motion
 {
 
-// What to do with a bone a frame does not carry — either because the capture
+// What to do with a joint a frame does not carry — either because the capture
 // system never solves it (fingers are the usual case) or because it dropped
 // below the confidence floor for this frame.
-enum class MissingBonePolicy : std::uint8_t
+enum class MissingJointPolicy : std::uint8_t
 {
-    // Leave the bone unbound. Downstream sees `validRotations` clear and is
+    // Leave the joint unbound. Downstream sees `validRotations` clear and is
     // free to fall back to the target rig's rest pose.
     LeaveUnbound,
     // Carry the last observed rotation forward. A brief dropout then reads as
@@ -50,7 +52,7 @@ enum class MissingBonePolicy : std::uint8_t
 // absolute world position, some a position and a velocity, some nothing at all.
 enum class RootMotionIntake : std::uint8_t
 {
-    // Record exactly what the adapter delivered.
+    // Record exactly what the connector delivered.
     Passthrough,
     // Drop root motion entirely; only the joint hierarchy survives. Use when
     // the avatar's placement is owned by the application, not the capture.
@@ -66,13 +68,13 @@ struct LiveCaptureConfig
 {
     std::size_t bufferCapacity = PoseBuffer::DefaultCapacity;
 
-    // Bones whose reported confidence is below this floor are treated as
-    // missing and resolved by `missingBones`. Frames with no confidence array
-    // are never gated — an adapter that cannot measure confidence must not be
+    // Joints whose reported confidence is below this floor are treated as
+    // missing and resolved by `missingJoints`. Frames with no confidence array
+    // are never gated — a connector that cannot measure confidence must not be
     // punished for saying so.
     float confidenceFloor = 0.0f;
 
-    MissingBonePolicy missingBones = MissingBonePolicy::HoldLast;
+    MissingJointPolicy missingJoints = MissingJointPolicy::HoldLast;
     RootMotionIntake rootMotion = RootMotionIntake::DeriveVelocity;
 
     // Past the newest observed frame, carry the root along its last velocity
@@ -93,7 +95,7 @@ struct LiveCaptureConfig
 };
 
 // Everything an operator needs to judge a capture session without a debugger.
-// These are the numbers the Phase D evaluation reports: how much arrived, how
+// These are the numbers a capture evaluation reports: how much arrived, how
 // much was refused and why, how much of the humanoid was actually observed,
 // and how often evaluation ran ahead of the data.
 struct LiveCaptureStats
@@ -103,10 +105,10 @@ struct LiveCaptureStats
     std::uint64_t framesRejectedStale = 0;
     std::uint64_t framesRejectedEmpty = 0;
 
-    std::uint64_t bonesObserved = 0;
-    std::uint64_t bonesGatedByConfidence = 0;
-    std::uint64_t bonesHeld = 0;
-    std::uint64_t bonesUnbound = 0;
+    std::uint64_t jointsObserved = 0;
+    std::uint64_t jointsGatedByConfidence = 0;
+    std::uint64_t jointsHeld = 0;
+    std::uint64_t jointsUnbound = 0;
 
     std::uint64_t rootSamplesObserved = 0;
     std::uint64_t rootVelocitiesDerived = 0;
@@ -124,7 +126,7 @@ struct LiveCaptureStats
     double peakLagSeconds = 0.0;
 };
 
-class MOTIONRUNTIME_API LiveCaptureSource final : public IMotionSource
+class MOTIONRECORDING_API LiveCaptureSource final : public IMotionSource
 {
   public:
     explicit LiveCaptureSource(const LiveCaptureConfig& config = {});
@@ -139,8 +141,8 @@ class MOTIONRUNTIME_API LiveCaptureSource final : public IMotionSource
     // mid-stream would otherwise blend two different filters.
     void SetConfig(const LiveCaptureConfig& config);
 
-    void SetSourceMetadata(const MotionSourceMetadata& metadata);
-    MotionSourceMetadata
+    void SetSourceMetadata(const SourceMetadata& metadata);
+    SourceMetadata
     GetSourceMetadata() const override
     {
         return _metadata;
@@ -148,10 +150,10 @@ class MOTIONRUNTIME_API LiveCaptureSource final : public IMotionSource
 
     // Accepts one decoded frame, stamped in the capture system's own clock.
     // Returns false when the frame was refused — out of order, stale, or
-    // carrying neither a valid bone nor root data — and the stats record why.
-    bool Push(const HumanoidPose& pose);
+    // carrying neither a valid joint nor root data — and the stats record why.
+    bool Push(const MotionPose& pose);
 
-    // captureTime = evaluationTime + clockOffset. An adapter that knows its
+    // captureTime = evaluationTime + clockOffset. A connector that knows its
     // stream's epoch sets this directly; one that does not calls AlignClock().
     void
     SetClockOffset(double clockOffset) noexcept
@@ -184,13 +186,13 @@ class MOTIONRUNTIME_API LiveCaptureSource final : public IMotionSource
         return _buffer.IsEmpty();
     }
 
-    // Bones this session has ever observed at or above the confidence floor.
+    // Joints this session has ever observed at or above the confidence floor.
     // A capture rig that solves no fingers reports it here rather than in a
     // per-frame diff.
-    const std::bitset<HumanBoneCount>&
-    GetObservedBones() const noexcept
+    const std::bitset<HumanJointCount>&
+    GetObservedJoints() const noexcept
     {
-        return _observedBones;
+        return _observedJoints;
     }
 
     const LiveCaptureStats&
@@ -204,22 +206,22 @@ class MOTIONRUNTIME_API LiveCaptureSource final : public IMotionSource
         _stats = LiveCaptureStats();
     }
 
-    // Drops buffered history, the held-bone state, and the smoothing state.
+    // Drops buffered history, the held-joint state, and the smoothing state.
     // Stats and the clock offset survive; use ResetStats() for those.
     void Reset();
 
   private:
-    HumanoidPose _Condition(const HumanoidPose& pose);
+    MotionPose _Condition(const MotionPose& pose);
 
     LiveCaptureConfig _config;
     PoseBuffer _buffer;
     PoseFilter _filter;
-    MotionSourceMetadata _metadata;
+    SourceMetadata _metadata;
 
-    std::optional<HumanoidPose> _lastAccepted;
-    std::bitset<HumanBoneCount> _observedBones;
+    std::optional<MotionPose> _lastAccepted;
+    std::bitset<HumanJointCount> _observedJoints;
     double _clockOffset = 0.0;
     LiveCaptureStats _stats;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

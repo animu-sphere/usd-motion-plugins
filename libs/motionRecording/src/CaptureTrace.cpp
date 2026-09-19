@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/CaptureTrace.h"
+#include "motionRecording/CaptureTrace.h"
 
 #include <array>
 #include <cmath>
@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace motion
+namespace openstrata::motion
 {
 
 namespace
@@ -41,7 +41,7 @@ Fail(CaptureTraceError* error, std::size_t line, std::string message)
 
 // A line is either fully consumed or malformed. Ignoring the tail would let
 // `b hips 1 0 0 0 grbage` read as a perfectly good frame -- the same class of
-// mistake as an unknown bone name, which this parser already refuses outright
+// mistake as an unknown joint name, which this parser already refuses outright
 // rather than treating as a missing limb (CaptureTrace.h).
 bool
 FullyConsumed(std::istringstream& stream, CaptureTraceError* error, std::size_t line,
@@ -141,7 +141,7 @@ ParseContact(const std::string& token, FootContact* contact)
 // an escaping rule behind it, in a format whose whole value is that a fixture
 // diffs and round-trips.
 bool
-IsWritableExpressionName(const std::string& name) noexcept
+IsWritableChannelName(const std::string& name) noexcept
 {
     return !name.empty() && name.find_first_of(" \t\r\n\v\f") == std::string::npos;
 }
@@ -186,14 +186,14 @@ IsWritableProvenanceValue(const std::string& value) noexcept
 
 struct FrameBuilder
 {
-    HumanoidPose pose;
-    std::array<float, HumanBoneCount> confidence{};
+    MotionPose pose;
+    std::array<float, HumanJointCount> confidence{};
     bool anyConfidence = false;
 
-    HumanoidPose
+    MotionPose
     Build() const
     {
-        HumanoidPose built = pose;
+        MotionPose built = pose;
         if (anyConfidence)
         {
             built.confidence = confidence;
@@ -205,14 +205,14 @@ struct FrameBuilder
 } // namespace
 
 bool
-ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTraceError* error)
+ReadCaptureTrace(std::istream& input, MotionClip* animation, CaptureTraceError* error)
 {
     if (!animation)
     {
         return Fail(error, 0, "no output animation was provided");
     }
 
-    HumanoidAnimation result;
+    MotionClip result;
     result.source.kind = MotionSourceKind::LiveCapture;
 
     bool sawMagic = false;
@@ -341,29 +341,29 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
 
         if (keyword == "b")
         {
-            std::string boneName;
-            if (!(stream >> boneName))
+            std::string jointName;
+            if (!(stream >> jointName))
             {
-                return Fail(error, lineNumber, "'b' needs a bone name");
+                return Fail(error, lineNumber, "'b' needs a joint name");
             }
-            const std::optional<HumanBone> bone = FindHumanBone(boneName);
-            if (!bone)
+            const std::optional<HumanJoint> joint = FindHumanJoint(jointName);
+            if (!joint)
             {
-                return Fail(error, lineNumber, "unknown humanoid bone '" + boneName + "'");
+                return Fail(error, lineNumber, "unknown humanoid joint '" + jointName + "'");
             }
             float quaternion[4] = {0.0f, 0.0f, 0.0f, 0.0f};
             if (!ReadFloats(stream, quaternion, 4))
             {
-                return Fail(error, lineNumber, "'b " + boneName + "' needs a w x y z rotation");
+                return Fail(error, lineNumber, "'b " + jointName + "' needs a w x y z rotation");
             }
-            if (!CheckUnitQuaternion(quaternion, error, lineNumber, "'b " + boneName + "'"))
+            if (!CheckUnitQuaternion(quaternion, error, lineNumber, "'b " + jointName + "'"))
             {
                 return false;
             }
-            const std::size_t index = static_cast<std::size_t>(*bone);
+            const std::size_t index = static_cast<std::size_t>(*joint);
             if (frame->pose.validRotations.test(index))
             {
-                return Fail(error, lineNumber, "bone '" + boneName + "' appears twice in a frame");
+                return Fail(error, lineNumber, "joint '" + jointName + "' appears twice in a frame");
             }
             frame->pose.localRotations[index] = pxr::GfQuatf(
                 quaternion[0], pxr::GfVec3f(quaternion[1], quaternion[2], quaternion[3]));
@@ -384,7 +384,7 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
                 // The extraction failed on something that is not end of line,
                 // so the trailing text is not a confidence at all.
                 return Fail(error, lineNumber,
-                            "'b " + boneName +
+                            "'b " + jointName +
                                 "' takes a w x y z rotation and an optional "
                                 "confidence in [0, 1]");
             }
@@ -392,7 +392,7 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
             {
                 frame->confidence[index] = 1.0f;
             }
-            if (!FullyConsumed(stream, error, lineNumber, "the 'b " + boneName + "' confidence"))
+            if (!FullyConsumed(stream, error, lineNumber, "the 'b " + jointName + "' confidence"))
             {
                 return false;
             }
@@ -506,17 +506,17 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
 
         if (keyword == "e")
         {
-            if (formatVersion < CaptureTraceExpressionsVersion)
+            if (formatVersion < CaptureTraceChannelsVersion)
             {
                 return Fail(error, lineNumber,
-                            "'e' expression weights need format version " +
-                                std::to_string(CaptureTraceExpressionsVersion) +
+                            "'e' channel values need format version " +
+                                std::to_string(CaptureTraceChannelsVersion) +
                                 "; this trace declares " + std::to_string(formatVersion));
             }
             std::string name;
             if (!(stream >> name))
             {
-                return Fail(error, lineNumber, "'e' needs an expression name and a weight");
+                return Fail(error, lineNumber, "'e' needs a channel name and a value");
             }
             float weight = 0.0f;
             if (!ReadFloats(stream, &weight, 1))
@@ -532,10 +532,10 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
             // with it here -- and it is the same defect a repeated `b` is: two
             // values for one channel in one frame, with no rule saying which
             // wins.
-            if (!frame->pose.expressions.Set(name, weight))
+            if (!frame->pose.channels.Set(name, weight))
             {
                 return Fail(error, lineNumber,
-                            "expression '" + name + "' appears twice in a frame");
+                            "channel '" + name + "' appears twice in a frame");
             }
             continue;
         }
@@ -572,7 +572,7 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
         result.nominalFrameRate =
             (span > 0.0 && intervals > 0) ? static_cast<double>(intervals) / span : 30.0;
     }
-    for (HumanoidPose& sample : result.samples)
+    for (MotionPose& sample : result.samples)
     {
         sample.source = result.source;
     }
@@ -582,7 +582,7 @@ ReadCaptureTrace(std::istream& input, HumanoidAnimation* animation, CaptureTrace
 }
 
 bool
-ReadCaptureTraceFile(const std::string& path, HumanoidAnimation* animation,
+ReadCaptureTraceFile(const std::string& path, MotionClip* animation,
                      CaptureTraceError* error)
 {
     std::ifstream input(path, std::ios::binary);
@@ -594,13 +594,13 @@ ReadCaptureTraceFile(const std::string& path, HumanoidAnimation* animation,
 }
 
 bool
-WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
+WriteCaptureTrace(std::ostream& output, const MotionClip& animation)
 {
     // Checked before a byte is emitted rather than as each frame is reached: a
     // caller that gets `false` back has an untouched stream, instead of a file
     // that is a valid trace of the frames that happened to come first.
     //
-    // The provenance strings are checked for the same reason the expression
+    // The provenance strings are checked for the same reason the channel
     // names are, and they were not until a real producer supplied one this
     // format could not spell. They are the only fields here whose content
     // arrives from outside this repository -- a sender's model title is
@@ -612,11 +612,11 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
     {
         return false;
     }
-    for (const HumanoidPose& pose : animation.samples)
+    for (const MotionPose& pose : animation.samples)
     {
-        for (const ExpressionWeight& entry : pose.expressions.entries)
+        for (const MotionChannel& entry : pose.channels.entries)
         {
-            if (!IsWritableExpressionName(entry.name))
+            if (!IsWritableChannelName(entry.name))
             {
                 return false;
             }
@@ -641,7 +641,7 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
     }
     output << "frameRate " << animation.nominalFrameRate << '\n';
 
-    for (const HumanoidPose& pose : animation.samples)
+    for (const MotionPose& pose : animation.samples)
     {
         output << '\n' << "t " << pose.timestamp << '\n';
 
@@ -678,7 +678,7 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
             output << "lookat " << g[0] << ' ' << g[1] << ' ' << g[2] << '\n';
         }
 
-        for (std::size_t index = 0; index < HumanBoneCount; ++index)
+        for (std::size_t index = 0; index < HumanJointCount; ++index)
         {
             if (!pose.validRotations.test(index))
             {
@@ -686,7 +686,7 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
             }
             const pxr::GfQuatf& q = pose.localRotations[index];
             const pxr::GfVec3f& i = q.GetImaginary();
-            output << "b " << HumanBoneName(static_cast<HumanBone>(index)) << ' ' << q.GetReal()
+            output << "b " << HumanJointName(static_cast<HumanJoint>(index)) << ' ' << q.GetReal()
                    << ' ' << i[0] << ' ' << i[1] << ' ' << i[2];
             if (pose.confidence)
             {
@@ -695,12 +695,12 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
             output << '\n';
         }
 
-        // Already in name order: that is the order `ExpressionWeights` keeps,
+        // Already in name order: that is the order `MotionChannelSet` keeps,
         // and sorting here instead would let a set that lost the invariant
         // still write a well-formed file.
-        for (const ExpressionWeight& entry : pose.expressions.entries)
+        for (const MotionChannel& entry : pose.channels.entries)
         {
-            output << "e " << entry.name << ' ' << entry.weight << '\n';
+            output << "e " << entry.name << ' ' << entry.value << '\n';
         }
     }
 
@@ -708,7 +708,7 @@ WriteCaptureTrace(std::ostream& output, const HumanoidAnimation& animation)
 }
 
 bool
-WriteCaptureTraceFile(const std::string& path, const HumanoidAnimation& animation)
+WriteCaptureTraceFile(const std::string& path, const MotionClip& animation)
 {
     // Binary mode with explicit '\n': a trace written on Windows must be byte
     // identical to one written on Linux, or a golden fixture cannot be shared
@@ -721,4 +721,4 @@ WriteCaptureTraceFile(const std::string& path, const HumanoidAnimation& animatio
     return WriteCaptureTrace(output, animation) && output.flush().good();
 }
 
-} // namespace motion
+} // namespace openstrata::motion

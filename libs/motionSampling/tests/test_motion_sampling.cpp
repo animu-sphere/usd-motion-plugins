@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Blend.h"
-#include "motionRuntime/Filter.h"
-#include "motionRuntime/Interpolation.h"
-#include "motionRuntime/PoseBuffer.h"
-#include "motionRuntime/Resample.h"
+#include "motionSampling/Blend.h"
+#include "motionSampling/Filter.h"
+#include "motionSampling/Interpolation.h"
+#include "motionSampling/PoseBuffer.h"
+#include "motionSampling/Resample.h"
 
 #include <cassert>
 #include <cmath>
@@ -48,13 +48,13 @@ RotationX(float degrees)
                         pxr::GfVec3f(std::sin(radians * 0.5f), 0.0f, 0.0f));
 }
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 MakePose(double timestamp, float hipsDegrees, const pxr::GfVec3f& rootPosition)
 {
-    motion::HumanoidPose pose;
+    openstrata::motion::MotionPose pose;
     pose.timestamp = timestamp;
-    pose.localRotations[static_cast<std::size_t>(motion::HumanBone::Hips)] = RotationX(hipsDegrees);
-    pose.validRotations.set(static_cast<std::size_t>(motion::HumanBone::Hips));
+    pose.localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips)] = RotationX(hipsDegrees);
+    pose.validRotations.set(static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips));
     pose.root.worldPosition = rootPosition;
     pose.root.hasPosition = true;
     return pose;
@@ -67,90 +67,90 @@ TestSlerpTakesTheShortArc()
     const pxr::GfQuatf ninety = RotationX(90.0f);
     const pxr::GfQuatf ninetyFlipped(-ninety.GetReal(), -ninety.GetImaginary());
 
-    const pxr::GfQuatf direct = motion::SlerpShortest(identity, ninety, 0.5f);
-    const pxr::GfQuatf viaFlipped = motion::SlerpShortest(identity, ninetyFlipped, 0.5f);
+    const pxr::GfQuatf direct = openstrata::motion::SlerpShortest(identity, ninety, 0.5f);
+    const pxr::GfQuatf viaFlipped = openstrata::motion::SlerpShortest(identity, ninetyFlipped, 0.5f);
 
     assert(SameOrientation(direct, RotationX(45.0f)));
     // The sign-flipped representative must not spin the long way round.
     assert(SameOrientation(direct, viaFlipped));
 
-    assert(SameOrientation(motion::SlerpShortest(identity, ninety, -1.0f), identity));
-    assert(SameOrientation(motion::SlerpShortest(identity, ninety, 2.0f), ninety));
+    assert(SameOrientation(openstrata::motion::SlerpShortest(identity, ninety, -1.0f), identity));
+    assert(SameOrientation(openstrata::motion::SlerpShortest(identity, ninety, 2.0f), ninety));
 }
 
 void
-TestMissingBonesAreHeldNotFaded()
+TestMissingJointsAreHeldNotFaded()
 {
-    motion::HumanoidPose a;
+    openstrata::motion::MotionPose a;
     a.timestamp = 0.0;
-    const auto head = static_cast<std::size_t>(motion::HumanBone::Head);
+    const auto head = static_cast<std::size_t>(openstrata::motion::HumanJoint::Head);
     a.localRotations[head] = RotationX(40.0f);
     a.validRotations.set(head);
 
-    motion::HumanoidPose b;
+    openstrata::motion::MotionPose b;
     b.timestamp = 1.0;
 
-    const motion::HumanoidPose mid = motion::LerpPose(a, b, 0.5f);
+    const openstrata::motion::MotionPose mid = openstrata::motion::LerpPose(a, b, 0.5f);
     assert(mid.validRotations.test(head));
     // Held at its only observed value rather than dragged toward identity.
     assert(SameOrientation(mid.localRotations[head], RotationX(40.0f)));
     assert(NearlyEqual(static_cast<float>(mid.timestamp), 0.5f));
 
-    // A bone present in neither endpoint stays absent.
-    const auto jaw = static_cast<std::size_t>(motion::HumanBone::Jaw);
+    // A joint present in neither endpoint stays absent.
+    const auto jaw = static_cast<std::size_t>(openstrata::motion::HumanJoint::Jaw);
     assert(!mid.validRotations.test(jaw));
 }
 
 void
-TestExpressionsAreHeldNotFaded()
+TestChannelsAreHeldNotFaded()
 {
-    motion::HumanoidPose a;
+    openstrata::motion::MotionPose a;
     a.timestamp = 0.0;
-    a.expressions.Set("happy", 0.2f);
-    a.expressions.Set("blink", 1.0f);
+    a.channels.Set("happy", 0.2f);
+    a.channels.Set("blink", 1.0f);
 
-    motion::HumanoidPose b;
+    openstrata::motion::MotionPose b;
     b.timestamp = 1.0;
-    b.expressions.Set("happy", 0.6f);
-    b.expressions.Set("aa", 0.5f);
+    b.channels.Set("happy", 0.6f);
+    b.channels.Set("aa", 0.5f);
 
-    const motion::HumanoidPose mid = motion::LerpPose(a, b, 0.5f);
+    const openstrata::motion::MotionPose mid = openstrata::motion::LerpPose(a, b, 0.5f);
 
     // Reported by both: interpolated.
-    const float* happy = mid.expressions.Find("happy");
+    const float* happy = mid.channels.Find("happy");
     assert(happy != nullptr && NearlyEqual(*happy, 0.4f));
 
     // Reported by one endpoint only: held at that weight. Fading it toward zero
     // would invent a blink closing that neither pose described -- the same rule
-    // a missing bone follows, for the same reason.
-    const float* blink = mid.expressions.Find("blink");
+    // a missing joint follows, for the same reason.
+    const float* blink = mid.channels.Find("blink");
     assert(blink != nullptr && NearlyEqual(*blink, 1.0f));
-    const float* aa = mid.expressions.Find("aa");
+    const float* aa = mid.channels.Find("aa");
     assert(aa != nullptr && NearlyEqual(*aa, 0.5f));
 
     // A name neither endpoint reported stays unreported rather than becoming 0.
-    assert(mid.expressions.Find("sad") == nullptr);
+    assert(mid.channels.Find("sad") == nullptr);
     // The union arrives sorted, whichever endpoint each name came from.
-    assert(mid.expressions.entries.size() == 3);
-    assert(mid.expressions.entries[0].name == "aa");
-    assert(mid.expressions.entries[1].name == "blink");
-    assert(mid.expressions.entries[2].name == "happy");
+    assert(mid.channels.entries.size() == 3);
+    assert(mid.channels.entries[0].name == "aa");
+    assert(mid.channels.entries[1].name == "blink");
+    assert(mid.channels.entries[2].name == "happy");
 }
 
 void
 TestLookAtTargetIsHeldNotFaded()
 {
-    motion::HumanoidPose a;
+    openstrata::motion::MotionPose a;
     a.timestamp = 0.0;
     a.lookAtTarget = pxr::GfVec3f(0.0f, 1.5f, -2.0f);
 
-    motion::HumanoidPose b;
+    openstrata::motion::MotionPose b;
     b.timestamp = 1.0;
     b.lookAtTarget = pxr::GfVec3f(1.0f, 1.5f, -2.0f);
 
     // Reported by both: the target moves between them, which is the motion of
     // the thing being watched.
-    const motion::HumanoidPose mid = motion::LerpPose(a, b, 0.5f);
+    const openstrata::motion::MotionPose mid = openstrata::motion::LerpPose(a, b, 0.5f);
     assert(mid.lookAtTarget);
     assert(NearlyEqual((*mid.lookAtTarget)[0], 0.5f));
     assert(NearlyEqual((*mid.lookAtTarget)[1], 1.5f));
@@ -158,33 +158,33 @@ TestLookAtTargetIsHeldNotFaded()
     // Reported by one endpoint only: held. Easing it toward the origin would
     // aim the gaze at a place no producer named -- and the origin is a place,
     // which is exactly why it cannot double as "no target".
-    motion::HumanoidPose silent;
+    openstrata::motion::MotionPose silent;
     silent.timestamp = 1.0;
-    const motion::HumanoidPose held = motion::LerpPose(a, silent, 0.5f);
+    const openstrata::motion::MotionPose held = openstrata::motion::LerpPose(a, silent, 0.5f);
     assert(held.lookAtTarget && *held.lookAtTarget == *a.lookAtTarget);
-    const motion::HumanoidPose heldFromB = motion::LerpPose(silent, a, 0.5f);
+    const openstrata::motion::MotionPose heldFromB = openstrata::motion::LerpPose(silent, a, 0.5f);
     assert(heldFromB.lookAtTarget && *heldFromB.lookAtTarget == *a.lookAtTarget);
 
     // Neither endpoint reported one: still none, rather than the origin.
-    motion::HumanoidPose alsoSilent;
+    openstrata::motion::MotionPose alsoSilent;
     alsoSilent.timestamp = 1.0;
-    assert(!motion::LerpPose(silent, alsoSilent, 0.5f).lookAtTarget);
+    assert(!openstrata::motion::LerpPose(silent, alsoSilent, 0.5f).lookAtTarget);
 }
 
 void
 TestRootMotionFlagsSurviveInterpolation()
 {
-    motion::RootMotion a;
+    openstrata::motion::RootMotion a;
     a.worldPosition = pxr::GfVec3f(0.0f, 1.0f, 0.0f);
     a.hasPosition = true;
 
-    motion::RootMotion b;
+    openstrata::motion::RootMotion b;
     b.worldPosition = pxr::GfVec3f(0.0f, 1.0f, 2.0f);
     b.hasPosition = true;
     b.worldOrientation = RotationX(90.0f);
     b.hasOrientation = true;
 
-    const motion::RootMotion mid = motion::LerpRootMotion(a, b, 0.5f);
+    const openstrata::motion::RootMotion mid = openstrata::motion::LerpRootMotion(a, b, 0.5f);
     assert(mid.hasPosition);
     assert(NearlyEqual(mid.worldPosition, pxr::GfVec3f(0.0f, 1.0f, 1.0f)));
     // Orientation is carried from the only endpoint that reported one.
@@ -196,7 +196,7 @@ TestRootMotionFlagsSurviveInterpolation()
 void
 TestPoseBufferOrderingAndSampling()
 {
-    motion::PoseBuffer buffer(3);
+    openstrata::motion::PoseBuffer buffer(3);
     assert(buffer.IsEmpty());
     assert(!buffer.Sample(0.0).has_value());
 
@@ -215,7 +215,7 @@ TestPoseBufferOrderingAndSampling()
 
     const auto mid = buffer.Sample(0.5);
     assert(mid.has_value());
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
     assert(SameOrientation(mid->localRotations[hips], RotationX(45.0f)));
     assert(NearlyEqual(mid->root.worldPosition, pxr::GfVec3f(0.0f, 0.0f, 0.5f)));
 
@@ -234,7 +234,7 @@ TestPoseBufferOrderingAndSampling()
 void
 TestPoseBufferExtrapolatesPositionOnly()
 {
-    motion::PoseBuffer buffer;
+    openstrata::motion::PoseBuffer buffer;
     buffer.Push(MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f)));
     buffer.Push(MakePose(1.0, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f)));
 
@@ -243,7 +243,7 @@ TestPoseBufferExtrapolatesPositionOnly()
     // 1 m/s derived from the last two samples, advanced by 0.1 s.
     assert(NearlyEqual(lead->root.worldPosition, pxr::GfVec3f(0.0f, 0.0f, 1.1f)));
     // Rotation is held, never extrapolated.
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
     assert(SameOrientation(lead->localRotations[hips], RotationX(90.0f)));
 
     // The lead is capped.
@@ -258,56 +258,56 @@ TestPoseBufferExtrapolatesPositionOnly()
 void
 TestResampleCoversTheWholeInterval()
 {
-    motion::HumanoidAnimation animation;
+    openstrata::motion::MotionClip animation;
     animation.startTime = 0.0;
     animation.endTime = 1.0;
     animation.nominalFrameRate = 30.0;
     animation.samples.push_back(MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f)));
     animation.samples.push_back(MakePose(1.0, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f)));
 
-    const motion::HumanoidAnimation uniform = motion::Resample(animation, 4.0);
+    const openstrata::motion::MotionClip uniform = openstrata::motion::Resample(animation, 4.0);
     assert(uniform.samples.size() == 5);
     assert(NearlyEqual(static_cast<float>(uniform.nominalFrameRate), 4.0f));
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
     assert(SameOrientation(uniform.samples[1].localRotations[hips], RotationX(22.5f)));
     assert(NearlyEqual(static_cast<float>(uniform.samples.back().timestamp), 1.0f));
 
     // A duration that is not a multiple of the step still ends on endTime.
     animation.endTime = 0.7;
-    const motion::HumanoidAnimation ragged = motion::Resample(animation, 4.0);
+    const openstrata::motion::MotionClip ragged = openstrata::motion::Resample(animation, 4.0);
     assert(NearlyEqual(static_cast<float>(ragged.samples.back().timestamp), 0.7f));
 
     // A clip that carries samples but never declared its interval falls back to
     // the sample timestamps instead of collapsing to a single pose.
-    motion::HumanoidAnimation undeclared;
+    openstrata::motion::MotionClip undeclared;
     undeclared.samples = animation.samples;
-    const motion::HumanoidAnimation recovered = motion::Resample(undeclared, 4.0);
+    const openstrata::motion::MotionClip recovered = openstrata::motion::Resample(undeclared, 4.0);
     assert(recovered.samples.size() == 5);
     assert(NearlyEqual(static_cast<float>(recovered.endTime), 1.0f));
 
     // Degenerate inputs yield no samples rather than a fabricated timeline.
-    assert(motion::Resample(animation, 0.0).samples.empty());
-    assert(motion::Resample(motion::HumanoidAnimation(), 30.0).samples.empty());
+    assert(openstrata::motion::Resample(animation, 0.0).samples.empty());
+    assert(openstrata::motion::Resample(openstrata::motion::MotionClip(), 30.0).samples.empty());
 }
 
 void
 TestFilterIsFrameRateIndependentAndTolerantOfDropouts()
 {
-    motion::PoseFilter::Options options;
+    openstrata::motion::PoseFilter::Options options;
     options.cutoffHz = 0.0f;
-    motion::PoseFilter passthrough(options);
-    const motion::HumanoidPose raw = MakePose(0.0, 90.0f, pxr::GfVec3f(0.0f));
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    openstrata::motion::PoseFilter passthrough(options);
+    const openstrata::motion::MotionPose raw = MakePose(0.0, 90.0f, pxr::GfVec3f(0.0f));
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
     assert(SameOrientation(passthrough.Apply(raw).localRotations[hips], RotationX(90.0f)));
 
     options.cutoffHz = 1.0f;
-    motion::PoseFilter filter(options);
+    openstrata::motion::PoseFilter filter(options);
     // The first pose seeds the state and passes through untouched.
     assert(
         SameOrientation(filter.Apply(MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f))).localRotations[hips],
                         RotationX(0.0f)));
 
-    const motion::HumanoidPose smoothed =
+    const openstrata::motion::MotionPose smoothed =
         filter.Apply(MakePose(0.1, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f)));
     // Moves toward the new sample without reaching it.
     const float real = smoothed.localRotations[hips].GetNormalized().GetReal();
@@ -316,10 +316,10 @@ TestFilterIsFrameRateIndependentAndTolerantOfDropouts()
     assert(smoothed.root.worldPosition[2] > 0.0f);
     assert(smoothed.root.worldPosition[2] < 1.0f);
 
-    // A bone that drops out is not invented, and its history is retained.
-    motion::HumanoidPose withoutHips;
+    // A joint that drops out is not invented, and its history is retained.
+    openstrata::motion::MotionPose withoutHips;
     withoutHips.timestamp = 0.2;
-    const motion::HumanoidPose dropout = filter.Apply(withoutHips);
+    const openstrata::motion::MotionPose dropout = filter.Apply(withoutHips);
     assert(!dropout.validRotations.test(hips));
     assert(filter.HasState());
 
@@ -330,22 +330,22 @@ TestFilterIsFrameRateIndependentAndTolerantOfDropouts()
 void
 TestBlendWeightsAndUnitLength()
 {
-    const motion::HumanoidPose a = MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose b = MakePose(0.0, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f));
-    const auto hips = static_cast<std::size_t>(motion::HumanBone::Hips);
+    const openstrata::motion::MotionPose a = MakePose(0.0, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose b = MakePose(0.0, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f));
+    const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
 
-    assert(SameOrientation(motion::BlendPoses(a, b, 0.0f).localRotations[hips], RotationX(0.0f)));
-    assert(SameOrientation(motion::BlendPoses(a, b, 1.0f).localRotations[hips], RotationX(90.0f)));
+    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 0.0f).localRotations[hips], RotationX(0.0f)));
+    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 1.0f).localRotations[hips], RotationX(90.0f)));
 
-    const motion::HumanoidPose even = motion::BlendPoses({{a, 1.0f}, {b, 1.0f}});
+    const openstrata::motion::MotionPose even = openstrata::motion::BlendPoses({{a, 1.0f}, {b, 1.0f}});
     assert(SameOrientation(even.localRotations[hips], RotationX(45.0f)));
     assert(NearlyEqual(even.localRotations[hips].GetLength(), 1.0f));
 
     // Non-positive weights drop out; the surviving pose wins outright.
-    const motion::HumanoidPose skewed = motion::BlendPoses({{a, 0.0f}, {b, 2.0f}, {a, -1.0f}});
+    const openstrata::motion::MotionPose skewed = openstrata::motion::BlendPoses({{a, 0.0f}, {b, 2.0f}, {a, -1.0f}});
     assert(SameOrientation(skewed.localRotations[hips], RotationX(90.0f)));
 
-    assert(!motion::BlendPoses({}).validRotations.any());
+    assert(!openstrata::motion::BlendPoses({}).validRotations.any());
 }
 
 } // namespace
@@ -354,8 +354,8 @@ int
 main()
 {
     TestSlerpTakesTheShortArc();
-    TestMissingBonesAreHeldNotFaded();
-    TestExpressionsAreHeldNotFaded();
+    TestMissingJointsAreHeldNotFaded();
+    TestChannelsAreHeldNotFaded();
     TestLookAtTargetIsHeldNotFaded();
     TestRootMotionFlagsSurviveInterpolation();
     TestPoseBufferOrderingAndSampling();
@@ -363,6 +363,6 @@ main()
     TestResampleCoversTheWholeInterval();
     TestFilterIsFrameRateIndependentAndTolerantOfDropouts();
     TestBlendWeightsAndUnitLength();
-    std::puts("motionRuntime unit tests passed");
+    std::puts("motionSampling unit tests passed");
     return 0;
 }

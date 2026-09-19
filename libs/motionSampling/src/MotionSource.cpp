@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/MotionSource.h"
+#include "motionSampling/MotionSource.h"
 
-#include "motionRuntime/Resample.h"
+#include "motionSampling/Resample.h"
 
-namespace motion
+namespace openstrata::motion
 {
 
 IMotionSource::~IMotionSource() = default;
@@ -37,12 +37,12 @@ operator!=(const PoseSampleResult& a, const PoseSampleResult& b) noexcept
     return !(a == b);
 }
 
-ClipSource::ClipSource(HumanoidAnimation animation) : _animation(std::move(animation))
+ClipSource::ClipSource(MotionClip animation) : _animation(std::move(animation))
 {
 }
 
 void
-ClipSource::SetAnimation(HumanoidAnimation animation)
+ClipSource::SetAnimation(MotionClip animation)
 {
     _animation = std::move(animation);
 }
@@ -73,7 +73,7 @@ ClipSource::Sample(double evaluationTime)
     return result;
 }
 
-MotionSourceMetadata
+SourceMetadata
 ClipSource::GetSourceMetadata() const
 {
     return _animation.source;
@@ -97,4 +97,4 @@ ClipSource::GetTimeRange(double* startTime, double* endTime) const
     return true;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

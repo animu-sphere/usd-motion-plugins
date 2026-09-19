@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "description": "Machine-readable provenance for the Motion Phase D capture corpus. Every trace is synthesised by libs/motionRuntime/tools/generate_traces.py from closed-form maths - there is no third-party capture data here and therefore no redistribution gate. Field values are measured from the committed files, never guessed.",
+  "description": "Machine-readable provenance for the motionRecording capture corpus. Every trace is synthesised by libs/motionRecording/tools/generate_traces.py from closed-form maths - there is no third-party capture data here and therefore no redistribution gate. Field values are measured from the committed files, never guessed.",
   "format": {
     "name": "motion-capture-trace",
     "version": 3,
-    "spec": "libs/motionRuntime/include/motionRuntime/CaptureTrace.h"
+    "spec": "libs/motionRecording/include/motionRecording/CaptureTrace.h"
   },
   "provenance": {
     "origin": "synthetic",
-    "generator": "libs/motionRuntime/tools/generate_traces.py",
+    "generator": "libs/motionRecording/tools/generate_traces.py",
     "license": "Apache-2.0",
     "redistributionAllowed": true,
     "capturedFromRealDevice": false,

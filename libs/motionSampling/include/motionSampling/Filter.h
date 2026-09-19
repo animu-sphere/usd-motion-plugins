@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "motionRuntime/api.h"
+#include "motionSampling/api.h"
 
-#include "motionCore/Humanoid.h"
+#include "motionCore/MotionPose.h"
 
 #include <optional>
 
-namespace motion
+namespace openstrata::motion
 {
 
 // Frame-rate independent exponential smoothing.
@@ -15,7 +15,7 @@ namespace motion
 // The cutoff is expressed in hertz rather than as a blend weight so the same
 // options behave identically on a 30 Hz clip and a 90 Hz live source: the
 // per-step weight is derived from the actual elapsed time between poses.
-class MOTIONRUNTIME_API PoseFilter
+class MOTIONSAMPLING_API PoseFilter
 {
   public:
     struct Options
@@ -57,17 +57,17 @@ class MOTIONRUNTIME_API PoseFilter
     }
 
     // Smooths `pose` against the accumulated state and returns the result. A
-    // bone absent from `pose` is not invented from history: it stays absent,
+    // joint absent from `pose` is not invented from history: it stays absent,
     // and its stored state is left untouched so a brief dropout does not
-    // restart the filter for that bone.
+    // restart the filter for that joint.
     //
     // A non-increasing timestamp yields no smoothing step (the pose is
     // returned unchanged and reseeds the state).
-    HumanoidPose Apply(const HumanoidPose& pose);
+    MotionPose Apply(const MotionPose& pose);
 
   private:
     Options _options;
-    std::optional<HumanoidPose> _state;
+    std::optional<MotionPose> _state;
 };
 
-} // namespace motion
+} // namespace openstrata::motion

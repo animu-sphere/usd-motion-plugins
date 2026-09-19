@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Blend.h"
+#include "motionSampling/Blend.h"
 
-#include "motionRuntime/Interpolation.h"
+#include "motionSampling/Interpolation.h"
 
 #include <algorithm>
 
-namespace motion
+namespace openstrata::motion
 {
 
-HumanoidPose
-BlendPoses(const HumanoidPose& a, const HumanoidPose& b, float weight)
+MotionPose
+BlendPoses(const MotionPose& a, const MotionPose& b, float weight)
 {
     return LerpPose(a, b, weight);
 }
 
-HumanoidPose
+MotionPose
 BlendPoses(const std::vector<WeightedPose>& poses)
 {
-    HumanoidPose result;
+    MotionPose result;
     double accumulated = 0.0;
     bool seeded = false;
 
@@ -45,4 +45,4 @@ BlendPoses(const std::vector<WeightedPose>& poses)
     return result;
 }
 
-} // namespace motion
+} // namespace openstrata::motion

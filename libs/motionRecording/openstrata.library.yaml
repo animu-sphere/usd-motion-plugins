@@ -1,0 +1,17 @@
+# OpenStrata plain-library descriptor. motionRecording is stream intake, the
+# recorder, the motion-capture-trace format and replay
+# (docs/design/MOTION_CONTRACT.md §9-§10).
+schema: openstrata.library/v1alpha1
+library:
+  id: motionRecording
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+requires:
+  libraries:
+    - id: motionCore
+      version: ">=0.1,<0.2"
+    - id: motionSampling
+      version: ">=0.1,<0.2"
+cmake:
+  package: motionRecording
+  target: motionRecording::motionRecording

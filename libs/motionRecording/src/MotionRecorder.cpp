@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Recorder.h"
+#include "motionRecording/MotionRecorder.h"
 
 #include <algorithm>
 #include <utility>
 
-namespace motion
+namespace openstrata::motion
 {
 
-CaptureRecorder::CaptureRecorder(double frameRate) : _frameRate(frameRate > 0.0 ? frameRate : 30.0)
+MotionRecorder::MotionRecorder(double frameRate) : _frameRate(frameRate > 0.0 ? frameRate : 30.0)
 {
 }
 
 bool
-CaptureRecorder::Record(const PoseSampleResult& result)
+MotionRecorder::Record(const PoseSampleResult& result)
 {
     ++_report.ticks;
     _report.peakLagSeconds = std::max(_report.peakLagSeconds, result.lag);
@@ -48,11 +48,11 @@ CaptureRecorder::Record(const PoseSampleResult& result)
     return true;
 }
 
-HumanoidAnimation
-CaptureRecorder::Take()
+MotionClip
+MotionRecorder::Take()
 {
-    HumanoidAnimation clip = std::move(_animation);
-    _animation = HumanoidAnimation();
+    MotionClip clip = std::move(_animation);
+    _animation = MotionClip();
 
     clip.nominalFrameRate = _frameRate;
     if (!clip.samples.empty())
@@ -68,10 +68,10 @@ CaptureRecorder::Take()
 }
 
 void
-CaptureRecorder::Clear()
+MotionRecorder::Clear()
 {
-    _animation = HumanoidAnimation();
+    _animation = MotionClip();
     _report = RecordReport();
 }
 
-} // namespace motion
+} // namespace openstrata::motion

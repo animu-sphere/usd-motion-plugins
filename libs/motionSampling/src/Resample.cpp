@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "motionRuntime/Resample.h"
+#include "motionSampling/Resample.h"
 
-#include "motionRuntime/Interpolation.h"
+#include "motionSampling/Interpolation.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace motion
+namespace openstrata::motion
 {
 
-HumanoidPose
-SampleAnimation(const HumanoidAnimation& animation, double timestamp)
+MotionPose
+SampleAnimation(const MotionClip& animation, double timestamp)
 {
-    const std::vector<HumanoidPose>& samples = animation.samples;
+    const std::vector<MotionPose>& samples = animation.samples;
     if (samples.empty())
     {
-        return HumanoidPose();
+        return MotionPose();
     }
     if (timestamp <= samples.front().timestamp)
     {
@@ -27,7 +27,7 @@ SampleAnimation(const HumanoidAnimation& animation, double timestamp)
     }
 
     const auto upper = std::lower_bound(samples.begin(), samples.end(), timestamp,
-                                        [](const HumanoidPose& sample, double time)
+                                        [](const MotionPose& sample, double time)
                                         { return sample.timestamp < time; });
     if (upper == samples.begin() || upper == samples.end())
     {
@@ -44,10 +44,10 @@ SampleAnimation(const HumanoidAnimation& animation, double timestamp)
     return LerpPose(*lower, *upper, alpha);
 }
 
-HumanoidAnimation
-Resample(const HumanoidAnimation& animation, double frameRate)
+MotionClip
+Resample(const MotionClip& animation, double frameRate)
 {
-    HumanoidAnimation result;
+    MotionClip result;
     result.startTime = animation.startTime;
     result.endTime = animation.endTime;
     result.nominalFrameRate = animation.nominalFrameRate;
@@ -84,7 +84,7 @@ Resample(const HumanoidAnimation& animation, double frameRate)
     for (std::size_t i = 0; i <= steps; ++i)
     {
         const double time = start + static_cast<double>(i) * step;
-        HumanoidPose pose = SampleAnimation(animation, time);
+        MotionPose pose = SampleAnimation(animation, time);
         pose.timestamp = time;
         result.samples.push_back(std::move(pose));
     }
@@ -93,11 +93,11 @@ Resample(const HumanoidAnimation& animation, double frameRate)
     // covers the same interval as its source.
     if (result.samples.back().timestamp < end)
     {
-        HumanoidPose pose = SampleAnimation(animation, end);
+        MotionPose pose = SampleAnimation(animation, end);
         pose.timestamp = end;
         result.samples.push_back(std::move(pose));
     }
     return result;
 }
 
-} // namespace motion
+} // namespace openstrata::motion
