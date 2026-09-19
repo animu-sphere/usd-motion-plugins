@@ -83,14 +83,16 @@ struct MotionStageReport
 //   whole frame when within 1e-6 of it, so a clip taken at a divisor of 30 Hz
 //   lands on whole frames rather than on `62.00000000000001`.
 //
-// Refused, with nothing authored, when the clip has no sample, observes no
-// joint and no root, or has a timestamp that is not finite or does not
-// increase. `report` may be null.
+// Refused, with nothing authored, when the stage already holds `/Animation`,
+// the clip has no sample, observes no joint and no root, or has a timestamp
+// that is not finite or does not increase. `report` may be null.
 MOTIONUSD_API bool AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
                                      const MotionStageOptions& options,
                                      MotionStageReport* report, std::string* error);
 
-// `AuthorMotionStage` into the layer at `path`, created or cleared, then saved.
+// `AuthorMotionStage` into the layer at `path`, which it creates or replaces,
+// then saves. A refused clip leaves `path` as it was: no file is created and
+// an existing one is not touched.
 MOTIONUSD_API bool WriteMotionStage(const std::string& path, const MotionClip& clip,
                                     const MotionStageOptions& options,
                                     MotionStageReport* report, std::string* error);

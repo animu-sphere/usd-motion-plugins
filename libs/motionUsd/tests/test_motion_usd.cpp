@@ -330,6 +330,36 @@ TestRefusalsAuthorNothing()
     assert(refuses(collapsed));
 
     assert(!openstrata::motion::AuthorMotionStage(nullptr, MakeClip(), {}, nullptr, &error));
+
+    // A stage that already holds a motion stage is not written over in place:
+    // what the new clip did not overwrite would survive into it.
+    const pxr::UsdStageRefPtr filled = pxr::UsdStage::CreateInMemory();
+    assert(openstrata::motion::AuthorMotionStage(filled, MakeClip(), {}, nullptr, &error));
+    assert(!openstrata::motion::AuthorMotionStage(filled, MakeClip(), {}, nullptr, &error));
+}
+
+// A refused write leaves the path as it was: no file where there was none, and
+// an existing file untouched.
+void
+TestARefusedWriteTouchesNothing()
+{
+    std::string error;
+    const std::string absent = TempPath("motionUsd_refused_absent.usda");
+    std::filesystem::remove(absent);
+    assert(!openstrata::motion::WriteMotionStage(absent, MotionClip(), {}, nullptr, &error));
+    assert(!std::filesystem::exists(absent));
+
+    const std::string existing = TempPath("motionUsd_refused_existing.usda");
+    assert(openstrata::motion::WriteMotionStage(existing, MakeClip(), {}, nullptr, &error));
+    const pxr::SdfLayerRefPtr held = pxr::SdfLayer::FindOrOpen(existing);
+    assert(held);
+    const auto size = std::filesystem::file_size(existing);
+    MotionClip backwards = MakeClip();
+    std::swap(backwards.samples[0], backwards.samples[2]);
+    assert(!openstrata::motion::WriteMotionStage(existing, backwards, {}, nullptr, &error));
+    assert(std::filesystem::file_size(existing) == size);
+    // Nor emptied in memory for the caller still holding the layer.
+    assert(held->GetPrimAtPath(pxr::SdfPath("/Animation/Body")));
 }
 
 // Re-running a conversion over its previous output replaces it.
@@ -362,6 +392,7 @@ main()
     TestAbsenceIsAuthoredAsAbsence();
     TestUnauthoredValuesAreReported();
     TestRefusalsAuthorNothing();
+    TestARefusedWriteTouchesNothing();
     TestRewritingReplacesThePreviousStage();
     std::puts("motionUsd tests passed");
     return 0;

@@ -8,8 +8,8 @@ plugin (USD_MAPPING.md §1). Four checks: no plugin registration, file format,
 imaging or OpenExec API in the sources; no include from a repository library
 outside its declared edges, and no transport; a link line and a binary that
 import no OpenUSD plugin, imaging or OpenExec library; and no product, device
-or avatar-format name in the code or its string literals. Comments may cite where a rule came from, so they are stripped before
-scanning.
+or avatar-format name in the code or its string literals. Comments may cite
+where a rule came from, so they are stripped before scanning.
 """
 
 from __future__ import annotations
@@ -148,19 +148,34 @@ def main() -> int:
                     errors.append(f"{path}:{number}: product name '{match.group(0)}' "
                                   f"in {LIBRARY}'s code")
 
+    # What the library links: every target_link_libraries call, and the list
+    # the OpenUSD targets are linked from. Read as names, so a word elsewhere in
+    # the file (`execute_process`, a comment) is not a link.
     cmake = re.sub(r"#[^\n]*", "",
                    (source / "CMakeLists.txt").read_text(encoding="utf-8"))
-    if re.search(r"\b(?:plug|hd\w*|usdImaging\w*|exec\w*)\b", cmake):
-        errors.append(f"{LIBRARY} CMake must link only its declared libraries and "
-                      "OpenUSD's usd, sdf, usdGeom and usdSkel")
+    linked = re.findall(r"target_link_libraries\(([^)]*)\)", cmake)
+    linked += re.findall(r"foreach\(\s*\w+\s+IN\s+ITEMS\s+([^)]*)\)", cmake)
+    names = {name.split("::")[-1] for call in linked for name in call.split()}
+    allowed_pxr = {"usd", "sdf", "usdGeom", "usdSkel"}
+    for name in sorted(names):
+        if name in {"PUBLIC", "PRIVATE", "INTERFACE", LIBRARY, "motionCore"}:
+            continue
+        if name.startswith("${") or name in allowed_pxr:
+            continue
+        errors.append(f"{LIBRARY} links '{name}', which is neither a declared "
+                      "library nor OpenUSD's usd, sdf, usdGeom or usdSkel")
+    if not linked:
+        errors.append(f"{LIBRARY}: no link line found; the link check examined nothing")
 
     try:
         dependencies = _binary_dependencies(library)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         errors.append(f"could not inspect {LIBRARY} dependencies: {exc}")
         dependencies = ""
+    # Not `usd_ms`: a monolithic OpenUSD is one library holding the stage API
+    # this library is allowed, so its name alone says nothing here.
     forbidden_binary = re.compile(
-        r"(?:usd_ms|(?:usd_|lib)(?:usd_)?(?:hd\w*|usdImaging\w*|exec\w*|esf\w*|vdf)[._-])",
+        r"(?:usd_|lib)(?:usd_)?(?:hd\w*|usdImaging\w*|exec\w*|esf\w*|vdf)[._-]",
         re.IGNORECASE)
     if forbidden_binary.search(dependencies):
         errors.append(f"{LIBRARY} binary imports an OpenUSD imaging or OpenExec library")

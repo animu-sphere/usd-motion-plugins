@@ -61,6 +61,14 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
         *error = "the clip has no sample";
         return false;
     }
+    // A stage that already holds a motion stage would keep whatever the new
+    // clip does not overwrite -- a joint's old time samples, a prim this
+    // writer no longer authors -- and read as one clip made of two.
+    if (stage->GetPrimAtPath(pxr::SdfPath("/Animation")))
+    {
+        *error = "the stage already holds /Animation";
+        return false;
+    }
 
     // Every check before any authoring, so a refusal leaves the stage as it was.
     std::vector<double> timeCodes;
@@ -285,15 +293,21 @@ WriteMotionStage(const std::string& path, const MotionClip& clip,
                  const MotionStageOptions& options, MotionStageReport* report,
                  std::string* error)
 {
+    // Authored in memory first, so a refused clip leaves the path as it was:
+    // `SdfLayer::CreateNew` writes an empty file at once, and clearing an
+    // existing layer before the clip is checked would empty it in memory for
+    // anyone else holding it.
+    const pxr::UsdStageRefPtr scratch = pxr::UsdStage::CreateInMemory();
+    if (!AuthorMotionStage(scratch, clip, options, report, error))
+    {
+        return false;
+    }
+
     // Re-running a conversion over a previous output is the normal case, so an
-    // existing layer is cleared instead of failing the way UsdStage::CreateNew
+    // existing layer is replaced instead of failing the way UsdStage::CreateNew
     // would.
     pxr::SdfLayerRefPtr layer = pxr::SdfLayer::FindOrOpen(path);
-    if (layer)
-    {
-        layer->Clear();
-    }
-    else
+    if (!layer)
     {
         layer = pxr::SdfLayer::CreateNew(path);
     }
@@ -302,16 +316,7 @@ WriteMotionStage(const std::string& path, const MotionClip& clip,
         *error = "could not create output layer: " + path;
         return false;
     }
-    const pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(layer);
-    if (!stage)
-    {
-        *error = "could not open output layer as a stage: " + path;
-        return false;
-    }
-    if (!AuthorMotionStage(stage, clip, options, report, error))
-    {
-        return false;
-    }
+    layer->TransferContent(scratch->GetRootLayer());
     if (!layer->Save())
     {
         *error = "could not save output layer: " + path;
