@@ -58,8 +58,9 @@ enum class RetargetDiagnosticCode : std::uint8_t
 {
     // --- raised by this library: where a clip meets a rig --------------------
 
-    // A bone VRM 1.0 requires has no joint on this rig: the map binds none, or
-    // binds an index the rig does not have. Retargeting onto such a rig is
+    // A bone the caller requires (RetargetOptions::requiredBones, and the hips
+    // under RootMotionMode::Hips) has no joint on this rig: the map binds none,
+    // or binds an index the rig does not have. Retargeting onto such a rig is
     // legal and useful, which is why this is a warning; doing it silently is
     // not. Subject: the bone. `hips` names a consequence as well, in its
     // detail, when root motion was asked for.
@@ -139,7 +140,7 @@ struct RetargetDiagnostic
     RetargetDiagnosticSeverity severity = RetargetDiagnosticSeverity::Warning;
     bool recoverable = true;
 
-    // What the code is about, as plain text: a human bone's VRM name, a joint
+    // What the code is about, as plain text: a human bone's vocabulary name, a joint
     // token, a path. Separate from `detail` because it is what two
     // implementations are compared on -- the sentence around it is not.
     std::string subject;

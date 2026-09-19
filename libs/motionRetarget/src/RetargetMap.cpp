@@ -67,30 +67,12 @@ RetargetMap::IsMapped(openstrata::motion::HumanJoint bone) const
     return openstrata::motion::IsValidHumanJoint(bone) && _mapped.test(static_cast<std::size_t>(bone));
 }
 
-const std::vector<openstrata::motion::HumanJoint>&
-RetargetMap::GetRequiredBones()
-{
-    // VRM 1.0's required humanoid bones. Eyes, jaw, toes, shoulders, fingers,
-    // and upperChest are optional and deliberately absent.
-    static const std::vector<openstrata::motion::HumanJoint> required = {
-        openstrata::motion::HumanJoint::Hips,          openstrata::motion::HumanJoint::Spine,
-        openstrata::motion::HumanJoint::Chest,         openstrata::motion::HumanJoint::Neck,
-        openstrata::motion::HumanJoint::Head,          openstrata::motion::HumanJoint::LeftUpperLeg,
-        openstrata::motion::HumanJoint::LeftLowerLeg,  openstrata::motion::HumanJoint::LeftFoot,
-        openstrata::motion::HumanJoint::RightUpperLeg, openstrata::motion::HumanJoint::RightLowerLeg,
-        openstrata::motion::HumanJoint::RightFoot,     openstrata::motion::HumanJoint::LeftUpperArm,
-        openstrata::motion::HumanJoint::LeftLowerArm,  openstrata::motion::HumanJoint::LeftHand,
-        openstrata::motion::HumanJoint::RightUpperArm, openstrata::motion::HumanJoint::RightLowerArm,
-        openstrata::motion::HumanJoint::RightHand,
-    };
-    return required;
-}
-
 std::vector<openstrata::motion::HumanJoint>
-RetargetMap::FindMissingRequiredBones() const
+RetargetMap::FindMissingRequiredBones(
+    const std::vector<openstrata::motion::HumanJoint>& required) const
 {
     std::vector<openstrata::motion::HumanJoint> missing;
-    for (const openstrata::motion::HumanJoint bone : GetRequiredBones())
+    for (const openstrata::motion::HumanJoint bone : required)
     {
         if (!IsMapped(bone))
         {

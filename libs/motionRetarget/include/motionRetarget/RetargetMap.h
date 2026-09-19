@@ -15,13 +15,14 @@
 namespace openstrata::motion
 {
 
-// Which target joint each VRM human bone drives.
+// Which target joint each human bone drives.
 //
-// The source of the mapping is the caller's problem: a `.vrm` avatar carries it
-// as `vrm:humanBones:<bone>` under VrmHumanoidAPI, a hand-written rig supplies
-// it as a side file. Either way motionRetarget receives resolved indices and never
-// guesses from joint names — name heuristics are exactly the kind of silent
-// mis-retarget this contract exists to prevent.
+// The source of the mapping is the caller's problem: a format repository reads
+// its own humanoid binding, a role table names a rig's conventional joints, a
+// hand-written rig supplies a side file. Either way motionRetarget receives
+// resolved indices and never guesses from joint names — name heuristics are
+// exactly the kind of silent mis-retarget this contract exists to prevent
+// (RETARGETING_POLICY.md §3).
 class MOTIONRETARGET_API RetargetMap
 {
   public:
@@ -51,12 +52,12 @@ class MOTIONRETARGET_API RetargetMap
         return _mapped.count();
     }
 
-    // The bones a VRM 1.0 avatar must define. A rig missing one of these can
-    // still be retargeted onto, but the caller should say so.
-    static const std::vector<openstrata::motion::HumanJoint>& GetRequiredBones();
-
-    // Required bones with no binding, in vocabulary order.
-    std::vector<openstrata::motion::HumanJoint> FindMissingRequiredBones() const;
+    // The bones of `required` with no binding, in the order `required` states
+    // them. Which bones a target requires is the caller's statement, not the
+    // vocabulary's (RETARGETING_POLICY.md §4): a format supplies its own set,
+    // and a rig with no such rule supplies none.
+    std::vector<openstrata::motion::HumanJoint>
+    FindMissingRequiredBones(const std::vector<openstrata::motion::HumanJoint>& required) const;
 
     // True when two bones resolve to the same joint — always a mapping bug,
     // because the second binding would silently overwrite the first.

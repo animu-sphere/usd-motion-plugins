@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionRetarget/PoseRetargeter.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -260,7 +261,19 @@ DiagnoseRig(const SkeletonDescriptor& skeleton, const RetargetMap& map, const Re
     // them against, so one built against another rig binds a bone the
     // retarget can only drop -- and `FindMissingRequiredBones`, which reads
     // the map alone, cannot see that.
-    for (const openstrata::motion::HumanJoint bone : RetargetMap::GetRequiredBones())
+    //
+    // The caller's set, in its order. Under 'hips' the root lands on the hips,
+    // so the mode requires them itself, and they are asked first when the set
+    // does not name them: a caller with no required-bone rule still hears that
+    // its root motion was dropped.
+    std::vector<openstrata::motion::HumanJoint> required = options.requiredBones;
+    if (options.rootMotion.mode == RootMotionMode::Hips &&
+        std::find(required.begin(), required.end(), openstrata::motion::HumanJoint::Hips) ==
+            required.end())
+    {
+        required.insert(required.begin(), openstrata::motion::HumanJoint::Hips);
+    }
+    for (const openstrata::motion::HumanJoint bone : required)
     {
         const int jointIndex = map.GetJointIndex(bone);
         if (jointIndex >= 0 && static_cast<std::size_t>(jointIndex) < joints.size())

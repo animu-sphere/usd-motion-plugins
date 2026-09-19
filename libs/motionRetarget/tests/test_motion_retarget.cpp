@@ -132,6 +132,31 @@ DesignMap(const openstrata::motion::SkeletonDescriptor& skeleton)
     return map;
 }
 
+// A caller's required-bone set: the seventeen bones a VRM 1.0 avatar must
+// define, in the order usd-vrm-plugins supplies them. The library has no set of
+// its own (RETARGETING_POLICY.md §4); these tests arrived with this one, and
+// every count they assert was measured against it.
+const std::vector<openstrata::motion::HumanJoint>&
+DesignRequiredBones()
+{
+    using J = openstrata::motion::HumanJoint;
+    static const std::vector<J> required = {
+        J::Hips,          J::Spine,         J::Chest,        J::Neck,          J::Head,
+        J::LeftUpperLeg,  J::LeftLowerLeg,  J::LeftFoot,     J::RightUpperLeg, J::RightLowerLeg,
+        J::RightFoot,     J::LeftUpperArm,  J::LeftLowerArm, J::LeftHand,      J::RightUpperArm,
+        J::RightLowerArm, J::RightHand,
+    };
+    return required;
+}
+
+openstrata::motion::RetargetOptions
+DesignRequiredOptions()
+{
+    openstrata::motion::RetargetOptions options;
+    options.requiredBones = DesignRequiredBones();
+    return options;
+}
+
 // The clip's rest pose: hips at 1.0 m, matching canonical_walk.usda.
 openstrata::motion::SourceRestPose
 DesignSourceRest()
@@ -157,7 +182,7 @@ TestAMissingOptionalBoneIsNotAMissingBone()
 {
     using Code = openstrata::motion::RetargetDiagnosticCode;
     openstrata::motion::SkeletonDescriptor skeleton;
-    for (const openstrata::motion::HumanJoint bone : openstrata::motion::RetargetMap::GetRequiredBones())
+    for (const openstrata::motion::HumanJoint bone : DesignRequiredBones())
     {
         openstrata::motion::SkeletonJoint joint;
         joint.token = std::string(openstrata::motion::HumanJointName(bone));
@@ -165,12 +190,13 @@ TestAMissingOptionalBoneIsNotAMissingBone()
     }
     skeleton.ResolveParentsFromTokens();
     openstrata::motion::RetargetMap map;
-    for (const openstrata::motion::HumanJoint bone : openstrata::motion::RetargetMap::GetRequiredBones())
+    for (const openstrata::motion::HumanJoint bone : DesignRequiredBones())
     {
         assert(map.SetJointToken(bone, std::string(openstrata::motion::HumanJointName(bone)), skeleton));
     }
 
-    const openstrata::motion::RetargetDiagnostics rig = openstrata::motion::DiagnoseRig(skeleton, map);
+    const openstrata::motion::RetargetDiagnostics rig =
+        openstrata::motion::DiagnoseRig(skeleton, map, DesignRequiredOptions());
     assert(rig.reported.empty() && "a rig with every required bone reported something");
 
     openstrata::motion::MotionPose pose;
@@ -181,7 +207,8 @@ TestAMissingOptionalBoneIsNotAMissingBone()
         pose.localRotations[static_cast<std::size_t>(bone)] = Rotation(kAxisX, 10.0f);
         pose.validRotations.set(static_cast<std::size_t>(bone));
     }
-    const openstrata::motion::PoseRetargeter retargeter(skeleton, map, openstrata::motion::SourceRestPose());
+    const openstrata::motion::PoseRetargeter retargeter(
+        skeleton, map, openstrata::motion::SourceRestPose(), DesignRequiredOptions());
     openstrata::motion::RetargetDiagnostics diagnostics;
     const openstrata::motion::RetargetedPose result = retargeter.Retarget(pose, &diagnostics);
     assert(diagnostics.Subjects(Code::MissingRequiredBone).empty());
@@ -337,7 +364,7 @@ TestRetargetMapReportsGapsAndCollisions()
     assert(!map.SetJointToken(openstrata::motion::HumanJoint::Head, "NoSuchJoint", skeleton));
     assert(!map.IsMapped(openstrata::motion::HumanJoint::Head));
 
-    const std::vector<openstrata::motion::HumanJoint> missing = map.FindMissingRequiredBones();
+    const std::vector<openstrata::motion::HumanJoint> missing = map.FindMissingRequiredBones(DesignRequiredBones());
     assert(!missing.empty());
     assert(std::find(missing.begin(), missing.end(), openstrata::motion::HumanJoint::Head) != missing.end());
     assert(std::find(missing.begin(), missing.end(), openstrata::motion::HumanJoint::Hips) == missing.end());
@@ -740,7 +767,8 @@ void
 TestDesignTripletHandOff()
 {
     const openstrata::motion::SkeletonDescriptor skeleton = DesignAvatar();
-    const openstrata::motion::PoseRetargeter retargeter(skeleton, DesignMap(skeleton), DesignSourceRest());
+    const openstrata::motion::PoseRetargeter retargeter(skeleton, DesignMap(skeleton), DesignSourceRest(),
+                                                        DesignRequiredOptions());
 
     openstrata::motion::RetargetDiagnostics diagnostics;
     const openstrata::motion::RetargetedAnimation result = retargeter.Retarget(DesignClip(), &diagnostics);
@@ -772,7 +800,7 @@ TestDesignTripletHandOff()
     assert(NearlyEqual(last.translations[3], pxr::GfVec3f(0.0f, 0.5f, 0.0f)));
 
     // The rig maps three bones, so the other fourteen required bones are
-    // reported, one each and in vocabulary order -- and nothing the clip drives
+    // reported, one each and in the order the caller's set states them -- and nothing the clip drives
     // is unbound.
     using Code = openstrata::motion::RetargetDiagnosticCode;
     const std::vector<std::string> missing = diagnostics.Subjects(Code::MissingRequiredBone);
@@ -969,7 +997,8 @@ TestTheRigIsDiagnosedBeforeAnyClip()
     openstrata::motion::RetargetMap map = DesignMap(skeleton);
     assert(map.SetJointToken(openstrata::motion::HumanJoint::UpperChest, "Root/Pelvis/SpineA/ChestA", skeleton));
 
-    const openstrata::motion::RetargetDiagnostics rig = openstrata::motion::DiagnoseRig(skeleton, map);
+    const openstrata::motion::RetargetDiagnostics rig =
+        openstrata::motion::DiagnoseRig(skeleton, map, DesignRequiredOptions());
     assert(rig.Subjects(Code::DuplicateTarget) ==
            std::vector<std::string>{"Root/Pelvis/SpineA/ChestA"});
     const std::string& duplicate = rig.reported[rig.reported.size() - 1].detail;
@@ -989,19 +1018,47 @@ TestTheRigIsDiagnosedBeforeAnyClip()
     assert(hierarchy.Subjects(Code::InvalidHierarchy) ==
            std::vector<std::string>{"Root/Pelvis/SpineA"});
 
-    // No hips: under 'hips' the root lands nowhere, and the detail says so;
-    // under 'ignore' the same bone is only a missing bone.
+    // No hips: under 'hips' the root lands nowhere, and the detail says so --
+    // with or without a required set, since the mode requires the hips itself;
+    // under 'ignore' the same bone is only a missing bone, and only when the
+    // caller requires it.
     openstrata::motion::RetargetMap noHips;
     assert(noHips.SetJointToken(openstrata::motion::HumanJoint::Spine, "Root/Pelvis/SpineA", skeleton));
     const openstrata::motion::RetargetDiagnostics underHips = openstrata::motion::DiagnoseRig(skeleton, noHips);
     assert(underHips.reported.front().subject == "hips");
     assert(underHips.reported.front().detail.find("root motion was dropped") != std::string::npos);
-    openstrata::motion::RetargetOptions ignore;
+    assert(underHips.Subjects(Code::MissingRequiredBone) == std::vector<std::string>{"hips"});
+    openstrata::motion::RetargetOptions ignore = DesignRequiredOptions();
     ignore.rootMotion.mode = openstrata::motion::RootMotionMode::Ignore;
     const openstrata::motion::RetargetDiagnostics underIgnore =
         openstrata::motion::DiagnoseRig(skeleton, noHips, ignore);
     assert(underIgnore.reported.front().subject == "hips");
     assert(underIgnore.reported.front().detail.find("root motion") == std::string::npos);
+    openstrata::motion::RetargetOptions nothingRequired;
+    nothingRequired.rootMotion.mode = openstrata::motion::RootMotionMode::Ignore;
+    assert(openstrata::motion::DiagnoseRig(skeleton, noHips, nothingRequired).IsClean());
+}
+
+// RETARGETING_POLICY.md §4: which bones a target requires is the caller's
+// statement. The same rig reports what each caller's set leaves unbound, in
+// that set's order, and a caller with no set hears nothing about a bone it
+// never asked for.
+void
+TestTheRequiredBonesAreTheCallersSet()
+{
+    using Code = openstrata::motion::RetargetDiagnosticCode;
+    using J = openstrata::motion::HumanJoint;
+    const openstrata::motion::SkeletonDescriptor skeleton = DesignAvatar();
+    const openstrata::motion::RetargetMap map = DesignMap(skeleton);
+
+    assert(openstrata::motion::DiagnoseRig(skeleton, map).IsClean());
+
+    openstrata::motion::RetargetOptions headFirst;
+    headFirst.requiredBones = {J::Head, J::Hips, J::Neck};
+    assert((openstrata::motion::DiagnoseRig(skeleton, map, headFirst)
+                .Subjects(Code::MissingRequiredBone) == std::vector<std::string>{"head", "neck"}));
+    assert((map.FindMissingRequiredBones(headFirst.requiredBones) == std::vector<J>{J::Head, J::Neck}));
+    assert(map.FindMissingRequiredBones({}).empty());
 }
 
 // A clip whose every driven bone is bound reports exactly what the rig does, so
@@ -1012,13 +1069,16 @@ TestAClipReportsTheRigThenWhatItDrives()
 {
     const openstrata::motion::SkeletonDescriptor skeleton = DesignAvatar();
     const openstrata::motion::RetargetMap map = DesignMap(skeleton);
-    const openstrata::motion::PoseRetargeter retargeter(skeleton, map, DesignSourceRest());
+    const openstrata::motion::RetargetOptions options = DesignRequiredOptions();
+    const openstrata::motion::PoseRetargeter retargeter(skeleton, map, DesignSourceRest(), options);
 
     openstrata::motion::RetargetDiagnostics clip;
     retargeter.Retarget(DesignClip(), &clip);
-    assert(clip == openstrata::motion::DiagnoseRig(skeleton, map));
+    assert(!clip.IsClean());
+    assert(clip == openstrata::motion::DiagnoseRig(skeleton, map, options));
 
-    openstrata::motion::RetargetDiagnostics perPose = openstrata::motion::DiagnoseRig(skeleton, map);
+    openstrata::motion::RetargetDiagnostics perPose =
+        openstrata::motion::DiagnoseRig(skeleton, map, options);
     const openstrata::motion::MotionClip animation = DesignClip();
     for (const openstrata::motion::MotionPose& pose : animation.samples)
     {
@@ -1153,6 +1213,7 @@ main()
     TestARetargetDiagnosticFormatsOneStableLine();
     TestADiagnosticIsReportedOncePerCodeAndSubject();
     TestTheRigIsDiagnosedBeforeAnyClip();
+    TestTheRequiredBonesAreTheCallersSet();
     TestAClipReportsTheRigThenWhatItDrives();
     TestABoneDrivenOnlyLaterIsStillReported();
     TestHipsBoundOutsideTheRigAreReportedWithTheDroppedRoot();

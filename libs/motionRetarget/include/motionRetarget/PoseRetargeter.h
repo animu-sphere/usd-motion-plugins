@@ -121,10 +121,22 @@ MOTIONRETARGET_API bool GetJointWorldTransform(const SkeletonDescriptor& skeleto
 struct RetargetOptions
 {
     RootMotionOptions rootMotion;
+
+    // The bones this target requires, in the order the caller wants them
+    // reported. Empty -- the default -- requires nothing: the joint vocabulary
+    // carries no required-bone rule, so the set is the caller's statement
+    // (RETARGETING_POLICY.md §4). A format supplies its own, and a rig with no
+    // such rule supplies none.
+    //
+    // One bone is required by the options themselves: under
+    // RootMotionMode::Hips the root lands on the hips, so a rig without them is
+    // reported whether or not this list names them.
+    std::vector<openstrata::motion::HumanJoint> requiredBones;
 };
 
 // What a rig and its map say about every retarget onto them, before any clip
-// is involved: each required bone the map leaves unbound, each joint two bones
+// is involved: each bone RetargetOptions requires that the map leaves unbound
+// (and the hips under RootMotionMode::Hips), each joint two bones
 // share, the first joint out of parent-before-child order, and a root joint the
 // options name and the rig does not have.
 //
