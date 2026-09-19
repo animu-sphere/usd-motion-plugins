@@ -1,0 +1,16 @@
+# OpenStrata plain-library descriptor. motionSampling answers "what is the pose
+# at this time?" with a status: interpolation, resampling, filtering, blending
+# and the pose buffer over motionCore's values (docs/design/MOTION_CONTRACT.md
+# §8).
+schema: openstrata.library/v1alpha1
+library:
+  id: motionSampling
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
+requires:
+  libraries:
+    - id: motionCore
+      version: ">=0.1,<0.2"
+cmake:
+  package: motionSampling
+  target: motionSampling::motionSampling

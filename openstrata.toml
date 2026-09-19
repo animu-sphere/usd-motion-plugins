@@ -12,4 +12,8 @@ profile = "usd"
 # effect of creating a directory. The table arrived with the first member,
 # because `ost` 0.22.10 refuses an empty one.
 [workspace]
-members = ["libs/motionCore"]
+members = [
+    "libs/motionCore",
+    "libs/motionSampling",
+    "libs/motionRecording",
+]

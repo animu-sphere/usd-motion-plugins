@@ -1,15 +1,16 @@
 # Current — the scaffold, then v0.1.0
 
 Status: 🚧 documentation baseline done (2026-09-17); scaffold done
-(2026-09-19), its CI rendered with the first import; v0.1.0 🚧 — `motionCore`
-imported (2026-09-19).
+(2026-09-19), its CI rendered with the first import; v0.1.0 🚧 — `motionCore`,
+`motionSampling` and `motionRecording` imported (2026-09-19).
 
 Migration Phase A is *define the public contracts*
 ([DESIGN_POLICY.md §37](../design/DESIGN_POLICY.md#37-migration-from-usd-vrm-plugins)).
 Its documents exist — the design policy, the motion contract, the retargeting
 policy, the USD mapping and the workspace contract — as **proposed**
 contracts written from `usd-vrm-plugins`' measured implementation. The tree
-has received its first code: `motionCore`, with its history.
+has received its first code: `motionCore`, then `motionRuntime` as
+`motionSampling` and `motionRecording`, each with its history.
 
 ## What remains
 
@@ -58,7 +59,15 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   [RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md) §4.1, §6.1 and §10;
   recorded-source provenance and the tracker boundary are
   [MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md) §7.1 and §11.1.
-- ⬜ Import `motionRuntime` as `motionSampling` and `motionRecording`.
+- ✅ Import `motionRuntime` as `motionSampling` and `motionRecording`
+  ([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in)) —
+  2026-09-19. 28 commits arrived through `git filter-repo`; one move-only
+  commit put each file in the library whose role names it, and the rename
+  followed. The recorder took its contract name, `MotionRecorder`;
+  `LiveCaptureSource` kept its own, because the published `MotionStream`
+  shape is MC-O5. The trace format and every committed trace are unchanged.
+  `usd-vrm-plugins` deletes its copy in its MIG-2, against a release of this
+  one, after re-running the parity rows its MIG-0 named.
 - ⬜ `motionUsd`: author the motion stage of
   [USD_MAPPING.md §2–§5](../design/USD_MAPPING.md#2-the-standalone-motion-stage),
   identity `scales` and the `motion:timeCodesPerSecond` rate included

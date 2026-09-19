@@ -74,6 +74,8 @@ endif()
 
 # Components, in dependency order (WORKSPACE.md §2.1), as each import lands.
 add_subdirectory("libs/motionCore")
+add_subdirectory("libs/motionSampling")
+add_subdirectory("libs/motionRecording")
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
