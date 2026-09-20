@@ -268,6 +268,16 @@ separate from the package version
 
 ### Changed
 
+- **The `ost` pin is 0.23.0**, re-pinned across the ecosystem together with
+  `usd-vrm-plugins` and `motion-connectors`, and the workflow re-rendered from
+  it. The bump is taken for what it adds: `requires.libraries` can name a
+  digest-pinned library artifact from another repository, and every rendered
+  job runs `ost library pull` before it builds. That is the edge this
+  repository's packages are consumed over, so the pin is a precondition of
+  publishing them (`usd-vrm-plugins`' ost report 41). 0.23.0 also lets an
+  explicitly empty workspace render CI, which this repository needed before
+  its first member and the next repository to start empty still does. The
+  pinned runtime leaves do not move.
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are
   fixed** (MOTION_CONTRACT.md §8). Each is a pure function, and the streaming
   class beside it calls it, so each rule has one implementation:
