@@ -188,6 +188,16 @@ separate from the package version
     `ost plugin build` path and the L0–L5 pyramid, whose golden roundtrip over
     eight fixtures no CTest suite runs.
 
+- **USD-O4 is decided**
+  ([USD_MAPPING.md §4.3](docs/design/USD_MAPPING.md#43-channels)): a channel is
+  one prim under `/Animation/Channels`, carrying `motion:channelName` — the
+  namespaced semantic verbatim, and the key, because a sanitized prim path can
+  differ from the name — and a time-sampled `float motion:channelValue`.
+  `vrm:expressionType` does not come across: a format's classification of its
+  own channel belongs in that format's namespace. Nothing authors the prim
+  yet; `motionUsd` still reports the channels it did not author, and authoring
+  and reading arrive with the reading half in v0.2.0.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are

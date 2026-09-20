@@ -79,8 +79,10 @@ per second. `customData.motion.sourceFormat` is `capture`. The rules are
   from one that was never captured.
 
 Channels (a face's expression weights) and look-at targets are not authored
-yet: the `Channels` prim waits on USD-O4. The tool says so on stderr when a
-session carried either, rather than dropping them without a word.
+yet: the `Channels` prim's names are decided (USD §4.3) but nothing authors it
+until the reading half arrives, and a look-at target has no place at all. The
+tool says so on stderr when a session carried either, rather than dropping
+them without a word.
 
 ## Tests
 

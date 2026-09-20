@@ -88,9 +88,10 @@ struct MotionStageReport
     std::size_t jointCount = 0;
     std::size_t sampleCount = 0;
 
-    // Channel names the clip carried, sorted, each once. `/Animation/Channels`
-    // is not authored until its attribute names are decided (USD-O4), so a
-    // caller that needs them has to be told they were dropped.
+    // Channel names the clip carried, sorted, each once. The prim's shape is
+    // decided (USD_MAPPING.md §4.3) but nothing authors it until the reading
+    // half arrives, so a caller that needs them has to be told they were
+    // dropped.
     std::vector<std::string> unauthoredChannels;
 
     // Samples whose look-at target was not authored. A target is a point in

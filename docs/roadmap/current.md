@@ -83,8 +83,9 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   its history from `usd-vrm-plugins`' `motion_capture`, which is the writer
   there that authors an avatar-independent clip. `StageIo` reads a clip and
   bakes onto a VRM, so it is the reading half and arrives with v0.2.0. The
-  writer was adapted to the mapping after the move. The `Channels` prim waits
-  on USD-O4, and until then the channels a clip carries are reported rather
+  writer was adapted to the mapping after the move. The `Channels` prim's
+  names were decided on 2026-09-20 (USD-O4) and nothing authors it until the
+  reading half arrives, so the channels a clip carries are reported rather
   than authored.
 - ✅ Fix the sampling findings in their own change
   ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling))
