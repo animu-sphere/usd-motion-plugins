@@ -1,0 +1,1356 @@
+// SPDX-License-Identifier: Apache-2.0
+#include "StageIo.h"
+
+#include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/quatd.h"
+#include "pxr/base/gf/vec3h.h"
+#include "pxr/base/gf/vec4f.h"
+#include "pxr/base/js/json.h"
+#include "pxr/base/js/value.h"
+#include "pxr/base/tf/fileUtils.h"
+#include "pxr/base/tf/pathUtils.h"
+#include "pxr/base/tf/stringUtils.h"
+#include "pxr/base/tf/token.h"
+#include "pxr/base/vt/array.h"
+#include "pxr/base/vt/types.h"
+#include "pxr/usd/sdf/fileFormat.h"
+#include "pxr/usd/sdf/layer.h"
+#include "pxr/usd/usd/attribute.h"
+#include "pxr/usd/usd/primRange.h"
+#include "pxr/usd/usd/references.h"
+#include "pxr/usd/usdGeom/metrics.h"
+#include "pxr/usd/usdSkel/animation.h"
+#include "pxr/usd/usdSkel/bindingAPI.h"
+#include "pxr/usd/usdSkel/skeleton.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <set>
+#include <sstream>
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace motionRetargetTool
+{
+namespace
+{
+
+const char* const kHumanBonesPrefix = "vrm:humanBones:";
+
+// The semantic joint tokens the motion contract defines are paths whose leaf is
+// the human bone name ("hips", "hips/spine", "hips/spine/chest"). Reading the
+// leaf back is the documented inverse, not a name heuristic.
+std::string
+LeafToken(const std::string& jointPath)
+{
+    const std::size_t separator = jointPath.rfind('/');
+    return separator == std::string::npos ? jointPath : jointPath.substr(separator + 1);
+}
+
+// Finds the skeleton to work with: the override when given, otherwise the first
+// UsdSkelSkeleton in stage order. Reporting "which one" back to the caller is
+// what makes --skeleton actionable when a stage carries several.
+//
+// The two refusals are different inputs' faults. An override that names
+// nothing is the command line's; a stage with no skeleton at all is the
+// stage's, and `absent` is what that means for this side of the retarget.
+bool
+FindSkeleton(const UsdStageRefPtr& stage, const std::string& override_, const char* what,
+             ExitCode absent, UsdSkelSkeleton* skeleton, Failure* failure)
+{
+    if (!override_.empty())
+    {
+        if (!SdfPath::IsValidPathString(override_))
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        std::string("not a valid prim path: ") + override_);
+        }
+        const UsdPrim prim = stage->GetPrimAtPath(SdfPath(override_));
+        if (!prim)
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        std::string("no prim at ") + override_);
+        }
+        *skeleton = UsdSkelSkeleton(prim);
+        if (!*skeleton)
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        override_ + " is not a UsdSkelSkeleton");
+        }
+        return true;
+    }
+
+    std::vector<SdfPath> found;
+    for (const UsdPrim& prim : stage->Traverse())
+    {
+        if (prim.IsA<UsdSkelSkeleton>())
+        {
+            found.push_back(prim.GetPath());
+        }
+    }
+    if (found.empty())
+    {
+        return Fail(failure, absent, std::string("the ") + what + " stage has no UsdSkelSkeleton");
+    }
+    *skeleton = UsdSkelSkeleton(stage->GetPrimAtPath(found.front()));
+    return true;
+}
+
+// Why a stage did not open, as the input at fault.
+//
+// Asked only after UsdStage::Open refused, never before it: a path the resolver
+// understands and the file system does not -- a package-relative path, a URI
+// -- opens without reaching this, so the check cannot refuse a stage OpenUSD
+// would have opened. What is left splits three ways, and only the first is the
+// command line's.
+//
+// "There" means a regular file, not any path: a directory exists and is still
+// not a layer, and letting it through would report a missing plugin for a
+// mistyped argument. Symlinks are followed, so a link to a real file reaches
+// the format checks below.
+bool
+FailToOpen(const std::string& path, const char* what, Failure* failure)
+{
+    if (TfIsDir(path, /* resolveSymlinks = */ true))
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    path + " is a directory, not an " + what + " file");
+    }
+    if (!TfIsFile(path, /* resolveSymlinks = */ true))
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    std::string("no ") + what + " file at " + path);
+    }
+    if (!SdfFileFormat::FindByExtension(path))
+    {
+        // The two formats this workspace ships are the likely cause, and the
+        // bundle to register is the one thing the user needs to know.
+        const std::string extension = TfGetExtension(path);
+        std::string message = "OpenUSD has no file format for '." + extension + "' files, so the " +
+                              what + " " + path + " cannot be opened";
+        if (extension == "vrm")
+        {
+            message += "; a .vrm needs usdVrmFileFormat registered";
+        }
+        else if (extension == "vrma")
+        {
+            message += "; a .vrma needs usdVrmaFileFormat registered";
+        }
+        return Fail(failure, ExitCode::StageFailure, message);
+    }
+    return Fail(failure, ExitCode::StageFailure,
+                std::string("OpenUSD could not open the ") + what + " stage " + path);
+}
+
+// Decomposes a clip rest transform through the library's one decomposition.
+// A clip's rest scale is dropped: the correction reads rotations and
+// translations, and scale is not retargeted.
+void
+DecomposeRest(const GfMatrix4d& matrix, GfQuatf* rotation, GfVec3f* translation)
+{
+    vrmRetarget::TargetJoint joint;
+    vrmRetarget::DecomposeRestTransform(matrix, &joint);
+    *rotation = joint.restRotation;
+    *translation = joint.restTranslation;
+}
+
+bool
+ReadSkeletonRest(const UsdSkelSkeleton& skeleton, VtTokenArray* joints,
+                 VtMatrix4dArray* restTransforms, std::vector<std::string>* warnings)
+{
+    if (!skeleton.GetJointsAttr().Get(joints) || joints->empty())
+    {
+        return false;
+    }
+    if (!skeleton.GetRestTransformsAttr().Get(restTransforms) ||
+        restTransforms->size() != joints->size())
+    {
+        // bindTransforms are world-space, so they cannot substitute for local
+        // rest transforms without the topology walk UsdSkel already provides
+        // elsewhere. Fall back to identity and say so rather than guess.
+        warnings->push_back("skeleton <" + skeleton.GetPath().GetString() +
+                            "> has no usable restTransforms; assuming identity rest pose");
+        restTransforms->assign(joints->size(), GfMatrix4d(1.0));
+    }
+    return true;
+}
+
+// Both sides of an expression spell the same three tokens: the avatar declares
+// the binds under them and the clip authors the weight. The join key is
+// `vrm:expressionName` and never a prim name — the two file formats sanitize
+// with their own private tables, so a Japanese name lands on a hashed fallback
+// on one side and a valid-identifier result on the other.
+const TfToken kExpressionName("vrm:expressionName");
+const TfToken kExpressionWeight("vrm:expressionWeight");
+const TfToken kIsBinary("vrm:isBinary");
+const TfToken kOverrideBlink("vrm:overrideBlink");
+const TfToken kOverrideLookAt("vrm:overrideLookAt");
+const TfToken kOverrideMouth("vrm:overrideMouth");
+const TfToken kMorphTargets("vrm:morphTargets");
+const TfToken kMorphTargetWeights("vrm:morphTargetWeights");
+const TfToken kMaterialColorTargets("vrm:materialColorTargets");
+const TfToken kMaterialColorTypes("vrm:materialColorTypes");
+const TfToken kMaterialColorValues("vrm:materialColorValues");
+
+const TfToken kVrmType("vrm:type");
+const TfToken kLeftEye("vrm:leftEye");
+const TfToken kRightEye("vrm:rightEye");
+// SetCustomDataByKey nests on ':', so the importer's "vrm:lookAt:raw" is read
+// back by the same colon-separated key rather than by a flat attribute name.
+const TfToken kLookAtRaw("vrm:lookAt:raw");
+const TfToken kLookAtTarget("vrm:lookAtTarget");
+const TfToken kLookAtOffset("vrm:lookAtOffsetFromHeadBone");
+
+// Is this the avatar's VrmLookAtAPI prim?
+//
+// `vrm:type` alone does not say so -- VrmConstraintAPI spells its constraint
+// kind with the same name -- so the test is `vrm:type` plus one thing only a
+// look-at carries: an eye token, or the preserved curve block. A constraint has
+// neither, and an expression-driven look-at that names no eye still has the
+// block, because a rig that drives its gaze through the face states the curves
+// that scale it.
+bool
+IsLookAtPrim(const UsdPrim& prim)
+{
+    if (!prim.HasAttribute(kVrmType))
+    {
+        return false;
+    }
+    return prim.HasAttribute(kLeftEye) || prim.HasAttribute(kRightEye) ||
+           !prim.GetCustomDataByKey(kLookAtRaw).IsEmpty();
+}
+
+// Reads one eye token and resolves it against the target skeleton.
+//
+// A token the skeleton does not contain is dropped rather than carried: the
+// evaluator hands the identifier straight back on the rotation it produces, so
+// an unresolvable one would travel all the way to the authoring step before
+// vanishing, with nothing said about why the eye did not move.
+std::string
+ReadEyeJoint(const UsdPrim& prim, const TfToken& attributeName,
+             const vrmRetarget::TargetSkeleton& skeleton, std::vector<std::string>* warnings)
+{
+    const UsdAttribute attribute = prim.GetAttribute(attributeName);
+    TfToken token;
+    if (!attribute || !attribute.Get(&token) || token.IsEmpty())
+    {
+        return std::string();
+    }
+    if (skeleton.FindJoint(token.GetString()) == vrmRetarget::TargetSkeleton::kNoParent)
+    {
+        warnings->push_back("avatar look-at names '" + token.GetString() + "' as its " +
+                            attributeName.GetString() +
+                            ", which the target skeleton does not contain; that eye is not "
+                            "driven");
+        return std::string();
+    }
+    return token.GetString();
+}
+
+// The verbatim expression name a prim answers to, or an empty string when it
+// declares none. An expression with no name is not an expression this layer can
+// join anything to, so it is reported rather than resolved against its prim
+// name — which would be a key that agrees with the other side by luck.
+std::string
+ReadExpressionName(const UsdPrim& prim)
+{
+    const UsdAttribute attribute = prim.GetAttribute(kExpressionName);
+    TfToken name;
+    if (!attribute || !attribute.Get(&name))
+    {
+        return std::string();
+    }
+    return name.GetString();
+}
+
+// Reads one `/Asset/rig/Expressions/<name>` prim into the value form
+// `vrmRetarget` resolves against: what the avatar says this expression does to
+// its own meshes and materials, with nothing evaluated.
+vrmRetarget::ExpressionDefinition
+ReadExpressionDefinition(const UsdPrim& prim, const std::string& name,
+                         std::vector<std::string>* warnings)
+{
+    vrmRetarget::ExpressionDefinition definition;
+    definition.name = name;
+
+    const UsdAttribute binaryAttr = prim.GetAttribute(kIsBinary);
+    bool isBinary = false;
+    if (binaryAttr && binaryAttr.Get(&isBinary))
+    {
+        definition.isBinary = isBinary;
+    }
+
+    // The three override fields. An absent attribute is the avatar saying
+    // nothing, which is what every VRM 0.x rig says; a token outside the
+    // vocabulary is a statement this layer cannot act on, so it is refused
+    // loudly rather than read as `none` -- an override silently downgraded to
+    // "no arbitration" is a face that renders wrong with nothing in the log.
+    const auto readOverride = [&](const TfToken& attributeName) -> vrmRetarget::ExpressionOverride
+    {
+        const UsdAttribute attribute = prim.GetAttribute(attributeName);
+        TfToken token;
+        if (!attribute || !attribute.Get(&token))
+        {
+            return vrmRetarget::ExpressionOverride::None;
+        }
+        bool recognized = false;
+        const vrmRetarget::ExpressionOverride mode =
+            vrmRetarget::ParseExpressionOverride(token.GetString(), &recognized);
+        if (!recognized)
+        {
+            warnings->push_back("expression <" + prim.GetPath().GetString() + "> declares " +
+                                attributeName.GetString() + " '" + token.GetString() +
+                                "', which is not none, block or blend; it arbitrates "
+                                "nothing");
+        }
+        return mode;
+    };
+    definition.overrideBlink = readOverride(kOverrideBlink);
+    definition.overrideLookAt = readOverride(kOverrideLookAt);
+    definition.overrideMouth = readOverride(kOverrideMouth);
+
+    SdfPathVector morphTargets;
+    if (const UsdRelationship rel = prim.GetRelationship(kMorphTargets))
+    {
+        rel.GetTargets(&morphTargets);
+    }
+    VtFloatArray morphWeights;
+    if (const UsdAttribute attribute = prim.GetAttribute(kMorphTargetWeights))
+    {
+        attribute.Get(&morphWeights);
+    }
+    // The schema calls the arrays parallel; a stage where they are not is
+    // authored data this layer cannot repair. Falling back to the conventional
+    // full weight keeps the bind rather than dropping the target silently, and
+    // says which prim to look at.
+    if (!morphTargets.empty() && morphWeights.size() != morphTargets.size())
+    {
+        warnings->push_back("expression <" + prim.GetPath().GetString() + "> binds " +
+                            std::to_string(morphTargets.size()) + " morph target(s) and " +
+                            std::to_string(morphWeights.size()) +
+                            " weight(s); the missing weights are taken as 1");
+    }
+    for (std::size_t i = 0; i < morphTargets.size(); ++i)
+    {
+        vrmRetarget::MorphTargetBind bind;
+        bind.target = morphTargets[i].GetString();
+        bind.weight = i < morphWeights.size() ? morphWeights[i] : 1.0f;
+        definition.morphTargets.push_back(std::move(bind));
+    }
+
+    SdfPathVector colorTargets;
+    if (const UsdRelationship rel = prim.GetRelationship(kMaterialColorTargets))
+    {
+        rel.GetTargets(&colorTargets);
+    }
+    VtTokenArray colorTypes;
+    if (const UsdAttribute attribute = prim.GetAttribute(kMaterialColorTypes))
+    {
+        attribute.Get(&colorTypes);
+    }
+    VtVec4fArray colorValues;
+    if (const UsdAttribute attribute = prim.GetAttribute(kMaterialColorValues))
+    {
+        attribute.Get(&colorValues);
+    }
+    if (!colorTargets.empty() &&
+        (colorTypes.size() != colorTargets.size() || colorValues.size() != colorTargets.size()))
+    {
+        warnings->push_back("expression <" + prim.GetPath().GetString() + "> binds " +
+                            std::to_string(colorTargets.size()) + " material colour(s) with " +
+                            std::to_string(colorTypes.size()) + " slot(s) and " +
+                            std::to_string(colorValues.size()) +
+                            " value(s); the binds that are short of either are skipped");
+    }
+    for (std::size_t i = 0; i < colorTargets.size(); ++i)
+    {
+        // Skipped, as the warning says, and not completed from thin air. A
+        // slot is half the key, so inventing one would merge two binds of a
+        // material under a single accumulator; and a value invented for a
+        // colour is a colour -- opaque white, and indistinguishable downstream
+        // from one the avatar actually asked for.
+        if (i >= colorTypes.size() || i >= colorValues.size())
+        {
+            continue;
+        }
+        vrmRetarget::MaterialColorBind bind;
+        bind.material = colorTargets[i].GetString();
+        bind.colorType = colorTypes[i].GetString();
+        bind.targetValue = colorValues[i];
+        definition.materialColors.push_back(std::move(bind));
+    }
+    return definition;
+}
+
+// The token each blend shape answers to on the mesh that binds it.
+//
+// A UsdSkelAnimation names blend shapes by token, and UsdSkel maps those tokens
+// onto each skinned prim's own `skel:blendShapes` order — so a weight resolved
+// onto a blend-shape *path* has to be translated before it can be authored, and
+// a blend shape no mesh binds cannot be reached from an animation at all.
+void
+ReadBlendShapeTokens(const UsdStageRefPtr& stage, std::map<std::string, std::string>* tokens,
+                     std::vector<std::string>* warnings)
+{
+    std::map<std::string, std::string> pathByToken;
+    for (const UsdPrim& prim : stage->Traverse())
+    {
+        const UsdSkelBindingAPI binding(prim);
+        const UsdAttribute namesAttr = binding.GetBlendShapesAttr();
+        if (!namesAttr)
+        {
+            continue;
+        }
+        VtTokenArray names;
+        if (!namesAttr.Get(&names) || names.empty())
+        {
+            continue;
+        }
+        SdfPathVector targets;
+        if (const UsdRelationship rel = binding.GetBlendShapeTargetsRel())
+        {
+            rel.GetTargets(&targets);
+        }
+        if (names.size() != targets.size())
+        {
+            warnings->push_back("<" + prim.GetPath().GetString() + "> binds " +
+                                std::to_string(names.size()) + " blend-shape name(s) to " +
+                                std::to_string(targets.size()) +
+                                " target(s); only the pairs that line up can be driven");
+        }
+        const std::size_t paired = std::min(names.size(), targets.size());
+        for (std::size_t i = 0; i < paired; ++i)
+        {
+            const std::string target = targets[i].GetString();
+            const std::string token = names[i].GetString();
+            const auto existing = tokens->find(target);
+            if (existing != tokens->end())
+            {
+                if (existing->second != token)
+                {
+                    // Two meshes naming one blend shape differently: an
+                    // animation names it once, so whichever token we author
+                    // drives one of them and not the other.
+                    warnings->push_back("blend shape <" + target + "> is bound as '" +
+                                        existing->second + "' and as '" + token +
+                                        "'; an animation can name only one of them, and '" +
+                                        existing->second + "' is what is authored");
+                }
+                continue;
+            }
+            const auto claimed = pathByToken.find(token);
+            if (claimed != pathByToken.end() && claimed->second != target)
+            {
+                // The reverse collision, and the more dangerous one: authoring
+                // this token would drive a blend shape no expression asked for.
+                warnings->push_back("blend shapes <" + claimed->second + "> and <" + target +
+                                    "> are both bound as '" + token +
+                                    "'; a SkelAnimation cannot tell them apart, so only the "
+                                    "first is driven");
+                continue;
+            }
+            tokens->emplace(target, token);
+            pathByToken.emplace(token, target);
+        }
+    }
+}
+
+} // namespace
+
+bool
+ReadHumanoidMapFile(const std::string& path, std::map<std::string, std::string>* entries,
+                    Failure* failure)
+{
+    std::ifstream file(path);
+    if (!file)
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    "could not open humanoid map file: " + path);
+    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+
+    JsParseError parseError;
+    const JsValue parsed = JsParseString(buffer.str(), &parseError);
+    if (parsed.IsNull())
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    "could not parse " + path + ": " + parseError.reason + " (line " +
+                        std::to_string(parseError.line) + ")");
+    }
+    if (!parsed.IsObject())
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    path + " must contain a JSON object of humanBone -> joint "
+                           "token");
+    }
+
+    for (const auto& entry : parsed.GetJsObject())
+    {
+        if (!entry.second.IsString())
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        path + ": value for '" + entry.first + "' is not a string");
+        }
+        if (!motion::FindHumanBone(entry.first))
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        path + ": '" + entry.first + "' is not a VRM human bone name");
+        }
+        (*entries)[entry.first] = entry.second.GetString();
+    }
+    return true;
+}
+
+bool
+ReadAvatar(const std::string& path, const std::string& skeletonPathOverride,
+           const std::map<std::string, std::string>& extraMappings, Avatar* avatar,
+           Failure* failure)
+{
+    avatar->stage = UsdStage::Open(path);
+    if (!avatar->stage)
+    {
+        return FailToOpen(path, "avatar", failure);
+    }
+
+    const UsdPrim defaultPrim = avatar->stage->GetDefaultPrim();
+    if (!defaultPrim)
+    {
+        return Fail(failure, ExitCode::RetargetContractViolation,
+                    "avatar stage " + path +
+                        " has no defaultPrim; the output layer references "
+                        "it by name");
+    }
+    avatar->defaultPrimPath = defaultPrim.GetPath();
+
+    // A VrmHumanoidAPI prim points at its own skeleton, so prefer that over
+    // "first skeleton on the stage" when the avatar carries one.
+    UsdPrim humanoidPrim;
+    for (const UsdPrim& prim : avatar->stage->Traverse())
+    {
+        if (prim.HasAttribute(TfToken(std::string(kHumanBonesPrefix) + "hips")))
+        {
+            humanoidPrim = prim;
+            break;
+        }
+    }
+
+    std::string skeletonOverride = skeletonPathOverride;
+    if (skeletonOverride.empty() && humanoidPrim)
+    {
+        const UsdRelationship skeletonRel = humanoidPrim.GetRelationship(TfToken("vrm:skeleton"));
+        SdfPathVector targets;
+        if (skeletonRel && skeletonRel.GetTargets(&targets) && !targets.empty())
+        {
+            skeletonOverride = targets.front().GetString();
+        }
+    }
+
+    // A `vrm:skeleton` the humanoid names is the stage's statement, not the
+    // user's, so a target that is not a skeleton is the rig's defect even
+    // though it reaches FindSkeleton the way --skeleton does.
+    const bool skeletonNamedByUser = !skeletonPathOverride.empty();
+    UsdSkelSkeleton skeleton;
+    if (!FindSkeleton(avatar->stage, skeletonOverride, "avatar",
+                      ExitCode::RetargetContractViolation, &skeleton, failure))
+    {
+        if (!skeletonNamedByUser)
+        {
+            failure->code = ExitCode::RetargetContractViolation;
+        }
+        return false;
+    }
+    avatar->skeletonPath = skeleton.GetPath();
+
+    // The rig's layout rather than the choice of skeleton, whoever made it:
+    // the skeleton is a real one, and the avatar's defaultPrim does not cover
+    // it.
+    if (!avatar->skeletonPath.HasPrefix(avatar->defaultPrimPath))
+    {
+        return Fail(failure, ExitCode::RetargetContractViolation,
+                    "target skeleton <" + avatar->skeletonPath.GetString() +
+                        "> is not under the avatar's defaultPrim <" +
+                        avatar->defaultPrimPath.GetString() +
+                        ">, so referencing the avatar would not bring it "
+                        "in");
+    }
+
+    VtTokenArray joints;
+    VtMatrix4dArray restTransforms;
+    if (!ReadSkeletonRest(skeleton, &joints, &restTransforms, &avatar->warnings))
+    {
+        return Fail(failure, ExitCode::RetargetContractViolation,
+                    "target skeleton <" + avatar->skeletonPath.GetString() + "> has no joints");
+    }
+
+    for (std::size_t i = 0; i < joints.size(); ++i)
+    {
+        vrmRetarget::TargetJoint joint;
+        joint.token = joints[i].GetString();
+        vrmRetarget::DecomposeRestTransform(restTransforms[i], &joint);
+        avatar->skeleton.AddJoint(joint);
+    }
+    avatar->skeleton.ResolveParentsFromTokens();
+    if (!avatar->skeleton.IsTopologicallyOrdered())
+    {
+        avatar->warnings.push_back("target skeleton joints are not in parent-before-child order");
+    }
+
+    // Stage mappings first, explicit file mappings over the top.
+    if (humanoidPrim)
+    {
+        for (std::size_t slot = 0; slot < motion::HumanBoneCount; ++slot)
+        {
+            const auto bone = static_cast<motion::HumanBone>(slot);
+            const std::string name(motion::HumanBoneName(bone));
+            const UsdAttribute attribute =
+                humanoidPrim.GetAttribute(TfToken(std::string(kHumanBonesPrefix) + name));
+            TfToken jointToken;
+            if (!attribute || !attribute.Get(&jointToken) || jointToken.IsEmpty())
+            {
+                continue;
+            }
+            if (!avatar->map.SetJointToken(bone, jointToken.GetString(), avatar->skeleton))
+            {
+                avatar->warnings.push_back("avatar maps '" + name + "' to joint '" +
+                                           jointToken.GetString() +
+                                           "', which the target skeleton does not contain");
+            }
+        }
+    }
+
+    for (const auto& entry : extraMappings)
+    {
+        const auto bone = motion::FindHumanBone(entry.first);
+        if (!bone)
+        {
+            continue;
+        }
+        if (!avatar->map.SetJointToken(*bone, entry.second, avatar->skeleton))
+        {
+            return Fail(failure, ExitCode::InvalidUserInput,
+                        "humanoid map binds '" + entry.first + "' to joint '" + entry.second +
+                            "', which the target skeleton does not contain");
+        }
+    }
+
+    if (avatar->map.GetMappedCount() == 0)
+    {
+        return Fail(failure, ExitCode::RetargetContractViolation,
+                    "no humanoid mapping was found on " + path +
+                        " and none was supplied; pass --humanoid-map");
+    }
+
+    // The face half of the rig. A rig that declares no expression is the normal
+    // case for a plain `.usda` skeleton, and it is not a warning: the bake then
+    // authors joints only, exactly as it did before this half existed.
+    for (const UsdPrim& prim : avatar->stage->Traverse())
+    {
+        if (!prim.HasAttribute(kExpressionName))
+        {
+            continue;
+        }
+        const std::string name = ReadExpressionName(prim);
+        if (name.empty())
+        {
+            avatar->warnings.push_back("avatar expression <" + prim.GetPath().GetString() +
+                                       "> authors no vrm:expressionName, so no clip can name it");
+            continue;
+        }
+        if (!avatar->expressionRig.Add(ReadExpressionDefinition(prim, name, &avatar->warnings)))
+        {
+            // The importer refuses this on the way in (VRM152); a hand-authored
+            // stage can still carry it, and a resolve would silently bind
+            // whichever prim it reached first.
+            avatar->warnings.push_back("avatar declares expression '" + name +
+                                       "' more than once; <" + prim.GetPath().GetString() +
+                                       "> is ignored");
+        }
+    }
+    ReadBlendShapeTokens(avatar->stage, &avatar->blendShapeTokens, &avatar->warnings);
+
+    // The gaze half of the rig. Like the face half, declaring none is the
+    // ordinary case for a plain `.usda` skeleton and is not a warning.
+    for (const UsdPrim& prim : avatar->stage->Traverse())
+    {
+        if (!IsLookAtPrim(prim))
+        {
+            continue;
+        }
+        if (avatar->hasLookAt)
+        {
+            avatar->warnings.push_back("avatar declares more than one look-at configuration; <" +
+                                       prim.GetPath().GetString() + "> is ignored");
+            continue;
+        }
+        avatar->hasLookAt = true;
+
+        // The preserved block first, then the authored `vrm:type` over it: the
+        // attribute is the value the importer normalized -- a VRM 0.x
+        // "BlendShape" already turned into the 1.0 vocabulary -- and the block
+        // is whatever the source file happened to say.
+        const VtValue raw = prim.GetCustomDataByKey(kLookAtRaw);
+        if (raw.IsHolding<std::string>())
+        {
+            vrmRetarget::ParseLookAtRangeMaps(raw.UncheckedGet<std::string>(), &avatar->lookAtRig,
+                                              &avatar->warnings);
+        }
+        TfToken type;
+        if (prim.GetAttribute(kVrmType).Get(&type))
+        {
+            if (type == TfToken("bone"))
+            {
+                avatar->lookAtRig.type = vrmRetarget::LookAtType::Bone;
+            }
+            else if (type == TfToken("expression"))
+            {
+                avatar->lookAtRig.type = vrmRetarget::LookAtType::Expression;
+            }
+            else if (!type.IsEmpty())
+            {
+                avatar->warnings.push_back("avatar look-at states vrm:type '" + type.GetString() +
+                                           "', which is neither 'bone' nor 'expression'; the "
+                                           "preserved block's own type is used instead");
+            }
+        }
+        avatar->lookAtRig.leftEyeJoint =
+            ReadEyeJoint(prim, kLeftEye, avatar->skeleton, &avatar->warnings);
+        avatar->lookAtRig.rightEyeJoint =
+            ReadEyeJoint(prim, kRightEye, avatar->skeleton, &avatar->warnings);
+    }
+    return true;
+}
+
+bool
+ReadClip(const std::string& path, const std::string& skeletonPathOverride, Clip* clip,
+         Failure* failure)
+{
+    clip->stage = UsdStage::Open(path);
+    if (!clip->stage)
+    {
+        return FailToOpen(path, "animation", failure);
+    }
+    clip->timeCodesPerSecond = clip->stage->GetTimeCodesPerSecond();
+    if (clip->timeCodesPerSecond <= 0.0)
+    {
+        clip->timeCodesPerSecond = 30.0;
+    }
+
+    UsdSkelSkeleton skeleton;
+    if (!FindSkeleton(clip->stage, skeletonPathOverride, "animation",
+                      ExitCode::UnsupportedSourceFeature, &skeleton, failure))
+    {
+        return false;
+    }
+    clip->skeletonPath = skeleton.GetPath();
+
+    UsdPrim animationPrim;
+    if (!UsdSkelBindingAPI(skeleton.GetPrim()).GetAnimationSource(&animationPrim) || !animationPrim)
+    {
+        // A clip layer whose skeleton carries no binding is still usable when
+        // the stage holds exactly one SkelAnimation.
+        std::vector<UsdPrim> animations;
+        for (const UsdPrim& prim : clip->stage->Traverse())
+        {
+            if (prim.IsA<UsdSkelAnimation>())
+            {
+                animations.push_back(prim);
+            }
+        }
+        if (animations.size() != 1)
+        {
+            return Fail(failure, ExitCode::UnsupportedSourceFeature,
+                        "clip skeleton <" + clip->skeletonPath.GetString() +
+                            "> has no skel:animationSource and the stage "
+                            "does not hold exactly one UsdSkelAnimation");
+        }
+        animationPrim = animations.front();
+    }
+
+    const UsdSkelAnimation animation(animationPrim);
+    VtTokenArray animationJoints;
+    if (!animation.GetJointsAttr().Get(&animationJoints) || animationJoints.empty())
+    {
+        return Fail(failure, ExitCode::UnsupportedSourceFeature,
+                    "clip animation <" + animationPrim.GetPath().GetString() + "> has no joints");
+    }
+
+    // Semantic joint -> human bone, plus the clip's own rest pose.
+    std::vector<motion::HumanBone> boneForJoint(animationJoints.size(), motion::HumanBone::Count);
+    std::size_t recognized = 0;
+    for (std::size_t i = 0; i < animationJoints.size(); ++i)
+    {
+        const auto bone = motion::FindHumanBone(LeafToken(animationJoints[i].GetString()));
+        if (bone)
+        {
+            boneForJoint[i] = *bone;
+            ++recognized;
+        }
+        else
+        {
+            clip->warnings.push_back("clip joint '" + animationJoints[i].GetString() +
+                                     "' is not a VRM human bone and was ignored");
+        }
+    }
+    if (recognized == 0)
+    {
+        return Fail(failure, ExitCode::UnsupportedSourceFeature,
+                    "no joint of clip animation <" + animationPrim.GetPath().GetString() +
+                        "> names a VRM human bone; is this an "
+                        "avatar-independent semantic clip?");
+    }
+
+    VtTokenArray restJoints;
+    VtMatrix4dArray restTransforms;
+    if (ReadSkeletonRest(skeleton, &restJoints, &restTransforms, &clip->warnings))
+    {
+        std::map<std::string, std::size_t> restIndexByJoint;
+        for (std::size_t i = 0; i < restJoints.size(); ++i)
+        {
+            restIndexByJoint[restJoints[i].GetString()] = i;
+        }
+        // The clip skeleton's joint paths give the semantic parent, so the rest
+        // correction does not need a second copy of the humanoid taxonomy.
+        for (std::size_t i = 0; i < restJoints.size(); ++i)
+        {
+            const std::string jointPath = restJoints[i].GetString();
+            const auto bone = motion::FindHumanBone(LeafToken(jointPath));
+            if (!bone)
+            {
+                continue;
+            }
+            const auto slot = static_cast<std::size_t>(*bone);
+            GfQuatf rotation;
+            GfVec3f translation;
+            DecomposeRest(restTransforms[i], &rotation, &translation);
+            clip->restPose.localRotations[slot] = rotation;
+            clip->restPose.localTranslations[slot] = translation;
+
+            const std::size_t separator = jointPath.rfind('/');
+            if (separator == std::string::npos)
+            {
+                continue;
+            }
+            const auto parentBone =
+                motion::FindHumanBone(LeafToken(jointPath.substr(0, separator)));
+            if (parentBone)
+            {
+                clip->restPose.SetParent(*bone, *parentBone);
+            }
+        }
+    }
+
+    const UsdAttribute rotationsAttr = animation.GetRotationsAttr();
+    const UsdAttribute translationsAttr = animation.GetTranslationsAttr();
+
+    std::vector<double> rotationTimes;
+    std::vector<double> translationTimes;
+    rotationsAttr.GetTimeSamples(&rotationTimes);
+    translationsAttr.GetTimeSamples(&translationTimes);
+
+    std::set<double> timeCodes(rotationTimes.begin(), rotationTimes.end());
+    timeCodes.insert(translationTimes.begin(), translationTimes.end());
+
+    // The clip's expression tracks, in the shape motionCore carries them: a
+    // verbatim name and one weight per sample. Their key times join the body's,
+    // because expressions live on the pose and a face key is a sample of the
+    // same performance — a clip that blinks between two body keys would
+    // otherwise have nowhere to say so.
+    struct ClipExpression
+    {
+        std::string name;
+        UsdAttribute weight;
+    };
+    std::vector<ClipExpression> clipExpressions;
+    std::set<std::string> clipExpressionNames;
+    for (const UsdPrim& prim : clip->stage->Traverse())
+    {
+        if (!prim.HasAttribute(kExpressionName))
+        {
+            continue;
+        }
+        const std::string name = ReadExpressionName(prim);
+        if (name.empty())
+        {
+            clip->warnings.push_back("clip expression <" + prim.GetPath().GetString() +
+                                     "> authors no vrm:expressionName, so no avatar can bind it");
+            continue;
+        }
+        const UsdAttribute weightAttr = prim.GetAttribute(kExpressionWeight);
+        // Declared and never driven is *not* a weight of zero. An unreported
+        // name means the producer said nothing about that expression, and
+        // inventing a zero here would author it — holding the rig's face at the
+        // neutral shape for the whole clip on the strength of a prim that only
+        // said the expression exists.
+        if (!weightAttr || !weightAttr.HasValue())
+        {
+            continue;
+        }
+        if (!clipExpressionNames.insert(name).second)
+        {
+            clip->warnings.push_back("clip animates expression '" + name + "' more than once; <" +
+                                     prim.GetPath().GetString() + "> is ignored");
+            continue;
+        }
+        clipExpressions.push_back(ClipExpression{name, weightAttr});
+
+        std::vector<double> weightTimes;
+        weightAttr.GetTimeSamples(&weightTimes);
+        timeCodes.insert(weightTimes.begin(), weightTimes.end());
+    }
+
+    // The clip's gaze track, on the same union of key times for the reason the
+    // expressions are on it: a look-at channel keys into the instants the poses
+    // already exist at, so a gaze that moves between two body keys has
+    // somewhere to say so.
+    UsdAttribute lookAtTargetAttr;
+    for (const UsdPrim& prim : clip->stage->Traverse())
+    {
+        const UsdAttribute target = prim.GetAttribute(kLookAtTarget);
+        const UsdAttribute offset = prim.GetAttribute(kLookAtOffset);
+        if (!target && !offset)
+        {
+            continue;
+        }
+        if (clip->hasLookAtTrack || clip->lookAtOffsetFromHeadBone)
+        {
+            clip->warnings.push_back("clip carries more than one look-at prim; <" +
+                                     prim.GetPath().GetString() + "> is ignored");
+            continue;
+        }
+        GfVec3f offsetValue(0.0f);
+        if (offset && offset.Get(&offsetValue))
+        {
+            clip->lookAtOffsetFromHeadBone = offsetValue;
+        }
+        // A prim that states an offset and no target is a clip that measured
+        // the rig it was authored on and animated no gaze -- which the VRMA
+        // reader authors deliberately, so it is not a defect here either.
+        if (target && target.HasValue())
+        {
+            lookAtTargetAttr = target;
+            clip->hasLookAtTrack = true;
+            std::vector<double> targetTimes;
+            target.GetTimeSamples(&targetTimes);
+            timeCodes.insert(targetTimes.begin(), targetTimes.end());
+        }
+    }
+
+    if (timeCodes.empty())
+    {
+        // A clip with no time samples still has a default value; treat it as a
+        // single pose at the stage's start -- an instant the stage chose, not
+        // one the clip stated, which is what the code says.
+        timeCodes.insert(clip->stage->GetStartTimeCode());
+        clip->diagnostics.Report(vrmRetarget::MakeRetargetDiagnostic(
+            vrmRetarget::RetargetDiagnosticCode::TimeRangeDerived,
+            animationPrim.GetPath().GetString(),
+            "the clip states no time samples, so its one pose is placed at "
+            "the stage's start time code, " +
+                TfStringify(clip->stage->GetStartTimeCode())));
+    }
+
+    // The scale policy: a clip that animates scale is read, and its scale is
+    // not carried -- the bake authors the rig's rest scale. Said once, naming
+    // the first joint and instant that stated one, so the drop is never silent.
+    // A clip that states no `scales`, or states identity, raises nothing.
+    const UsdAttribute scalesAttr = animation.GetScalesAttr();
+    std::vector<UsdTimeCode> scaleTimes{UsdTimeCode::Default()};
+    {
+        std::vector<double> times;
+        scalesAttr.GetTimeSamples(&times);
+        scaleTimes.insert(scaleTimes.end(), times.begin(), times.end());
+    }
+    for (const UsdTimeCode at : scaleTimes)
+    {
+        VtVec3hArray scales;
+        if (!scalesAttr.Get(&scales, at))
+        {
+            continue;
+        }
+        const auto nonUnit = std::find_if(scales.begin(), scales.end(), [](const GfVec3h& scale)
+                                          { return scale != GfVec3h(1.0f); });
+        if (nonUnit == scales.end())
+        {
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(nonUnit - scales.begin());
+        const std::string joint = index < animationJoints.size()
+                                      ? animationJoints[index].GetString()
+                                      : std::to_string(index);
+        clip->diagnostics.Report(vrmRetarget::MakeRetargetDiagnostic(
+            vrmRetarget::RetargetDiagnosticCode::NonUnitScale, animationPrim.GetPath().GetString(),
+            "the clip scales joint '" + joint + "' to " + TfStringify(GfVec3f(*nonUnit)) +
+                (at.IsDefault() ? std::string(" by default")
+                                : " at time code " + TfStringify(at.GetValue())) +
+                "; scale is not retargeted, so the bake keeps the rig's rest scale"));
+        break;
+    }
+
+    int hipsJointIndex = -1;
+    for (std::size_t i = 0; i < boneForJoint.size(); ++i)
+    {
+        if (boneForJoint[i] == motion::HumanBone::Hips)
+        {
+            hipsJointIndex = static_cast<int>(i);
+            break;
+        }
+    }
+
+    clip->animation.samples.reserve(timeCodes.size());
+    for (const double timeCode : timeCodes)
+    {
+        motion::HumanoidPose pose;
+        pose.timestamp = timeCode / clip->timeCodesPerSecond;
+
+        VtQuatfArray rotations;
+        if (rotationsAttr.Get(&rotations, timeCode) && rotations.size() == animationJoints.size())
+        {
+            for (std::size_t i = 0; i < rotations.size(); ++i)
+            {
+                if (boneForJoint[i] == motion::HumanBone::Count)
+                {
+                    continue;
+                }
+                const auto slot = static_cast<std::size_t>(boneForJoint[i]);
+                pose.localRotations[slot] = rotations[i].GetNormalized();
+                pose.validRotations.set(slot);
+            }
+        }
+
+        VtVec3fArray translations;
+        if (hipsJointIndex >= 0 && translationsAttr.Get(&translations, timeCode) &&
+            translations.size() == animationJoints.size())
+        {
+            // Only hips translation is body translation (motion contract); the
+            // rest is rest-pose data the retargeter re-derives per rig.
+            pose.root.worldPosition = translations[static_cast<std::size_t>(hipsJointIndex)];
+            pose.root.hasPosition = true;
+        }
+
+        if (lookAtTargetAttr)
+        {
+            // Get() answers with the default when the attribute has no time
+            // samples, so a gaze the clip stated once and a gaze it animates
+            // read the same way here -- and an attribute the clip never
+            // authored leaves the pose's target absent, which is not a gaze at
+            // the origin.
+            GfVec3f target;
+            if (lookAtTargetAttr.Get(&target, timeCode))
+            {
+                pose.lookAtTarget = target;
+            }
+        }
+
+        for (const ClipExpression& expression : clipExpressions)
+        {
+            float weight = 0.0f;
+            // Carried verbatim, out-of-range values included: the specification
+            // clamps when a weight is applied to a rig, and this is the read.
+            if (expression.weight.Get(&weight, timeCode))
+            {
+                pose.expressions.Set(expression.name, weight);
+            }
+        }
+
+        clip->animation.samples.push_back(std::move(pose));
+    }
+
+    clip->animation.startTime = clip->animation.samples.front().timestamp;
+    clip->animation.endTime = clip->animation.samples.back().timestamp;
+    clip->animation.nominalFrameRate = clip->timeCodesPerSecond;
+    clip->animation.source.kind = motion::MotionSourceKind::Clip;
+    clip->animation.source.sourceId = path;
+    return true;
+}
+
+namespace
+{
+
+// Asset paths are layer-relative and always forward-slashed, including on
+// Windows, so the authored layer stays portable.
+std::string
+RelativeAssetPath(const std::string& target, const std::string& fromLayer)
+{
+    namespace fs = std::filesystem;
+    std::error_code code;
+    const fs::path absoluteTarget = fs::absolute(fs::path(target), code);
+    if (code)
+    {
+        return target;
+    }
+    const fs::path layerDirectory = fs::absolute(fs::path(fromLayer), code).parent_path();
+    if (code)
+    {
+        return target;
+    }
+    const fs::path relative = fs::relative(absoluteTarget, layerDirectory, code);
+    if (code || relative.empty())
+    {
+        return absoluteTarget.generic_string();
+    }
+    std::string result = relative.generic_string();
+    if (result.compare(0, 2, "..") != 0 && result.compare(0, 2, "./") != 0)
+    {
+        result = "./" + result;
+    }
+    return result;
+}
+
+// Authors the resolved expression weights onto the animation.
+//
+// This is the other half of the same binding the joints already use: UsdSkel
+// carries blend-shape weights on the SkelAnimation the skeleton is bound to,
+// and hands each skinned prim the subset its own `skel:blendShapes` names. So
+// nothing is authored on the meshes — the avatar keeps owning its binds, the
+// way it keeps owning its rig — and what this writes is `blendShapes` plus one
+// weight array per sample.
+void
+AuthorBlendShapeWeights(const UsdSkelAnimation& authored, const Avatar& avatar,
+                        double timeCodesPerSecond,
+                        const std::vector<vrmRetarget::ResolvedExpressions>& expressions,
+                        WriteResult* result)
+{
+    // One slot per blend shape any sample drives, in blend-shape path order so
+    // that re-baking the same clip authors the same array.
+    std::set<std::string> driven;
+    for (const vrmRetarget::ResolvedExpressions& sample : expressions)
+    {
+        for (const vrmRetarget::ResolvedMorphTarget& morph : sample.morphTargets)
+        {
+            driven.insert(morph.target);
+        }
+    }
+
+    std::map<std::string, std::size_t> slotByTarget;
+    std::vector<TfToken> tokens;
+    std::map<std::string, std::string> targetByToken;
+    for (const std::string& target : driven)
+    {
+        const auto bound = avatar.blendShapeTokens.find(target);
+        if (bound == avatar.blendShapeTokens.end())
+        {
+            // The avatar declares the bind and no mesh of it binds the blend
+            // shape, so there is no token to name it by. Authoring the path
+            // would produce an array UsdSkel maps onto nothing at all.
+            result->warnings.push_back("no mesh of the avatar binds blend shape <" + target +
+                                       ">, so the weight the clip resolves onto it cannot be "
+                                       "authored");
+            continue;
+        }
+        const auto claimed = targetByToken.find(bound->second);
+        if (claimed != targetByToken.end())
+        {
+            result->warnings.push_back("blend shape <" + target + "> shares the bound name '" +
+                                       bound->second + "' with <" + claimed->second +
+                                       ">; only the latter is driven");
+            continue;
+        }
+        targetByToken.emplace(bound->second, target);
+        slotByTarget.emplace(target, tokens.size());
+        tokens.emplace_back(bound->second);
+    }
+    if (tokens.empty())
+    {
+        return;
+    }
+
+    authored.CreateBlendShapesAttr().Set(VtTokenArray(tokens.begin(), tokens.end()));
+    const UsdAttribute weights = authored.CreateBlendShapeWeightsAttr();
+
+    // A fixed-width array has no "absent", so every sample authors every slot —
+    // and a slot this sample did not resolve keeps the value the last one gave
+    // it rather than dropping to zero. That is the same rule one layer down: a
+    // reported zero is a statement and is authored, while an unreported name is
+    // the producer saying nothing, which leaves the weight where it was.
+    VtFloatArray values(tokens.size(), 0.0f);
+    for (const vrmRetarget::ResolvedExpressions& sample : expressions)
+    {
+        for (const vrmRetarget::ResolvedMorphTarget& morph : sample.morphTargets)
+        {
+            const auto slot = slotByTarget.find(morph.target);
+            if (slot != slotByTarget.end())
+            {
+                values[slot->second] = morph.weight;
+            }
+        }
+        weights.Set(values, UsdTimeCode(sample.timestamp * timeCodesPerSecond));
+    }
+    result->blendShapesAuthored = tokens.size();
+}
+
+} // namespace
+
+bool
+WriteRetargetedAnimation(const std::string& outputPath, const Avatar& avatar, const Clip& clip,
+                         const vrmRetarget::RetargetedAnimation& animation,
+                         const std::vector<vrmRetarget::ResolvedExpressions>& expressions,
+                         const std::string& animationName, WriteResult* result, Failure* failure)
+{
+    if (!TfIsValidIdentifier(animationName))
+    {
+        return Fail(failure, ExitCode::InvalidUserInput,
+                    "'" + animationName + "' is not a valid prim name");
+    }
+
+    // Re-baking over a previous run is the normal case, so clear an existing
+    // layer instead of failing the way UsdStage::CreateNew would.
+    SdfLayerRefPtr layer = SdfLayer::FindOrOpen(outputPath);
+    if (layer)
+    {
+        // FindOrOpen goes through the layer registry, so an output naming an
+        // input returns the very layer we just read — Clear() would empty it and
+        // Save() would write the result over the user's asset. Compare layer
+        // identity rather than the paths, so a different spelling of the same
+        // file is caught too.
+        const SdfLayerHandle opened(layer);
+        const char* collided = nullptr;
+        if (opened == avatar.stage->GetRootLayer())
+        {
+            collided = "avatar";
+        }
+        else if (opened == clip.stage->GetRootLayer())
+        {
+            collided = "animation";
+        }
+        if (collided)
+        {
+            // The arguments' fault and not the output's: the same file was
+            // named twice, and nothing has been written.
+            return Fail(
+                failure, ExitCode::InvalidUserInput,
+                vrmRetarget::FormatRetargetDiagnostic(vrmRetarget::MakeRetargetDiagnostic(
+                    vrmRetarget::RetargetDiagnosticCode::OutputCollidesWithInput, outputPath,
+                    std::string("--output names the ") + collided +
+                        " layer this retarget read, and writing it "
+                        "would replace it")));
+        }
+        layer->Clear();
+    }
+    else
+    {
+        layer = SdfLayer::CreateNew(outputPath);
+    }
+    if (!layer)
+    {
+        return Fail(failure, ExitCode::OutputAuthoringFailure,
+                    "could not create output layer: " + outputPath);
+    }
+    const UsdStageRefPtr stage = UsdStage::Open(layer);
+    if (!stage)
+    {
+        return Fail(failure, ExitCode::OutputAuthoringFailure,
+                    "could not open output layer as a stage: " + outputPath);
+    }
+
+    // Reference the avatar's defaultPrim onto a prim of the same name, so every
+    // path under it — including the skeleton's — composes at its original path
+    // and the binding override lands where the rig actually is.
+    const std::string rootName = avatar.defaultPrimPath.GetName();
+    const SdfPath rootPath = SdfPath::AbsoluteRootPath().AppendChild(TfToken(rootName));
+    const UsdPrim rootPrim = stage->DefinePrim(rootPath);
+    const std::string avatarLayerPath = avatar.stage->GetRootLayer()->GetIdentifier();
+    rootPrim.GetReferences().AddReference(RelativeAssetPath(avatarLayerPath, outputPath));
+    stage->SetDefaultPrim(rootPrim);
+
+    const SdfPath animationPath = rootPath.AppendChild(TfToken(animationName));
+    const UsdSkelAnimation authored = UsdSkelAnimation::Define(stage, animationPath);
+
+    VtTokenArray joints;
+    joints.reserve(animation.joints.size());
+    for (const std::string& joint : animation.joints)
+    {
+        joints.push_back(TfToken(joint));
+    }
+    authored.CreateJointsAttr().Set(joints);
+
+    // UsdSkel fetches translations, rotations, and scales as a unit and fails
+    // as a unit; `scales` has no schema fallback, so an animation without it
+    // binds cleanly, reads back correctly attribute by attribute, and then
+    // resolves no joint transforms at all. Retargeting never animates scale, so
+    // author one constant array rather than a per-sample track -- each joint's
+    // *rest* scale, because UsdSkel takes an animated joint's transform from the
+    // animation whole and identity would replace a scaled rest (the scale
+    // policy).
+    VtVec3hArray restScales(animation.joints.size(), GfVec3h(1.0f));
+    for (std::size_t i = 0; i < animation.joints.size(); ++i)
+    {
+        const int joint = avatar.skeleton.FindJoint(animation.joints[i]);
+        if (joint != vrmRetarget::TargetSkeleton::kNoParent)
+        {
+            restScales[i] =
+                GfVec3h(avatar.skeleton.GetJoints()[static_cast<std::size_t>(joint)].restScale);
+        }
+    }
+    authored.CreateScalesAttr().Set(restScales);
+
+    const UsdAttribute rotations = authored.CreateRotationsAttr();
+    const UsdAttribute translations = authored.CreateTranslationsAttr();
+    for (const vrmRetarget::RetargetedPose& sample : animation.samples)
+    {
+        const UsdTimeCode timeCode(sample.timestamp * clip.timeCodesPerSecond);
+        rotations.Set(VtQuatfArray(sample.rotations.begin(), sample.rotations.end()), timeCode);
+        translations.Set(VtVec3fArray(sample.translations.begin(), sample.translations.end()),
+                         timeCode);
+    }
+
+    // The face, on the same samples and the same animation prim. `expressions`
+    // is either empty or one entry per sample; a mismatch would author weights
+    // against the wrong instants, so it is refused rather than truncated.
+    if (!expressions.empty())
+    {
+        if (expressions.size() != animation.samples.size())
+        {
+            return Fail(failure, ExitCode::OutputAuthoringFailure,
+                        "resolved " + std::to_string(expressions.size()) +
+                            " expression sample(s) for " +
+                            std::to_string(animation.samples.size()) + " retargeted sample(s)");
+        }
+        AuthorBlendShapeWeights(authored, avatar, clip.timeCodesPerSecond, expressions, result);
+    }
+
+    // Bind the result on an override of the referenced skeleton rather than by
+    // redefining it, so the avatar keeps owning its own rig.
+    const UsdPrim skeletonOverride = stage->OverridePrim(avatar.skeletonPath);
+    if (!skeletonOverride)
+    {
+        return Fail(failure, ExitCode::OutputAuthoringFailure,
+                    "could not author a binding override at <" + avatar.skeletonPath.GetString() +
+                        ">");
+    }
+    // Apply the schema, don't just author the relationship: UsdSkel resolves
+    // skel:animationSource only on a prim that carries SkelBindingAPI, so a
+    // bare rel leaves the rig in its rest pose with no diagnostic.
+    const UsdSkelBindingAPI skeletonBinding = UsdSkelBindingAPI::Apply(skeletonOverride);
+    if (!skeletonBinding)
+    {
+        return Fail(failure, ExitCode::OutputAuthoringFailure,
+                    "could not apply SkelBindingAPI at <" + avatar.skeletonPath.GetString() + ">");
+    }
+    skeletonBinding.CreateAnimationSourceRel().SetTargets({animationPath});
+
+    stage->SetTimeCodesPerSecond(clip.timeCodesPerSecond);
+    if (!animation.samples.empty())
+    {
+        stage->SetStartTimeCode(animation.startTime * clip.timeCodesPerSecond);
+        stage->SetEndTimeCode(animation.endTime * clip.timeCodesPerSecond);
+    }
+
+    // Stage metrics come from the root layer alone — the reference authored
+    // above does not carry them. An output that declares neither resolves to
+    // USD's defaults, so a `.vrm` rig that says `metersPerUnit = 1` composes
+    // back as a 1.6 cm avatar. Carry what the avatar resolves rather than
+    // assuming VRM's values: the tool takes any rig OpenUSD can open, and a
+    // plain `.usda` one may legitimately declare either.
+    UsdGeomSetStageMetersPerUnit(stage, UsdGeomGetStageMetersPerUnit(avatar.stage));
+    UsdGeomSetStageUpAxis(stage, UsdGeomGetStageUpAxis(avatar.stage));
+
+    if (!stage->GetRootLayer()->Save())
+    {
+        return Fail(failure, ExitCode::OutputAuthoringFailure, "could not save " + outputPath);
+    }
+    return true;
+}
+
+} // namespace motionRetargetTool
