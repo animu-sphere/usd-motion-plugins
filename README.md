@@ -8,7 +8,7 @@ Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
 of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
 bridge every avatar format and every motion source share.
 
-> **Status: v0.5.0, the first release — every library is installable.** Seven
+> **Status: v0.5.0 is published — every library is installable.** Seven
 > libraries are published as digest-pinned artifacts another repository names
 > in its own `requires.libraries`: `motionCore` — the value types every other
 > library builds on — `motionSampling`, `motionRecording`, `motionRetarget`,
