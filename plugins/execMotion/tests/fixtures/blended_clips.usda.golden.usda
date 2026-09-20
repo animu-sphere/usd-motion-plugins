@@ -9,7 +9,7 @@
     codes per second, so frame 50 is second 1, the head at 45 degrees about +Y
     and the hips at (0, 0.5, 1). /Turn holds still and differs from it in every
     field the suite reads: the head at 90 degrees about the same axis, the hips
-    at (2, 0, 0), and only two bones named -- so a spine and a chest that come
+    at (2, 0, 0), and only two joints named -- so a spine and a chest that come
     back from a blend can only have come from /Walk.
 
     /Blend is a UsdSkelAnimation that states nothing of its own but what to

@@ -220,10 +220,12 @@ _expect(rules.forbidden_imports(POSIX_BASELINE, False, "case") == [],
 # The schema partition
 # ---------------------------------------------------------------------------
 
+# One schema is this repository's; a rig schema and a vendor API belong to a
+# consumer's bundle, so they are None here rather than assigned to it.
 for schema, owner in {"UsdSkelAnimation": "execMotion",
-                      "UsdSkelSkeleton": "execVrm",
-                      "UsdSkelBindingAPI": "execVrm",
-                      "UsdVrmHumanoidAPI": "execVrm",
+                      "UsdSkelSkeleton": None,
+                      "UsdSkelBindingAPI": None,
+                      "UsdVrmHumanoidAPI": None,
                       "UsdGeomXformable": None}.items():
     _expect(rules.schema_owner(schema) == owner,
             f"{schema} is assigned to {rules.schema_owner(schema)}, not {owner}")

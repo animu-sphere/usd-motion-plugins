@@ -10,9 +10,9 @@
     between the two through motion.extractRootMotion is the policy and nothing
     else. That is what makes the pair measure the wrapper's rule the same way
     filtered_clip.usda does for smoothing: a clip stating nothing gets
-    motion::LiveCaptureConfig's own default, which is DeriveVelocity, and this
-    one states `passthrough` -- the one neighbouring policy whose answer differs
-    from the default by exactly one field.
+    openstrata::motion::LiveCaptureConfig's own default, which is
+    DeriveVelocity, and this one states `passthrough` -- the one neighbouring
+    policy whose answer differs from the default by exactly one field.
 
     So the pair is a two-sided measurement rather than one. Over the same two
     poses the default derives a linear velocity and this clip does not, and

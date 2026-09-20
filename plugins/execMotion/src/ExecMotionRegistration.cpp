@@ -7,18 +7,18 @@
 // decides is in ExecMotionPose.cpp, over plain values; this file only marshals
 // exec's inputs into those calls and hands the results back. That split is the
 // plan's "a node is a thin wrapper" rule made structural rather than intended
-// (motion policy §11.4) -- and it is what let this bundle record, rather than
+// (design policy §21) -- and it is what let this bundle record, rather than
 // hide, that `motion.sampleAnimation` has no library call to wrap
 // (docs/reports/openusd/26.08-openexec-sampling.md §5).
 //
 // # Why a registered aggregate
 //
-// `ExecTypeRegistry::RegisterType` static_asserts `!VtIsArray`, so a pose cannot
-// cross a computation boundary as a `VtArray`. It also static_asserts equality
-// comparability, which `motion::HumanoidPose` has carried since v0.6.0. So the
-// canonical type crosses unchanged, which is the only shape under which a node
-// stays a wrapper -- the alternatives dissolve the pose into channels and put
-// the joint-ordering contract into masks
+// `ExecTypeRegistry::RegisterType` static_asserts `!VtIsArray`, so a pose
+// cannot cross a computation boundary as a `VtArray`. It also static_asserts
+// equality comparability, which `openstrata::motion::MotionPose` has carried
+// since v0.6.0. So the canonical type crosses unchanged, which is the only
+// shape under which a node stays a wrapper -- the alternatives dissolve the
+// pose into channels and put the joint-ordering contract into masks
 // (docs/reports/openusd/26.08-openexec-migration.md §4).
 //
 // # How a computation here refuses
@@ -30,12 +30,13 @@
 // The rule is one rule and it is the same one the rate's refusal was written
 // for: an answer nobody can tell from a refusal is worse than no answer. A
 // default-constructed result fails that test for every type this bundle
-// produces -- an empty `motion::HumanoidPose` is what a clip whose `joints` name
-// no canonical bone legitimately samples to, and a cleared `motion::RootMotion`
-// is `motion:root:intake = "ignore"`'s own answer, bit for bit. So a refusal
-// that produced one would hand a misspelled `passthrough` the exact behaviour of
-// a deliberate `ignore`, for any consumer not inspecting `TfError`s. The same
-// holds for `motion::PoseSampleResult`, whose default is `Unavailable` -- the
+// produces -- an empty `openstrata::motion::MotionPose` is what a clip whose
+// `joints` name no canonical joint legitimately samples to, and a cleared
+// `openstrata::motion::RootMotion` is `motion:root:intake = "ignore"`'s own
+// answer, bit for bit. So a refusal that produced one would hand a misspelled
+// `passthrough` the exact behaviour of a deliberate `ignore`, for any consumer
+// not inspecting `TfError`s. The same holds for
+// `openstrata::motion::PoseSampleResult`, whose default is `Unavailable` -- the
 // library's answer for a history that holds nothing, which is a legitimate
 // answer and not the same statement as "this history cannot be sampled".
 //
@@ -52,7 +53,8 @@
 // A computation is registered *for a schema*, and 26.08 lets exactly one plugin
 // declare a given schema: a second declarer is a coding error and its
 // computations for that schema silently never register. `UsdSkelAnimation` is
-// therefore this bundle's, and `execVrm` reaches an animation through an input
+// therefore this bundle's, and a consumer's bundle (usd-vrm-plugins'
+// execVrm) reaches an animation through an input
 // accessor rather than by registering on it (WORKSPACE.md §2).
 
 #include "ExecMotionPose.h"
@@ -102,15 +104,15 @@ TF_DEFINE_PRIVATE_TOKENS(
     // shim for that gap and is meant to go away when it closes.
     ((timeCodesPerSecond, "motion:timeCodesPerSecond"))
     // What a clip states about how it wants to be smoothed. All three are
-    // optional and an absent one keeps `motion::PoseFilter`'s own default --
-    // see ExecMotionPose.h for why these are defaulted where the rate above is
-    // refused.
+    // optional and an absent one keeps `openstrata::motion::PoseFilter`'s own
+    // default -- see ExecMotionPose.h for why these are defaulted where the
+    // rate above is refused.
     ((cutoffHz, "motion:filter:cutoffHz"))((filterRootPosition, "motion:filter:rootPosition"))(
         (filterRootOrientation, "motion:filter:rootOrientation"))
     // What a clip states about how its root is taken in: one of
-    // `motion::RootMotionIntake`'s three policies, spelled in lowerCamelCase.
-    // Absent is the library's own default; a token naming no policy is refused
-    // (ExecMotionPose.h, RootIntakeForToken).
+    // `openstrata::motion::RootMotionIntake`'s three policies, spelled in
+    // lowerCamelCase. Absent is the library's own default; a token naming no
+    // policy is refused (ExecMotionPose.h, RootIntakeForToken).
     ((rootIntake, "motion:root:intake"))
     // Where the root places something, as a matrix an Xformable can take: the
     // attribute an `xformOp:transform` connects to, so a display reaches the
@@ -136,20 +138,20 @@ TF_REGISTRY_FUNCTION(ExecTypeRegistry)
     // shape invented here, and it satisfies the registry's two requirements --
     // not a `VtArray`, and equality comparable.
     //
-    //   * `motion::RootMotion` is what `motion.extractRootMotion` produces;
-    //   * `motion::HumanoidAnimation` is the snapshot `motion.poseHistory`
+    //   * `openstrata::motion::RootMotion` is what `motion.extractRootMotion` produces;
+    //   * `openstrata::motion::MotionClip` is the snapshot `motion.poseHistory`
     //     carries, and what a driver overrides it with -- a history of samples
     //     crosses as the canonical clip aggregate, whose `std::vector` of poses
     //     is not a `VtArray` and so is not refused;
-    //   * `motion::PoseSampleResult` is what `motion.interpolatePose` produces,
-    //     and the one type here that is `motionRuntime`'s rather than
+    //   * `openstrata::motion::PoseSampleResult` is what `motion.interpolatePose` produces,
+    //     and the one type here that is `motionSampling`'s rather than
     //     `motionCore`'s. It is the only one that needed a change to register:
     //     it had no `operator==` until this node asked for one, the same ask
     //     `motionCore`'s aggregates answered in v0.6.0.
-    ExecTypeRegistry::RegisterType(motion::HumanoidPose{});
-    ExecTypeRegistry::RegisterType(motion::RootMotion{});
-    ExecTypeRegistry::RegisterType(motion::HumanoidAnimation{});
-    ExecTypeRegistry::RegisterType(motion::PoseSampleResult{});
+    ExecTypeRegistry::RegisterType(openstrata::motion::MotionPose{});
+    ExecTypeRegistry::RegisterType(openstrata::motion::RootMotion{});
+    ExecTypeRegistry::RegisterType(openstrata::motion::MotionClip{});
+    ExecTypeRegistry::RegisterType(openstrata::motion::PoseSampleResult{});
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
@@ -157,7 +159,7 @@ PXR_NAMESPACE_CLOSE_SCOPE
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
 {
     self.PrimComputation(_tokens->identityPose)
-        .Callback<motion::HumanoidPose>(+[](const VdfContext& ctx)
+        .Callback<openstrata::motion::MotionPose>(+[](const VdfContext& ctx)
                                         {
                                             std::vector<std::string> jointPaths;
                                             VdfReadIterator<TfToken> joint(ctx, _tokens->joints);
@@ -174,7 +176,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                                             // callback reads exactly one thing, and it is declared there.
                                             //
                                             // The pose carries NO timestamp, and that is a measurement rather
-                                            // than an omission. A time code is a FRAME; `HumanoidPose::timestamp`
+                                            // than an omission. A time code is a FRAME; `MotionPose::timestamp`
                                             // is SECONDS; converting needs the stage's `timeCodesPerSecond`, and
                                             // a computation cannot reach it. `Stage().Metadata<double>()` for
                                             // that field is accepted by the builder, is not refused even with
@@ -209,12 +211,12 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     //
     // **Nothing here interpolates.** A frame between two keys is resolved by
     // USD, not by this bundle, which is why this node is not a wrapper over
-    // `motion::SampleAnimation` -- that function is handed a whole
-    // `HumanoidAnimation` and performs its own lookup, and an exec input arrives
-    // already resolved at one time. The two answers are compared at P0-6 rather
+    // `openstrata::motion::SampleAnimation` -- that function is handed a whole
+    // `MotionClip` and performs its own lookup, and an exec input arrives
+    // already resolved at one time. The two answers are compared by usd-vrm-plugins' parity rows rather
     // than assumed equal.
     self.PrimComputation(_tokens->sampleAnimation)
-        .Callback<motion::HumanoidPose>(
+        .Callback<openstrata::motion::MotionPose>(
             +[](const VdfContext& ctx)
             {
                 execmotion::ClipSample sample;
@@ -263,7 +265,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                     sample.hasTimeCode = true;
                 }
 
-                if (std::optional<motion::HumanoidPose> pose =
+                if (std::optional<openstrata::motion::MotionPose> pose =
                         execmotion::PoseFromClipSample(sample))
                 {
                     ctx.SetOutput(*pose);
@@ -279,7 +281,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                 // And the refusal sets NO value rather than a default-constructed
                 // one, which is this bundle's one refusal shape (see the block
                 // above the registrations). An empty pose is a pose a clip can
-                // legitimately produce -- one whose `joints` name no canonical bone
+                // legitimately produce -- one whose `joints` name no canonical joint
                 // does -- so returning one would make a refusal indistinguishable
                 // from an answer for anyone not reading TfErrors.
                 TF_RUNTIME_ERROR("motion.sampleAnimation: the clip states no usable "
@@ -308,39 +310,36 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // static in the callback is mutable state invalidation cannot see, and a
     // second attribute stating "the previous pose" would put a derived value
     // into the scene. So the recurrence stays with whoever drives the graph --
-    // which is where it already lives for a live source, in `motionRuntime`'s
+    // which is where it already lives for a live source, in `motionSampling`'s
     // pose buffer -- and reaches exec as an override on this key.
     //
     // Forwarding, rather than a second copy of the sampling callback: the two
     // value keys must be distinct so an override can name one of them, but the
     // behaviour must not be. Un-overridden, `motion.filterPose` therefore
-    // smooths the clip against itself, which `motion::PoseFilter` answers by
-    // returning it unchanged -- the pass-through falls out of `dt == 0` rather
-    // than being special-cased anywhere in this bundle.
+    // smooths the clip against itself, which `openstrata::motion::PoseFilter`
+    // answers by returning it unchanged -- the pass-through falls out of `dt ==
+    // 0` rather than being special-cased anywhere in this bundle.
     self.PrimComputation(_tokens->priorPose)
-        .Callback<motion::HumanoidPose>(+[](const VdfContext& ctx)
-                                        {
-                                            const motion::HumanoidPose* const pose =
-                                                ctx.GetInputValuePtr<motion::HumanoidPose>(
-                                                    _tokens->sampleAnimation);
-                                            if (!pose)
-                                            {
-                                                // The node it forwards refused, and forwarding means forwarding
-                                                // that too: a default pose here would turn one node's refusal
-                                                // into another node's answer, and would be the value an
-                                                // override is compared against besides.
-                                                ctx.SetEmptyOutput();
-                                                return;
-                                            }
-                                            ctx.SetOutput(*pose);
-                                        })
-        .Inputs(Computation<motion::HumanoidPose>(_tokens->sampleAnimation).Required());
+        .Callback<openstrata::motion::MotionPose>(+[](const VdfContext& ctx) {
+            const openstrata::motion::MotionPose* const pose =
+                ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->sampleAnimation);
+            if (!pose) {
+                // The node it forwards refused, and forwarding means forwarding
+                // that too: a default pose here would turn one node's refusal
+                // into another node's answer, and would be the value an
+                // override is compared against besides.
+                ctx.SetEmptyOutput();
+                return;
+            }
+            ctx.SetOutput(*pose);
+        })
+        .Inputs(Computation<openstrata::motion::MotionPose>(_tokens->sampleAnimation).Required());
 
     // -----------------------------------------------------------------------
-    // motion.filterPose -- one step of motion::PoseFilter
+    // motion.filterPose -- one step of openstrata::motion::PoseFilter
     // -----------------------------------------------------------------------
     //
-    // The first node in this bundle that wraps `motionRuntime`, and the first
+    // The first node in this bundle that wraps `motionSampling`, and the first
     // that consumes another computation's result rather than an attribute --
     // the plan's chain (SampleAnimation -> FilterPose -> ...) as two links.
     //
@@ -353,11 +352,11 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // weight is derived from, which is the whole reason the rate had to enter
     // the graph one node earlier.
     self.PrimComputation(_tokens->filterPose)
-        .Callback<motion::HumanoidPose>(
+        .Callback<openstrata::motion::MotionPose>(
             +[](const VdfContext& ctx)
             {
-                const motion::HumanoidPose* const pose =
-                    ctx.GetInputValuePtr<motion::HumanoidPose>(_tokens->sampleAnimation);
+                const openstrata::motion::MotionPose* const pose =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->sampleAnimation);
                 if (!pose)
                 {
                     // Required inputs are not guaranteed to arrive with a value
@@ -371,8 +370,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                     return;
                 }
 
-                const motion::HumanoidPose* const prior =
-                    ctx.GetInputValuePtr<motion::HumanoidPose>(_tokens->priorPose);
+                const openstrata::motion::MotionPose* const prior =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->priorPose);
 
                 execmotion::FilterPolicy policy;
                 if (const float* const cutoff = ctx.GetInputValuePtr<float>(_tokens->cutoffHz))
@@ -392,8 +391,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
 
                 ctx.SetOutput(execmotion::FilteredPose(prior ? *prior : *pose, *pose, policy));
             })
-        .Inputs(Computation<motion::HumanoidPose>(_tokens->sampleAnimation).Required(),
-                Computation<motion::HumanoidPose>(_tokens->priorPose).Required(),
+        .Inputs(Computation<openstrata::motion::MotionPose>(_tokens->sampleAnimation).Required(),
+                Computation<openstrata::motion::MotionPose>(_tokens->priorPose).Required(),
                 AttributeValue<float>(_tokens->cutoffHz),
                 AttributeValue<bool>(_tokens->filterRootPosition),
                 AttributeValue<bool>(_tokens->filterRootOrientation));
@@ -403,17 +402,17 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // -----------------------------------------------------------------------
     //
     // The first computation that produces something other than a pose, and the
-    // reason the bundle registers a second value type: a `motion::RootMotion`
-    // is what a consumer of body placement wants, and dissolving it into
-    // channels would put the presence flags into masks the way the migration
-    // report's rejected pose shapes did.
+    // reason the bundle registers a second value type: a
+    // `openstrata::motion::RootMotion` is what a consumer of body placement
+    // wants, and dissolving it into channels would put the presence flags into
+    // masks the way the migration report's rejected pose shapes did.
     //
     // It reads `motion.sampleAnimation` rather than `motion.filterPose`, and
     // that is the library's ordering rather than a preference:
     // `LiveCaptureSource` conditions the root of the frame as it *arrived* and
     // smooths afterwards, so a node deriving its velocity from a filtered
-    // position would answer a different question from the one `motionRuntime`
-    // answers, and P0-6 parity would have to explain the difference rather than
+    // position would answer a different question from the one `motionRecording`
+    // answers, and those parity rows would have to explain the difference rather than
     // measure it.
     //
     // The prior pose is the same `motion.priorPose` the filter takes, and it is
@@ -421,11 +420,11 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // feeds both nodes, because a velocity and a filter step want the identical
     // thing -- the previous frame's answer.
     self.PrimComputation(_tokens->extractRootMotion)
-        .Callback<motion::RootMotion>(
+        .Callback<openstrata::motion::RootMotion>(
             +[](const VdfContext& ctx)
             {
-                const motion::HumanoidPose* const pose =
-                    ctx.GetInputValuePtr<motion::HumanoidPose>(_tokens->sampleAnimation);
+                const openstrata::motion::MotionPose* const pose =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->sampleAnimation);
                 if (!pose)
                 {
                     // The one thing this node cannot compute without, checked
@@ -451,30 +450,32 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                         // defaulting there would hand a misspelled `Ignore` the
                         // root motion it asked not to have.
                         //
-                        // And this is the node where setting NO value rather than a
-                        // cleared one is load-bearing rather than tidy: a cleared
-                        // `motion::RootMotion` is `ignore`'s own legitimate answer,
-                        // bit for bit, so a refusal that produced one would hand a
-                        // misspelled `passthrough` the exact behaviour of a
-                        // deliberate `ignore` -- the mirror image of the mistake
-                        // the paragraph above refuses to make.
-                        TF_RUNTIME_ERROR("motion.extractRootMotion: the clip states "
-                                         "'motion:root:intake' = '%s', which names no "
-                                         "motion::RootMotionIntake policy; no root motion was "
-                                         "extracted",
-                                         stated->GetText());
+                        // And this is the node where setting NO value rather
+                        // than a cleared one is load-bearing rather than tidy:
+                        // a cleared `openstrata::motion::RootMotion` is
+                        // `ignore`'s own legitimate answer, bit for bit, so a
+                        // refusal that produced one would hand a misspelled
+                        // `passthrough` the exact behaviour of a deliberate
+                        // `ignore` -- the mirror image of the mistake the
+                        // paragraph above refuses to make.
+                        TF_RUNTIME_ERROR(
+                            "motion.extractRootMotion: the clip states "
+                            "'motion:root:intake' = '%s', which names no "
+                            "openstrata::motion::RootMotionIntake policy; no root motion was "
+                            "extracted",
+                            stated->GetText());
                         ctx.SetEmptyOutput();
                         return;
                     }
                 }
 
-                const motion::HumanoidPose* const prior =
-                    ctx.GetInputValuePtr<motion::HumanoidPose>(_tokens->priorPose);
+                const openstrata::motion::MotionPose* const prior =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->priorPose);
 
                 ctx.SetOutput(execmotion::RootMotionFrom(prior ? *prior : *pose, *pose, policy));
             })
-        .Inputs(Computation<motion::HumanoidPose>(_tokens->sampleAnimation).Required(),
-                Computation<motion::HumanoidPose>(_tokens->priorPose).Required(),
+        .Inputs(Computation<openstrata::motion::MotionPose>(_tokens->sampleAnimation).Required(),
+                Computation<openstrata::motion::MotionPose>(_tokens->priorPose).Required(),
                 AttributeValue<TfToken>(_tokens->rootIntake));
 
     // -----------------------------------------------------------------------
@@ -484,7 +485,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // The second value key in this bundle whose purpose is to be replaced, and
     // a different kind of thing from the first. `motion.priorPose` is the
     // graph's own previous *answer*, fed back; this is the source's *input*,
-    // handed in -- the "immutable snapshot" motion policy §11.4 puts between a
+    // handed in -- the "immutable snapshot" design policy §21 puts between a
     // live source's buffer and every computation. A computation never reaches
     // for a buffer, so the buffer's contents reach the graph the one way a
     // value the scene does not state can: `ComputeWithOverrides`.
@@ -495,35 +496,33 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // pass-through `motion.filterPose` has un-overridden, and special-cased in
     // neither.
     self.PrimComputation(_tokens->poseHistory)
-        .Callback<motion::HumanoidAnimation>(+[](const VdfContext& ctx)
-                                             {
-                                                 const motion::HumanoidPose* const pose =
-                                                     ctx.GetInputValuePtr<motion::HumanoidPose>(
-                                                         _tokens->sampleAnimation);
-                                                 if (!pose)
-                                                 {
-                                                     // Forwarding the refusal, as `motion.priorPose` does: a history
-                                                     // of one default pose would turn the sampler's refusal into a
-                                                     // sample, and an empty history would turn it into the library's
-                                                     // `Unavailable` -- an answer, and the wrong one.
-                                                     ctx.SetEmptyOutput();
-                                                     return;
-                                                 }
-                                                 ctx.SetOutput(execmotion::HistoryOfOne(*pose));
-                                             })
-        .Inputs(Computation<motion::HumanoidPose>(_tokens->sampleAnimation).Required());
+        .Callback<openstrata::motion::MotionClip>(+[](const VdfContext& ctx) {
+            const openstrata::motion::MotionPose* const pose =
+                ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->sampleAnimation);
+            if (!pose) {
+                // Forwarding the refusal, as `motion.priorPose` does: a history
+                // of one default pose would turn the sampler's refusal into a
+                // sample, and an empty history would turn it into the library's
+                // `Unavailable` -- an answer, and the wrong one.
+                ctx.SetEmptyOutput();
+                return;
+            }
+            ctx.SetOutput(execmotion::HistoryOfOne(*pose));
+        })
+        .Inputs(Computation<openstrata::motion::MotionPose>(_tokens->sampleAnimation).Required());
 
     // -----------------------------------------------------------------------
     // motion.interpolatePose -- what the history states at the evaluated time
     // -----------------------------------------------------------------------
     //
-    // `motion::ClipSource::Sample` over the snapshot, at the evaluated instant:
-    // `IMotionSource`'s one question, asked of the implementation that serves a
-    // finished animation. **Nothing here is a clip's interpolation** -- between
-    // two keys of a `UsdSkelAnimation` the answer is USD's, resolved before any
-    // callback runs (the sampling report section 5). What this node
-    // interpolates is a history the graph cannot see any other way: a driver's
-    // buffered samples, bracketing the instant the system is evaluating.
+    // `openstrata::motion::ClipSource::Sample` over the snapshot, at the
+    // evaluated instant: `IMotionSource`'s one question, asked of the
+    // implementation that serves a finished animation. **Nothing here is a
+    // clip's interpolation** -- between two keys of a `UsdSkelAnimation` the
+    // answer is USD's, resolved before any callback runs (the sampling report
+    // section 5). What this node interpolates is a history the graph cannot see
+    // any other way: a driver's buffered samples, bracketing the instant the
+    // system is evaluating.
     //
     // The instant arrives inside `motion.sampleAnimation`'s pose, as the
     // seconds that node stamped, rather than through `computeTime` and the rate
@@ -539,16 +538,16 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // input costs no extra recompute: the node is time dependent through both
     // of its other inputs already (the filtering report section 2).
     //
-    // The answer is the library's `motion::PoseSampleResult` whole. The pose in
-    // it is stamped at the evaluated instant whether the history reached that
-    // instant or not, so the status is the only thing that tells a sample from a
-    // hold -- and a stopped source answers `Held` forever.
+    // The answer is the library's `openstrata::motion::PoseSampleResult` whole.
+    // The pose in it is stamped at the evaluated instant whether the history
+    // reached that instant or not, so the status is the only thing that tells a
+    // sample from a hold -- and a stopped source answers `Held` forever.
     self.PrimComputation(_tokens->interpolatePose)
-        .Callback<motion::PoseSampleResult>(
+        .Callback<openstrata::motion::PoseSampleResult>(
             +[](const VdfContext& ctx)
             {
-                const motion::HumanoidPose* const pose =
-                    ctx.GetInputValuePtr<motion::HumanoidPose>(_tokens->sampleAnimation);
+                const openstrata::motion::MotionPose* const pose =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionPose>(_tokens->sampleAnimation);
                 if (!pose)
                 {
                     TF_RUNTIME_ERROR("motion.interpolatePose: no pose came back from "
@@ -573,8 +572,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                     return;
                 }
 
-                const motion::HumanoidAnimation* const history =
-                    ctx.GetInputValuePtr<motion::HumanoidAnimation>(_tokens->poseHistory);
+                const openstrata::motion::MotionClip* const history =
+                    ctx.GetInputValuePtr<openstrata::motion::MotionClip>(_tokens->poseHistory);
                 if (!history)
                 {
                     // Not reachable from the graph as declared: `motion.poseHistory`
@@ -596,7 +595,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                     return;
                 }
 
-                if (std::optional<motion::PoseSampleResult> result =
+                if (std::optional<openstrata::motion::PoseSampleResult> result =
                         execmotion::SampleHistory(*history, pose->timestamp))
                 {
                     ctx.SetOutput(*result);
@@ -614,8 +613,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                                  pose->timestamp);
                 ctx.SetEmptyOutput();
             })
-        .Inputs(Computation<motion::HumanoidPose>(_tokens->sampleAnimation).Required(),
-                Computation<motion::HumanoidAnimation>(_tokens->poseHistory).Required(),
+        .Inputs(Computation<openstrata::motion::MotionPose>(_tokens->sampleAnimation).Required(),
+                Computation<openstrata::motion::MotionClip>(_tokens->poseHistory).Required(),
                 Stage().Computation<EfTime>(ExecBuiltinComputations->computeTime).Required());
 
     // -----------------------------------------------------------------------
@@ -624,7 +623,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     //
     // The one node in this bundle that wants poses from more than one place,
     // and so the one where 26.08's fan-in rules land -- which is why the plan
-    // put it last. It is `motion::BlendPoses` over what the clips
+    // put it last. It is `openstrata::motion::BlendPoses` over what the clips
     // `motion:blend:sources` targets each sample at this frame, weighted by
     // `motion:blend:weights`: one library call, like `motion.interpolatePose`.
     //
@@ -650,7 +649,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // dependence reaches it across the fan-in from every source that has it
     // (measured, the filtering report section 2 across a relationship).
     self.PrimComputation(_tokens->blendPoses)
-        .Callback<motion::HumanoidPose>(
+        .Callback<openstrata::motion::MotionPose>(
             +[](const VdfContext& ctx)
             {
                 execmotion::BlendInputs inputs;
@@ -663,9 +662,10 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                 }
                 inputs.sourceCount = targets.size();
 
-                for (VdfReadIterator<motion::HumanoidPose> pose(ctx, _tokens->sourcePoses);
-                     !pose.IsAtEnd(); ++pose)
-                {
+                for (VdfReadIterator<openstrata::motion::MotionPose> pose(ctx,
+                                                                          _tokens->sourcePoses);
+                     !pose.IsAtEnd();
+                     ++pose) {
                     inputs.poses.push_back(*pose);
                 }
 
@@ -720,9 +720,10 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                                      inputs.weights.size(), inputs.sourceCount, named.c_str());
                     break;
                 case execmotion::BlendRefusal::WeightNotFinite:
-                    TF_RUNTIME_ERROR("motion.blendPoses: a 'motion:blend:weights' entry is not "
-                                     "finite, and motion::BlendPoses would carry it into every "
-                                     "rotation; no pose was blended");
+                    TF_RUNTIME_ERROR(
+                        "motion.blendPoses: a 'motion:blend:weights' entry is not "
+                        "finite, and openstrata::motion::BlendPoses would carry it into every "
+                        "rotation; no pose was blended");
                     break;
                 case execmotion::BlendRefusal::InstantsDisagree:
                     TF_RUNTIME_ERROR("motion.blendPoses: the sources (%s) were not sampled at "
@@ -734,10 +735,11 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                                      named.c_str());
                     break;
                 case execmotion::BlendRefusal::NothingWeighted:
-                    TF_RUNTIME_ERROR("motion.blendPoses: no 'motion:blend:weights' entry is "
-                                     "positive, and motion::BlendPoses answers that with a "
-                                     "default pose stamped 0.0 rather than at the instant the "
-                                     "sources were sampled; no pose was blended");
+                    TF_RUNTIME_ERROR(
+                        "motion.blendPoses: no 'motion:blend:weights' entry is "
+                        "positive, and openstrata::motion::BlendPoses answers that with a "
+                        "default pose stamped 0.0 rather than at the instant the "
+                        "sources were sampled; no pose was blended");
                     break;
                 }
                 ctx.SetEmptyOutput();
@@ -746,7 +748,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                     .TargetedObjects<SdfPath>(ExecBuiltinComputations->computePath)
                     .InputName(_tokens->sourcePaths),
                 Relationship(_tokens->blendSources)
-                    .TargetedObjects<motion::HumanoidPose>(_tokens->sampleAnimation)
+                    .TargetedObjects<openstrata::motion::MotionPose>(_tokens->sampleAnimation)
                     .InputName(_tokens->sourcePoses),
                 AttributeValue<float>(_tokens->blendWeights));
 
@@ -754,7 +756,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // motion:root:transform -- the root's placement, where a display reads it
     // -----------------------------------------------------------------------
     //
-    // The plan's P0-7, and not a computation: an **attribute expression**, which
+    // The display case, and not a computation: an **attribute expression**, which
     // replaces what `computeValue` answers for `motion:root:transform` on a clip
     // that declares it. That is the one route 26.08 leaves from this bundle to a
     // picture. `usdExecImaging` adapts exactly two schemas, and the one we can
@@ -780,29 +782,27 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // No `computeTime`: the placement is time dependent through the root motion
     // it reads, and declaring the frame again would say nothing new.
     self.AttributeExpression(_tokens->rootTransform)
-        .Callback<GfMatrix4d>(
-            +[](const VdfContext& ctx)
-            {
-                const motion::RootMotion* const root =
-                    ctx.GetInputValuePtr<motion::RootMotion>(_tokens->extractRootMotion);
-                if (!root)
-                {
-                    // Forwarding the refusal of the node it reads -- a sampler with
-                    // no rate, or an intake token naming no policy. That node has
-                    // already said why.
-                    ctx.SetEmptyOutput();
-                    return;
-                }
-                if (std::optional<GfMatrix4d> transform = execmotion::RootTransform(*root))
-                {
-                    ctx.SetOutput(*transform);
-                    return;
-                }
-                TF_RUNTIME_ERROR("motion:root:transform: the root motion states a position or "
-                                 "orientation that is not finite, or an orientation too short "
-                                 "to normalize, so it names no placement; no transform was "
-                                 "computed");
+        .Callback<GfMatrix4d>(+[](const VdfContext& ctx) {
+            const openstrata::motion::RootMotion* const root =
+                ctx.GetInputValuePtr<openstrata::motion::RootMotion>(_tokens->extractRootMotion);
+            if (!root) {
+                // Forwarding the refusal of the node it reads -- a sampler with
+                // no rate, or an intake token naming no policy. That node has
+                // already said why.
                 ctx.SetEmptyOutput();
-            })
-        .Inputs(Prim().Computation<motion::RootMotion>(_tokens->extractRootMotion).Required());
+                return;
+            }
+            if (std::optional<GfMatrix4d> transform = execmotion::RootTransform(*root)) {
+                ctx.SetOutput(*transform);
+                return;
+            }
+            TF_RUNTIME_ERROR("motion:root:transform: the root motion states a position or "
+                             "orientation that is not finite, or an orientation too short "
+                             "to normalize, so it names no placement; no transform was "
+                             "computed");
+            ctx.SetEmptyOutput();
+        })
+        .Inputs(Prim()
+                    .Computation<openstrata::motion::RootMotion>(_tokens->extractRootMotion)
+                    .Required());
 }

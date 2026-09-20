@@ -23,4 +23,5 @@ members = [
     "tools/motionBvhInspect",
     "tools/motionConvert",
     "tools/motionRecord",
+    "plugins/execMotion",
 ]

@@ -1,26 +1,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# execMotion — the vendor-neutral OpenExec motion bundle (Workspace Phase 8,
-# Motion Phase E). The boundary, four registered value types and eight
-# computations: `motion.identityPose`, which is the mechanism held at its
-# weakest possible value, `motion.sampleAnimation`, which reads a clip at the
-# evaluated frame, `motion.filterPose` with the `motion.priorPose` seam an
-# override enters through, `motion.extractRootMotion`, which is where the body
-# is under the clip's stated intake policy, `motion.interpolatePose`, which
-# samples the history a driver hands in through `motion.poseHistory`, and
-# `motion.blendPoses`, which weights the clips a relationship targets -- the
-# last of P0-4's nodes (docs/roadmap/openexec-foundation.md).
+# execMotion — the vendor-neutral OpenExec motion bundle, and this
+# workspace's one optional plugin (WORKSPACE.md §1.2). The boundary, four
+# registered value types and eight computations: `motion.identityPose`, which
+# is the mechanism held at its weakest possible value,
+# `motion.sampleAnimation`, which reads a clip at the evaluated frame,
+# `motion.filterPose` with the `motion.priorPose` seam an override enters
+# through, `motion.extractRootMotion`, which is where the body is under the
+# clip's stated intake policy, `motion.interpolatePose`, which samples the
+# history a driver hands in through `motion.poseHistory`, and
+# `motion.blendPoses`, which weights the clips a relationship targets.
 #
 # Self-contained so `ost plugin build plugins/execMotion` can configure it
 # directly, and also add_subdirectory()-able from the repo-root CMakeLists.txt
-# for the plain-CMake workflow — the same shape as every sibling bundle.
+# for the plain-CMake workflow — the same shape as every sibling member.
 cmake_minimum_required(VERSION 3.22)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
     file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION" _exec_motion_version LIMIT_COUNT 1)
     string(STRIP "${_exec_motion_version}" _exec_motion_version)
 else()
-    set(_exec_motion_version "0.9.0")  # mirrors openstrata.plugin.yaml
+    set(_exec_motion_version "0.1.0")  # mirrors openstrata.plugin.yaml
 endif()
 
 project(ExecMotionPlugin
@@ -28,8 +28,9 @@ project(ExecMotionPlugin
     DESCRIPTION "OpenExec computations over canonical motion"
     LANGUAGES CXX)
 
+# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2).
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -39,36 +40,47 @@ if(NOT _isMultiConfig AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Spelled USDVRM_BUILD_TESTS, like every sibling: the root defines it for all
-# bundles, and a bundle-private spelling is how usdVrmaFileFormat once shipped
-# a workspace lane that built it on three platforms and tested it on none.
-if(NOT DEFINED USDVRM_BUILD_TESTS)
-    option(USDVRM_BUILD_TESTS "Build usdVrm plugin tests" ${PROJECT_IS_TOP_LEVEL})
+# Spelled USDMOTION_BUILD_TESTS, like every member: the root defines it for
+# all of them, and a member-private spelling is how usd-vrm-plugins once
+# shipped a workspace lane that built a bundle on three platforms and tested
+# it on none.
+if(NOT DEFINED USDMOTION_BUILD_TESTS)
+    option(USDMOTION_BUILD_TESTS "Build usd-motion-plugins tests"
+           ${PROJECT_IS_TOP_LEVEL})
 endif()
 
 if(NOT pxr_FOUND)
     find_package(pxr REQUIRED CONFIG)
 endif()
-# The OpenUSD pin and the OpenExec capability probe. This bundle is the first
-# one that cannot link without the second half, so a runtime the probe refuses
-# would otherwise fail here as an unresolved symbol.
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdVrmOpenUsd.cmake")
+# The OpenUSD pin, and then the OpenExec probe -- which this member alone
+# calls, because it is the only one that cannot link without OpenExec, and
+# every library and tool here builds against a runtime that has none
+# (docs/architecture/DEPENDENCIES.md §1). A runtime the probe refuses would
+# otherwise fail here as an unresolved symbol.
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openexec()
 
 if(NOT TARGET motionCore::motionCore)
     find_package(motionCore CONFIG REQUIRED)
 endif()
 
-# The vendor-neutral runtime, from `motion.filterPose` onward: the node is one
-# step of `motion::PoseFilter` and the algorithm stays in the library
-# (WORKSPACE.md §2, motion policy §11.4) -- as it does for
-# `motion.interpolatePose`, which is `motion::ClipSource::Sample` and whose
-# result type, `motion::PoseSampleResult`, is this library's, and for
-# `motion.blendPoses`, which is `motion::BlendPoses`.
+# The sampling half, from `motion.filterPose` onward: the node is one step of
+# `PoseFilter` and the algorithm stays in the library (WORKSPACE.md §2, design
+# policy §21) -- as it does for `motion.interpolatePose`, which is `SampleClip`
+# and whose result type, `PoseSampleResult`, is this library's, and for
+# `motion.blendPoses`, which is the N-way `BlendPoses`.
 # `motion.identityPose` and `motion.sampleAnimation` need none of it -- an exec
 # input arrives already resolved at the evaluated frame, so the sampler had
 # nothing to wrap.
-if(NOT TARGET motionRuntime::motionRuntime)
-    find_package(motionRuntime CONFIG REQUIRED)
+if(NOT TARGET motionSampling::motionSampling)
+    find_package(motionSampling CONFIG REQUIRED)
+endif()
+
+# The recording half, for one node and one rule: `motion.extractRootMotion` is
+# `ConditionRootMotion`, the intake rule a capture session applies to every
+# frame it accepts. Nothing else here reaches into a session.
+if(NOT TARGET motionRecording::motionRecording)
+    find_package(motionRecording CONFIG REQUIRED)
 endif()
 
 set(PLUGIN_NAME ExecMotion)
@@ -82,17 +94,18 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE
     motionCore::motionCore
-    motionRuntime::motionRuntime)
+    motionSampling::motionSampling
+    motionRecording::motionRecording)
 
 if(MSVC)
     target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX _USE_MATH_DEFINES)
     target_compile_options(${PLUGIN_NAME} PRIVATE /bigobj /utf-8)
 endif()
 
-# The exec half is named explicitly rather than taken from usd_ms: the monolithic
-# target does not carry the exec libraries, and `esf`/`esfUsd`/`ef` are here
-# because the public exec headers include them transitively — the same list
-# cmake/UsdVrmOpenUsd.cmake probes for.
+# The exec half is named explicitly rather than taken from usd_ms: the
+# monolithic target does not carry the exec libraries, and `esf`/`esfUsd`/`ef`
+# are here because the public exec headers include them transitively — the same
+# list `usdmotion_require_openexec()` probes for.
 set(_exec_motion_targets)
 foreach(_t IN ITEMS arch tf gf vt plug sdf usd usdSkel
                     vdf ef esf esfUsd exec execUsd)
@@ -103,9 +116,9 @@ foreach(_t IN ITEMS arch tf gf vt plug sdf usd usdSkel
     else()
         message(FATAL_ERROR
             "execMotion needs the OpenUSD target '${_t}', which this install "
-            "does not define. cmake/UsdVrmOpenUsd.cmake should have refused "
-            "this runtime already; if it did not, its probe list and this one "
-            "have drifted apart.")
+            "does not define. usdmotion_require_openexec() should have "
+            "refused this runtime already; if it did not, its probe list "
+            "and this one have drifted apart.")
     endif()
 endforeach()
 target_link_libraries(${PLUGIN_NAME} PRIVATE ${_exec_motion_targets})
@@ -128,7 +141,7 @@ configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/plugin/resources/execMotion/plugInfo.json"
     @ONLY)
 
-if(USDVRM_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+if(USDMOTION_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     enable_testing()
     add_subdirectory(tests)
 endif()

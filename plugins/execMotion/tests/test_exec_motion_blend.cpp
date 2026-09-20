@@ -22,10 +22,11 @@
 //     states, enters a blend.
 //
 // Like the filter and root suites it does not link motionRuntime. The node is
-// `motion::BlendPoses`, and an expected value produced by that function would
-// assert that the library equals itself; the fixture's two clips turn one head
-// about one axis, so the blend of two of them is an angle interpolated along
-// that axis, and every number below is written from that definition.
+// `openstrata::motion::BlendPoses`, and an expected value produced by that
+// function would assert that the library equals itself; the fixture's two clips
+// turn one head about one axis, so the blend of two of them is an angle
+// interpolated along that axis, and every number below is written from that
+// definition.
 
 #include "pxr/pxr.h"
 
@@ -51,7 +52,7 @@
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/timeCode.h"
 
-#include <motionCore/Humanoid.h>
+#include <motionCore/MotionPose.h>
 
 #include <algorithm>
 #include <cassert>
@@ -88,9 +89,9 @@ constexpr float kTurnHead = 90.0f;
 const GfVec3f kWalkHips(0.0f, 0.5f, 1.0f);
 const GfVec3f kTurnHips(2.0f, 0.0f, 0.0f);
 
-constexpr std::size_t kHead = static_cast<std::size_t>(motion::HumanBone::Head);
-constexpr std::size_t kSpine = static_cast<std::size_t>(motion::HumanBone::Spine);
-constexpr std::size_t kChest = static_cast<std::size_t>(motion::HumanBone::Chest);
+constexpr std::size_t kHead = static_cast<std::size_t>(openstrata::motion::HumanJoint::Head);
+constexpr std::size_t kSpine = static_cast<std::size_t>(openstrata::motion::HumanJoint::Spine);
+constexpr std::size_t kChest = static_cast<std::size_t>(openstrata::motion::HumanJoint::Chest);
 
 bool
 NearlyEqual(double a, double b, double tolerance)
@@ -108,7 +109,7 @@ NearlyEqual(const GfVec3f& a, const GfVec3f& b, double tolerance)
 // The head's turn about +Y, in degrees -- signed, so a blend that went the long
 // way round would not land on the right number by symmetry.
 float
-HeadDegrees(const motion::HumanoidPose& pose)
+HeadDegrees(const openstrata::motion::MotionPose& pose)
 {
     const GfQuatf head = pose.localRotations[kHead].GetNormalized();
     const float sign = head.GetImaginary()[1] < 0.0f ? -1.0f : 1.0f;
@@ -132,15 +133,15 @@ BlendedHips(const GfVec3f& first, const GfVec3f& second, float w1, float w2)
     return first + (second - first) * (w2 / (w1 + w2));
 }
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 PoseAt(const ExecUsdCacheView& view, int index)
 {
     const VtValue value = view.Get(index);
     assert(!value.IsEmpty() && "no value came back -- if the plugInfo is unstaged this is what it "
                                "looks like, not a load error");
-    assert(value.IsHolding<motion::HumanoidPose>() &&
-           "motion.blendPoses did not return a motion::HumanoidPose");
-    return value.UncheckedGet<motion::HumanoidPose>();
+    assert(value.IsHolding<openstrata::motion::MotionPose>() &&
+           "motion.blendPoses did not return a openstrata::motion::MotionPose");
+    return value.UncheckedGet<openstrata::motion::MotionPose>();
 }
 
 // A refusal, which in this bundle is **no value at all** (README, "How a
@@ -246,20 +247,20 @@ TestTheBlendIsTheLibrarysWeightedFold(const std::string& fixture)
     // ---- armed at the default time code, where the blend answers ----------
     // Unlike `motion.interpolatePose`, which samples a timeline and so refuses
     // where there is no instant, a blend combines what its sources answered,
-    // and they answer there: /Walk, keyed only, resolves to no bones at all,
+    // and they answer there: /Walk, keyed only, resolves to no joints at all,
     // /Turn to its default values, and both are stamped 0.0. So the blend is
-    // /Turn's bones -- the ones only one source reports are taken from it --
+    // /Turn's joints -- the ones only one source reports are taken from it --
     // stamped 0.0, and the compute that arms the request is not a refusal.
     {
         TfErrorMark mark;
         ExecUsdCacheView view = system.Compute(request);
-        const motion::HumanoidPose blended = PoseAt(view, kBlended);
+        const openstrata::motion::MotionPose blended = PoseAt(view, kBlended);
         assert(mark.IsClean() && "the arming compute posted an error, so a driver's first frame "
                                  "through a blend is a refusal");
         assert(blended.timestamp == 0.0);
         assert(!PoseAt(view, kWalkSampled).validRotations.any());
         assert(blended == PoseAt(view, kTurnSampled) &&
-               "a source reporting no bones changed the blend");
+               "a source reporting no joints changed the blend");
     }
 
     system.ChangeTime(UsdTimeCode(kFrame));
@@ -272,12 +273,12 @@ TestTheBlendIsTheLibrarysWeightedFold(const std::string& fixture)
            "one of the clips it blends is keyed");
 
     ExecUsdCacheView view = system.Compute(request);
-    const motion::HumanoidPose walk = PoseAt(view, kWalkSampled);
-    const motion::HumanoidPose turn = PoseAt(view, kTurnSampled);
+    const openstrata::motion::MotionPose walk = PoseAt(view, kWalkSampled);
+    const openstrata::motion::MotionPose turn = PoseAt(view, kTurnSampled);
     assert(std::abs(HeadDegrees(walk) - kWalkHead) < 1e-3f);
     assert(std::abs(HeadDegrees(turn) - kTurnHead) < 1e-3f);
 
-    const motion::HumanoidPose blended = PoseAt(view, kBlended);
+    const openstrata::motion::MotionPose blended = PoseAt(view, kBlended);
 
     // /Turn folded into /Walk at 0.75 / (0.25 + 0.75): 78.75 degrees, and the
     // hips three quarters of the way to (2, 0, 0). A blend that paired the
@@ -293,10 +294,10 @@ TestTheBlendIsTheLibrarysWeightedFold(const std::string& fixture)
     // Stamped at the instant both clips were sampled at, exactly.
     assert(blended.timestamp == kSecond);
 
-    // A bone only /Walk reports is taken from /Walk rather than blended toward
+    // A joint only /Walk reports is taken from /Walk rather than blended toward
     // identity -- the library's rule, arriving through the wrapper unchanged.
     assert(blended.validRotations.test(kSpine) && blended.validRotations.test(kChest) &&
-           "a bone only one source reports was dropped from the blend");
+           "a joint only one source reports was dropped from the blend");
     assert(blended.localRotations[kSpine] == walk.localRotations[kSpine]);
 
     std::printf("execMotion blend: the fixture's blend is the weighted fold of "
@@ -472,13 +473,14 @@ TestWeightsAreStatedOnePerSource(const std::string& fixture)
     assert(blendReportedByValue && "an authored weight change was not reported for the blend");
     {
         ExecUsdCacheView view = system.Compute(request);
-        const motion::HumanoidPose blended = PoseAt(view, kBlended);
+        const openstrata::motion::MotionPose blended = PoseAt(view, kBlended);
         assert(std::abs(HeadDegrees(blended) - BlendedHead(kWalkHead, kTurnHead, 0.75f, 0.25f)) <
                1e-3f);
     }
 
     // ---- a negative weight is the library's zero -----------------------------
-    // Documented by `motion::BlendPoses`, so an answer: /Turn alone.
+    // Documented by `openstrata::motion::BlendPoses`, so an answer: /Turn
+    // alone.
     SetWeights(s, {-1.0f, 1.0f});
     {
         TfErrorMark mark;
@@ -600,7 +602,7 @@ TestAPoseHandedToASourceReachesTheBlend(const std::string& fixture)
     ExecUsdSystem system(s.stage);
     ExecUsdRequest request = ArmedAtFrame(system, s);
 
-    motion::HumanoidPose held;
+    openstrata::motion::MotionPose held;
     held.timestamp = kSecond;
     held.validRotations.set(kHead);
     held.localRotations[kHead] = GfQuatf(1.0f);
@@ -615,7 +617,7 @@ TestAPoseHandedToASourceReachesTheBlend(const std::string& fixture)
         ExecUsdCacheView view = system.ComputeWithOverrides(request, std::move(overrides));
 
         assert(PoseAt(view, kTurnSampled) == held);
-        const motion::HumanoidPose blended = PoseAt(view, kBlended);
+        const openstrata::motion::MotionPose blended = PoseAt(view, kBlended);
         assert(std::abs(HeadDegrees(blended) - BlendedHead(kWalkHead, 0.0f, 0.25f, 0.75f)) <
                    1e-3f &&
                "the override of a source's key did not reach the blend");
@@ -627,7 +629,7 @@ TestAPoseHandedToASourceReachesTheBlend(const std::string& fixture)
     // A pose from a driver's own clock, a frame behind: refused like two clips
     // at two rates, because it is the same statement.
     {
-        motion::HumanoidPose behind = held;
+        openstrata::motion::MotionPose behind = held;
         behind.timestamp = kSecond - 0.02;
         ExecUsdValueOverrideVector overrides;
         overrides.push_back(

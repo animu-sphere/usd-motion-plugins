@@ -41,7 +41,7 @@
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/timeCode.h"
 
-#include <motionCore/Humanoid.h>
+#include <motionCore/MotionPose.h>
 
 #include <algorithm>
 #include <cassert>
@@ -58,15 +58,15 @@ namespace
 const TfToken kSampleAnimation("motion.sampleAnimation");
 
 bool
-Has(const motion::HumanoidPose& pose, motion::HumanBone bone)
+Has(const openstrata::motion::MotionPose& pose, openstrata::motion::HumanJoint joint)
 {
-    return pose.validRotations.test(static_cast<std::size_t>(bone));
+    return pose.validRotations.test(static_cast<std::size_t>(joint));
 }
 
 const GfQuatf&
-RotationOf(const motion::HumanoidPose& pose, motion::HumanBone bone)
+RotationOf(const openstrata::motion::MotionPose& pose, openstrata::motion::HumanJoint joint)
 {
-    return pose.localRotations[static_cast<std::size_t>(bone)];
+    return pose.localRotations[static_cast<std::size_t>(joint)];
 }
 
 // The angle of a unit quaternion, in degrees. Formed in double precision from
@@ -93,16 +93,16 @@ NearlyEqual(const GfVec3f& a, const GfVec3f& b, double tolerance)
            NearlyEqual(a[2], b[2], tolerance);
 }
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 ComputePose(ExecUsdSystem& system, ExecUsdRequest& request)
 {
     ExecUsdCacheView view = system.Compute(request);
     const VtValue value = view.Get(0);
     assert(!value.IsEmpty() && "no value came back -- if the plugInfo is unstaged this is what it "
                                "looks like, not a load error");
-    assert(value.IsHolding<motion::HumanoidPose>() &&
+    assert(value.IsHolding<openstrata::motion::MotionPose>() &&
            "the canonical aggregate did not survive the boundary");
-    return value.UncheckedGet<motion::HumanoidPose>();
+    return value.UncheckedGet<openstrata::motion::MotionPose>();
 }
 
 // ---------------------------------------------------------------------------
@@ -141,10 +141,10 @@ TestASampledClip(const std::string& fixture)
     // A system evaluates at the default time until ChangeTime is called, and
     // this clip authors every channel as time samples and no default value at
     // all -- so what USD resolves there is nothing, and the pose says nothing:
-    // no bone, no root, no second. That is the honest answer for a clip asked
+    // no joint, no root, no second. That is the honest answer for a clip asked
     // about a time it has no opinion at, and it is the reason the seam treats
     // "no numeric frame" as "no timestamp" rather than as frame zero.
-    const motion::HumanoidPose atDefault = ComputePose(system, request);
+    const openstrata::motion::MotionPose atDefault = ComputePose(system, request);
     assert(atDefault.validRotations.count() == 0 &&
            "a clip with no default values resolved to a pose at the default "
            "time code");
@@ -154,7 +154,7 @@ TestASampledClip(const std::string& fixture)
     // ---- frame 0 ----------------------------------------------------------
     const int timeInvalidationsBefore = timeInvalidations;
     system.ChangeTime(UsdTimeCode(0.0));
-    const motion::HumanoidPose atZero = ComputePose(system, request);
+    const openstrata::motion::MotionPose atZero = ComputePose(system, request);
 
     // Unlike `motion.identityPose`, this value key IS time dependent and the
     // request is told so. What this assertion alone cannot say is *why*: this
@@ -167,24 +167,26 @@ TestASampledClip(const std::string& fixture)
 
     assert(atZero.timestamp == 0.0);
     assert(atZero.validRotations.count() == 4 &&
-           "the clip names four canonical bones and one thing that is not one");
-    assert(Has(atZero, motion::HumanBone::Hips));
-    assert(Has(atZero, motion::HumanBone::Spine));
-    assert(Has(atZero, motion::HumanBone::Chest));
-    assert(Has(atZero, motion::HumanBone::Head));
-    assert(NearlyEqual(AngleDegrees(RotationOf(atZero, motion::HumanBone::Head)), 0.0, 1e-3));
+           "the clip names four canonical joints and one thing that is not one");
+    assert(Has(atZero, openstrata::motion::HumanJoint::Hips));
+    assert(Has(atZero, openstrata::motion::HumanJoint::Spine));
+    assert(Has(atZero, openstrata::motion::HumanJoint::Chest));
+    assert(Has(atZero, openstrata::motion::HumanJoint::Head));
+    assert(NearlyEqual(
+        AngleDegrees(RotationOf(atZero, openstrata::motion::HumanJoint::Head)), 0.0, 1e-3));
     assert(atZero.root.hasPosition);
     assert(NearlyEqual(atZero.root.worldPosition, GfVec3f(0.0f), 1e-6));
 
     // ---- frame 100, which is second 2 at 50 time codes per second ---------
     system.ChangeTime(UsdTimeCode(100.0));
-    const motion::HumanoidPose atHundred = ComputePose(system, request);
+    const openstrata::motion::MotionPose atHundred = ComputePose(system, request);
     assert(NearlyEqual(atHundred.timestamp, 2.0, 1e-12) &&
            "the frame reached the pose as a frame rather than as a second");
-    assert(NearlyEqual(AngleDegrees(RotationOf(atHundred, motion::HumanBone::Head)), 90.0, 1e-2));
+    assert(NearlyEqual(
+        AngleDegrees(RotationOf(atHundred, openstrata::motion::HumanJoint::Head)), 90.0, 1e-2));
 
     // Only the hips carry body translation. The clip authors a translation for
-    // every joint -- including 9,9,9 on the one that names no bone -- so a node
+    // every joint -- including 9,9,9 on the one that names no joint -- so a node
     // that took the wrong row would land somewhere obviously wrong rather than
     // plausibly wrong.
     assert(atHundred.root.hasPosition);
@@ -194,19 +196,21 @@ TestASampledClip(const std::string& fixture)
     // Sampling between two keys is USD's answer, not this bundle's: an exec
     // input arrives already resolved at the evaluated time. Measured rather
     // than assumed, because it is the half of `motion.sampleAnimation` that is
-    // NOT a wrapper over `motion::SampleAnimation` -- that function holds a
-    // whole animation and performs its own lookup, and P0-6 parity is where the
-    // two answers get compared. USD documents quaternion arrays as interpolated
-    // by slerp, and a 90 degree turn halfway is 45 degrees.
+    // NOT a wrapper over `openstrata::motion::SampleAnimation` -- that function
+    // holds a whole animation and performs its own lookup, and P0-6 parity is
+    // where the two answers get compared. USD documents quaternion arrays as
+    // interpolated by slerp, and a 90 degree turn halfway is 45 degrees.
     system.ChangeTime(UsdTimeCode(50.0));
-    const motion::HumanoidPose atFifty = ComputePose(system, request);
+    const openstrata::motion::MotionPose atFifty = ComputePose(system, request);
     assert(NearlyEqual(atFifty.timestamp, 1.0, 1e-12));
-    assert(NearlyEqual(AngleDegrees(RotationOf(atFifty, motion::HumanBone::Head)), 45.0, 1e-2) &&
+    assert(NearlyEqual(AngleDegrees(RotationOf(atFifty, openstrata::motion::HumanJoint::Head)),
+                       45.0,
+                       1e-2) &&
            "a frame between two keys was not slerped");
     assert(NearlyEqual(atFifty.root.worldPosition, GfVec3f(0.0f, 0.5f, 1.0f), 1e-6));
 
     // ---- the same frame twice ---------------------------------------------
-    const motion::HumanoidPose again = ComputePose(system, request);
+    const openstrata::motion::MotionPose again = ComputePose(system, request);
     assert(again == atFifty && "the same request at the same time returned a different value");
 }
 
@@ -257,15 +261,15 @@ TestAClipWithNoRate(const std::string& fixture)
 
     // **No value at all**, rather than a pose stamped with a guess -- and
     // rather than a default-constructed pose, which is what this node used to
-    // return and what a review found could not be told apart from an answer.
-    // An empty `motion::HumanoidPose` is a pose a clip can legitimately sample
-    // to: one whose `joints` name no canonical bone produces exactly that. So
-    // the refusal sets no value (`VdfContext::SetEmptyOutput`), which is the
-    // one shape no computation in the bundle ever produces as an answer.
+    // return and what a review found could not be told apart from an answer. An
+    // empty `openstrata::motion::MotionPose` is a pose a clip can legitimately
+    // sample to: one whose `joints` name no canonical joint produces exactly
+    // that. So the refusal sets no value (`VdfContext::SetEmptyOutput`), which
+    // is the one shape no computation in the bundle ever produces as an answer.
     const VtValue value = view.Get(0);
     assert(value.IsEmpty() && "a clip with no rate produced a value -- if it holds a pose, the "
                               "refusal has gone back to being indistinguishable from an answer");
-    assert(!value.IsHolding<motion::HumanoidPose>());
+    assert(!value.IsHolding<openstrata::motion::MotionPose>());
 
     // And the refusal **propagates**: the node downstream is handed no pose,
     // refuses in turn, and the caller sees a refusal there too rather than a
@@ -329,12 +333,12 @@ TestAClipThatHoldsStill(const std::string& fixture)
     // A clip whose values are defaults resolves at the default time code, which
     // the keyed fixture does not -- so this pose is a pose, and the contrast in
     // TestASampledClip is about the clip rather than about the node.
-    const motion::HumanoidPose atDefault = ComputePose(system, request);
+    const openstrata::motion::MotionPose atDefault = ComputePose(system, request);
     assert(atDefault.validRotations.count() == 4);
     assert(atDefault.timestamp == 0.0);
 
     system.ChangeTime(UsdTimeCode(0.0));
-    const motion::HumanoidPose atZero = ComputePose(system, request);
+    const openstrata::motion::MotionPose atZero = ComputePose(system, request);
     assert(atZero.validRotations.count() == 4);
 
     // ---- the isolation ----------------------------------------------------
@@ -365,7 +369,7 @@ TestAClipThatHoldsStill(const std::string& fixture)
     // The pose itself is the same one, because nothing in the clip moved. The
     // stamp is not: the frame is an input to the second, and this is the one
     // thing in the pose that a static clip still changes.
-    const motion::HumanoidPose atHundred = ComputePose(system, request);
+    const openstrata::motion::MotionPose atHundred = ComputePose(system, request);
     assert(NearlyEqual(atHundred.timestamp, 2.0, 1e-12));
     assert(atHundred.validRotations == atZero.validRotations);
     assert(atHundred.root.worldPosition == atZero.root.worldPosition);
@@ -408,11 +412,11 @@ TestAOneJointClipThatKeysNothing()
     ExecUsdRequest request = system.BuildRequest(std::move(keys));
     assert(request.IsValid());
 
-    const motion::HumanoidPose pose = ComputePose(system, request);
-    assert(pose.validRotations.count() == 1 && Has(pose, motion::HumanBone::Hips) &&
+    const openstrata::motion::MotionPose pose = ComputePose(system, request);
+    assert(pose.validRotations.count() == 1 && Has(pose, openstrata::motion::HumanJoint::Hips) &&
            "a one-joint clip that keys nothing no longer samples a hips rotation; OpenExec's "
            "fallback delivery changed, so revisit the one-joint decision");
-    assert(RotationOf(pose, motion::HumanBone::Hips) == GfQuatf(1.0f));
+    assert(RotationOf(pose, openstrata::motion::HumanJoint::Hips) == GfQuatf(1.0f));
     assert(pose.root.hasPosition && pose.root.worldPosition == GfVec3f(0.0f) &&
            "a one-joint clip that keys nothing no longer samples a root at the origin; revisit "
            "the one-joint decision");

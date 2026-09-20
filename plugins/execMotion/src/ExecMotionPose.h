@@ -5,17 +5,17 @@
 // This is the bundle's project-owned seam and it takes **plain values**: joint
 // paths, rotation and translation arrays, a frame and a rate -- never a
 // `VdfContext` and never a stage. Marshalling exec's inputs into these arguments
-// is the registration TU's job (motion policy §11.4: a computation is a thin
+// is the registration TU's job (design policy §21: a computation is a thin
 // wrapper over a library that does not know exec exists). Keeping the seam free
 // of exec means it is testable with no stage, no system, and no request -- and
 // that a failure in the mechanism cannot be mistaken for a failure in the value.
 #pragma once
 
-#include <motionCore/Humanoid.h>
-#include <motionRuntime/Blend.h>
-#include <motionRuntime/Filter.h>
-#include <motionRuntime/LiveCaptureSource.h>
-#include <motionRuntime/MotionSource.h>
+#include <motionCore/MotionPose.h>
+#include <motionSampling/Blend.h>
+#include <motionSampling/Filter.h>
+#include <motionRecording/LiveCaptureSource.h>
+#include <motionSampling/MotionSource.h>
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/quatf.h"
@@ -30,21 +30,22 @@
 namespace execmotion
 {
 
-/// The bone a `UsdSkelAnimation` joint path names, or nullopt.
+/// The joint a `UsdSkelAnimation` joint path names, or nullopt.
 ///
 /// A joint path is `UsdSkelAnimation`'s own spelling, e.g. `hips/spine/chest`,
-/// of which only the last segment is a bone name (`motion::HumanBoneJointPath`
-/// authors the same shape). A path whose leaf names no canonical bone
-/// contributes nothing and is not an error: this layer reports what it
-/// recognized, and whoever knows which clip it is decides whether a gap matters.
+/// of which only the last segment is a joint name
+/// (`openstrata::motion::HumanJointPath` authors the same shape). A path whose
+/// leaf names no canonical joint contributes nothing and is not an error: this
+/// layer reports what it recognized, and whoever knows which clip it is decides
+/// whether a gap matters.
 ///
 /// Exposed for the tests, which check the leaf-segment rule directly rather than
 /// through a pose.
-std::optional<motion::HumanBone> BoneForJointPath(const std::string& jointPath);
+std::optional<openstrata::motion::HumanJoint> JointForPath(const std::string& jointPath);
 
 /// The identity pose for `jointPaths`.
 ///
-/// Every rotation is identity and `validRotations` carries exactly the bones the
+/// Every rotation is identity and `validRotations` carries exactly the joints the
 /// joint paths name.
 ///
 /// The pose's `timestamp` is left at zero, and the caller does not get to pass
@@ -54,17 +55,17 @@ std::optional<motion::HumanBone> BoneForJointPath(const std::string& jointPath);
 /// No sampling, no interpolation, no retarget. This is the identity, and it is
 /// what makes the first OpenExec computation attributable: a wrong result is a
 /// wrong mechanism, because there is no algorithm to blame.
-motion::HumanoidPose IdentityPoseForJoints(const std::vector<std::string>& jointPaths);
+openstrata::motion::MotionPose IdentityPoseForJoints(const std::vector<std::string>& jointPaths);
 
 /// What a `UsdSkelAnimation` states at one instant, as plain values.
 ///
 /// `rotations` and `translations` are already resolved **at** `timeCode`: exec
 /// resolves a time-sampled attribute input at the time the computation is
 /// evaluated at, so this layer interpolates nothing and holds nothing. That is
-/// the one behavioural difference from `motion::SampleAnimation`, which is
-/// handed a whole `HumanoidAnimation` and does its own hold-at-the-edges lookup;
-/// which of the two answers a frame between keys is USD's question here and
-/// `motionRuntime`'s there, and P0-6 parity is where the two get compared.
+/// the one behavioural difference from `openstrata::motion::SampleAnimation`,
+/// which is handed a whole `MotionClip` and does its own hold-at-the-edges
+/// lookup; which of the two answers a frame between keys is USD's question here
+/// and `motionSampling`'s there, and usd-vrm-plugins' parity rows are where the two get compared.
 struct ClipSample
 {
     /// `UsdSkelAnimation`'s `joints`, in the order the clip authored them.
@@ -84,7 +85,7 @@ struct ClipSample
     double timeCode = 0.0;
     bool hasTimeCode = false;
 
-    /// The rate that turns `timeCode` into the seconds `HumanoidPose::timestamp`
+    /// The rate that turns `timeCode` into the seconds `MotionPose::timestamp`
     /// is expressed in. It is an authored input rather than stage metadata
     /// because a computation cannot reach `timeCodesPerSecond`
     /// (docs/reports/openusd/26.08-openexec-mechanism.md §5).
@@ -95,13 +96,13 @@ struct ClipSample
 ///
 /// Returns nullopt for a non-positive `timeCodesPerSecond`, which covers both an
 /// absent rate and a nonsense one. That is a refusal rather than a fallback on
-/// purpose: `HumanoidPose::timestamp` is a plain double with no absent state, so
+/// purpose: `MotionPose::timestamp` is a plain double with no absent state, so
 /// a pose produced without a rate would carry a second every consumer downstream
 /// would take at face value, and there is no value of the field that spells
 /// "unknown". A clip whose rate is missing is a clip this layer will not sample.
 ///
 /// Everything else is a partial answer rather than a refusal, because a clip is
-/// allowed to be sparse: a joint path naming no canonical bone contributes
+/// allowed to be sparse: a joint path naming no canonical joint contributes
 /// nothing, an array whose length disagrees with `joints` contributes nothing,
 /// and a clip that authors no translations produces a pose with no root
 /// position. Only `hips` carries body translation (motion contract); the rest of
@@ -119,28 +120,29 @@ struct ClipSample
 /// ([the humanoid report](../../../docs/reports/openusd/26.08-openexec-humanoid.md)
 /// §4). Kept rather than refused, decided for v0.9.0: `execMotion_sample`
 /// pins it, and the driver contract in MOTION_CONTRACT.md states it.
-std::optional<motion::HumanoidPose> PoseFromClipSample(const ClipSample& sample);
+std::optional<openstrata::motion::MotionPose> PoseFromClipSample(const ClipSample& sample);
 
 /// What a clip states about how it wants to be smoothed.
 ///
 /// Every field is optional and an absent one is **not** a value this bundle
-/// picks: it is left at `motion::PoseFilter::Options`' own default, because a
-/// wrapper that supplied its own default would be a second policy sitting on
-/// top of the library's, and a clip authoring nothing would then be smoothed
-/// differently here than by the same library called anywhere else.
+/// picks: it is left at `openstrata::motion::PoseFilter::Options`' own default,
+/// because a wrapper that supplied its own default would be a second policy
+/// sitting on top of the library's, and a clip authoring nothing would then be
+/// smoothed differently here than by the same library called anywhere else.
 ///
 /// That is a different judgement from the sampling rate, and the difference is
-/// what each absent value costs. A missing rate produces a *number* --
-/// a `timestamp` in seconds -- that no consumer can tell from a measured one.
-/// A missing cutoff selects the library's documented behaviour, which every
-/// caller of `motion::PoseFilter` already gets. So the rate is refused and
-/// these are defaulted (the sampling report's "every node owes its own
-/// refusal" applies to what a node cannot compute without, and this one can).
+/// what each absent value costs. A missing rate produces a *number* -- a
+/// `timestamp` in seconds -- that no consumer can tell from a measured one. A
+/// missing cutoff selects the library's documented behaviour, which every
+/// caller of `openstrata::motion::PoseFilter` already gets. So the rate is
+/// refused and these are defaulted (the sampling report's "every node owes its
+/// own refusal" applies to what a node cannot compute without, and this one
+/// can).
 struct FilterPolicy
 {
     /// `motion:filter:cutoffHz`. Non-positive disables smoothing, which is
-    /// `motion::PoseFilter`'s own documented pass-through and not a special
-    /// case this layer added.
+    /// `openstrata::motion::PoseFilter`'s own documented pass-through and not a
+    /// special case this layer added.
     std::optional<float> cutoffHz;
 
     /// `motion:filter:rootPosition` / `motion:filter:rootOrientation`.
@@ -158,15 +160,16 @@ struct FilterPolicy
 
 /// `pose` smoothed against `prior`, under `policy`.
 ///
-/// One step of `motion::PoseFilter`, and the state it needs is passed in rather
-/// than kept. That is forced rather than chosen: an OpenExec callback is handed
-/// exactly one time and no way to reach another
-/// ([the sampling report](../../../docs/reports/openusd/26.08-openexec-sampling.md) §5),
-/// and a filter that remembered the last pose in a static would be the mutable
-/// state the purity rule forbids and invalidation cannot see. So the recurrence
+/// One step of `openstrata::motion::PoseFilter`, and the state it needs is
+/// passed in rather than kept. That is forced rather than chosen: an OpenExec
+/// callback is handed exactly one time and no way to reach another ([the
+/// sampling report](../../../docs/reports/openusd/26.08-openexec-sampling.md)
+/// §5), and a filter that remembered the last pose in a static would be the
+/// mutable state the purity rule forbids and invalidation cannot see. So the
+/// recurrence
 /// -- "the prior pose is the previous frame's answer" -- belongs to whoever
 /// drives the graph, which is where it already lives for a live source:
-/// `motionRuntime`'s pose buffer.
+/// `motionSampling`'s pose buffer.
 ///
 /// Seeding is the library's own: a `PoseFilter` with no state returns its first
 /// pose unchanged and keeps it, so `prior` costs one `Apply` and no special
@@ -176,31 +179,32 @@ struct FilterPolicy
 /// as it is for a streamed source.
 ///
 /// **What the round trip through a pose costs, measured rather than assumed.**
-/// `PoseFilter` retains a state strictly richer than the pose it returns: a bone
+/// `PoseFilter` retains a state strictly richer than the pose it returns: a joint
 /// a pose does not report keeps its stored rotation in the *state* and stays out
-/// of the *result*, so a brief dropout does not restart that bone's history.
+/// of the *result*, so a brief dropout does not restart that joint's history.
 /// Only a result can travel back in as the next `prior`, so that retained half
-/// does not survive the trip, and a bone returning after a missing frame is
+/// does not survive the trip, and a joint returning after a missing frame is
 /// passed through here where the streaming filter would slerp it -- 45 degrees
 /// against 23.8 in the case `execMotion_pose` pins, in both directions.
 ///
-/// It costs nothing for a clip, whose `joints` are `uniform` so no bone ever
-/// drops out, and it is real for a live source, which is what this node is
-/// aimed at. It is also the sharpened half of this bundle's ask on
-/// `motionRuntime`: a one-step entry point has to hand back the *state* as well
-/// as the result, or a caller cannot carry the history that makes a dropout
-/// survivable. Reproducing that carry-forward rule here instead would be the
-/// second algorithm the wrapper rule forbids, so the difference is recorded
-/// (P0-6 parity compares the two).
-motion::HumanoidPose FilteredPose(const motion::HumanoidPose& prior,
-                                  const motion::HumanoidPose& pose, const FilterPolicy& policy);
+/// It costs nothing for a clip, whose `joints` are `uniform` so no joint
+/// ever drops out, and it is real for a live source, which is what this node
+/// is aimed at. The library hands the state back -- `StepResult::state`, which
+/// is what this bundle's ask on the one-step entry point was for -- so the
+/// carry-forward rule is not reproduced here. What is still lost is lost in
+/// the *graph*: an exec computation's value is a pose, so until a node
+/// publishes the state as a value of its own, a driver has only the result to
+/// hand back as the next `prior`.
+openstrata::motion::MotionPose FilteredPose(const openstrata::motion::MotionPose& prior,
+                                            const openstrata::motion::MotionPose& pose,
+                                            const FilterPolicy& policy);
 
 /// What a clip states about how its root is taken in.
 ///
-/// The vocabulary is the library's -- `motion::RootMotionIntake`, the same enum
-/// a live session configures `motionRuntime` with -- rather than a second one
-/// spelled for exec. A wrapper that named its own policies would be a wrapper
-/// over a contract of its own making.
+/// The vocabulary is the library's -- `openstrata::motion::RootMotionIntake`,
+/// the same enum a live session configures `motionRecording` with -- rather
+/// than a second one spelled for exec. A wrapper that named its own policies
+/// would be a wrapper over a contract of its own making.
 ///
 /// Absent means the library's own default, the way `FilterPolicy`'s fields do,
 /// and for the same reason: `LiveCaptureConfig::rootMotion` already answers this
@@ -211,7 +215,7 @@ motion::HumanoidPose FilteredPose(const motion::HumanoidPose& prior,
 struct RootPolicy
 {
     /// `motion:root:intake`. Nullopt is `LiveCaptureConfig`'s own default.
-    std::optional<motion::RootMotionIntake> intake;
+    std::optional<openstrata::motion::RootMotionIntake> intake;
 };
 
 /// The intake policy `token` names, or nullopt for a token this layer does not
@@ -226,16 +230,17 @@ struct RootPolicy
 ///
 /// The spellings are the enum's own names in lowerCamelCase, which is what a
 /// USD token attribute reads like: `passthrough`, `ignore`, `deriveVelocity`.
-std::optional<motion::RootMotionIntake> RootIntakeForToken(std::string_view token);
+std::optional<openstrata::motion::RootMotionIntake> RootIntakeForToken(std::string_view token);
 
 /// The root motion `pose` states, under `policy`, given the pose before it.
 ///
-/// `Ignore` yields a default-constructed `motion::RootMotion` -- every presence
-/// flag clear, which is what "this clip's placement is not the capture's to
-/// decide" looks like downstream. `Passthrough` yields the pose's own root
-/// unchanged. `DeriveVelocity` is `Passthrough` plus one thing: when the pose
-/// carries a position and no linear velocity and `prior` carries a position, the
-/// velocity is the distance between the two over the seconds between them.
+/// `Ignore` yields a default-constructed `openstrata::motion::RootMotion` --
+/// every presence flag clear, which is what "this clip's placement is not the
+/// capture's to decide" looks like downstream. `Passthrough` yields the pose's
+/// own root unchanged. `DeriveVelocity` is `Passthrough` plus one thing: when
+/// the pose carries a position and no linear velocity and `prior` carries a
+/// position, the velocity is the distance between the two over the seconds
+/// between them.
 ///
 /// `prior` is the same value `motion.filterPose` takes, and it reaches this
 /// function under the same rule: a computation is handed one instant and a
@@ -245,33 +250,29 @@ std::optional<motion::RootMotionIntake> RootIntakeForToken(std::string_view toke
 /// same shape a zero-length filter step has and is not special-cased here
 /// either.
 ///
-/// **This node is the plan's third "not a wrapper" finding.** The rule it
-/// applies is `motionRuntime`'s, written down in the motion contract and
-/// implemented in `LiveCaptureSource::_Condition` -- a **private** method of a
-/// class that is a capture *session*: it owns a pose buffer, a filter, held-bone
-/// state and statistics, and it refuses a frame whose timestamp does not
-/// increase. So there is no call to make. The seed-then-step idiom
-/// `FilteredPose` uses was tried first and does not transfer: pushing `prior`
-/// and then `pose` into a local `LiveCaptureSource` gives the wrong answer in
-/// this bundle's *ordinary* case, because two poses at the same instant are one
-/// accepted frame and one refusal, and the buffer head is then the prior rather
-/// than the pose. `PoseFilter` reseeds where `LiveCaptureSource` refuses, and
-/// that difference is what decides it.
+/// **The whole node, and it is a wrapper**: `ConditionRootMotion`, the intake
+/// rule as a pure function beside the capture session that applies it to every
+/// frame it accepts. So every rule in the answer is the library's, and the rule
+/// has one implementation again.
 ///
-/// So the three lines are here, matched condition for condition to the library's
-/// and asserted against the definition rather than against the library, and the
-/// ask goes to [boundary consolidation](../../../docs/roadmap/boundary-consolidation.md):
-/// a stateless `ConditionRootMotion(prior, pose, intake)` free function beside
-/// the session class, so the rule has one implementation again.
-motion::RootMotion RootMotionFrom(const motion::HumanoidPose& prior,
-                                  const motion::HumanoidPose& pose, const RootPolicy& policy);
+/// It was this bundle's third "not a wrapper" finding before the move: the
+/// rule lived in a **private** method of `LiveCaptureSource`, a capture
+/// *session* that owns a pose buffer, a filter, held-joint state and
+/// statistics and refuses a frame whose timestamp does not increase, so there
+/// was no call to make and the three conditions were reproduced here. The
+/// seed-then-step idiom `FilteredPose` used does not transfer to a session:
+/// two poses at the same instant are one accepted frame and one refusal, and
+/// the buffer head is then the prior rather than the pose.
+openstrata::motion::RootMotion RootMotionFrom(const openstrata::motion::MotionPose& prior,
+                                              const openstrata::motion::MotionPose& pose,
+                                              const RootPolicy& policy);
 
 /// The transform `root` places something at, as a local-to-parent matrix: the
 /// orientation, then the position, each only where the root states it.
 ///
 /// It is what `motion:root:transform` computes, and so what an Xformable whose
 /// `xformOp:transform` is connected to that attribute draws at through
-/// `usdExecImaging` (the plan's P0-7). An unstated component contributes
+/// `usdExecImaging` (the display node). An unstated component contributes
 /// nothing rather than a guess, so a cleared root -- `ignore`'s answer -- is the
 /// identity, which leaves the Xformable at its parent's placement: the
 /// "leave the rig its own placement" that `ignore` exists to say.
@@ -282,14 +283,15 @@ motion::RootMotion RootMotionFrom(const motion::HumanoidPose& prior,
 /// nobody stated -- NaN hides the prim, and a normalized near-zero quaternion is
 /// an arbitrary rotation -- and a velocity is not read at all, because a
 /// placement at one instant does not depend on one.
-std::optional<pxr::GfMatrix4d> RootTransform(const motion::RootMotion& root);
+std::optional<pxr::GfMatrix4d> RootTransform(const openstrata::motion::RootMotion& root);
 
 /// The history a driver's pose buffer holds, when no driver supplies one: the
-/// pose at the evaluated instant, as a one-sample `motion::HumanoidAnimation`.
+/// pose at the evaluated instant, as a one-sample
+/// `openstrata::motion::MotionClip`.
 ///
 /// It is `motion.poseHistory`'s ordinary value and it exists for the same reason
 /// `motion.priorPose`'s does -- to be *replaced*. A computation evaluates an
-/// immutable snapshot and never reaches for one (motion policy §11.4), so a live
+/// immutable snapshot and never reaches for one (design policy §21), so a live
 /// source's buffered samples reach the graph the one way a value the scene does
 /// not state can: as an override on a value key.
 ///
@@ -297,26 +299,26 @@ std::optional<pxr::GfMatrix4d> RootTransform(const motion::RootMotion& root);
 /// that is what a history of one sample spans. `nominalFrameRate` is left at the
 /// library's own default rather than set: a single sample has no rate to state,
 /// and the node that reads this value does not use one.
-motion::HumanoidAnimation HistoryOfOne(const motion::HumanoidPose& pose);
+openstrata::motion::MotionClip HistoryOfOne(const openstrata::motion::MotionPose& pose);
 
 /// What `history` states at `seconds`, or nullopt when it cannot be sampled.
 ///
-/// **The whole node, and it is a wrapper**: `motion::ClipSource`, constructed
-/// over the history, asked `Sample(seconds)`. That is `IMotionSource`'s one
-/// question -- "what is the pose at this evaluation time?" -- asked of the
-/// implementation that serves a finished animation, which is what a snapshot is
-/// once it has been taken. So every rule in the answer is the library's:
-/// bracketing samples are interpolated by `motion::LerpPose` (a missing bone held,
-/// never faded), a time outside the history holds the nearer boundary, and the
-/// pose comes back stamped at `seconds`, on the consumer's clock.
+/// **The whole node, and it is a wrapper**: `openstrata::motion::SampleClip`
+/// over the history. That is `IMotionSource`'s one question -- "what is the
+/// pose at this evaluation time?" -- answered from a clip held by reference, so
+/// nothing is constructed and nothing is copied. So every rule in the answer is
+/// the library's: bracketing samples are interpolated by
+/// `openstrata::motion::LerpPose` (a missing joint held, never faded), a time
+/// outside the history holds the nearer boundary, and the pose comes back
+/// stamped at `seconds`, on the consumer's clock.
 ///
-/// The result is the library's `motion::PoseSampleResult` and not a bare pose,
-/// because the status is part of the answer (motion contract, live-capture
-/// semantics). The answer is stamped at the evaluated instant *whether or not*
-/// the history reached it, so a pose alone cannot say whether it was sampled or
-/// held -- and a source that has stopped delivering keeps answering `Held`
-/// forever, which a consumer holding only the pose would read as live. A wrapper
-/// does not get to drop a field of the thing it wraps.
+/// The result is the library's `openstrata::motion::PoseSampleResult` and not a
+/// bare pose, because the status is part of the answer (motion contract,
+/// live-capture semantics). The answer is stamped at the evaluated instant
+/// *whether or not* the history reached it, so a pose alone cannot say whether
+/// it was sampled or held -- and a source that has stopped delivering keeps
+/// answering `Held` forever, which a consumer holding only the pose would read
+/// as live. A wrapper does not get to drop a field of the thing it wraps.
 ///
 /// An **empty** history is an answer, not a refusal: the library's
 /// `Unavailable`, carrying no pose. The bundle refuses where an answer would be
@@ -325,11 +327,10 @@ motion::HumanoidAnimation HistoryOfOne(const motion::HumanoidPose& pose);
 /// which that is true.
 ///
 /// The one refusal is a history whose timestamps are **not finite** or
-/// **decrease** somewhere. `motion::SampleAnimation`, which `ClipSource` samples
-/// through, binary-searches the samples and so relies on their being in time
-/// order -- a precondition it neither states nor checks -- and a history out of
-/// order, or carrying a NaN every comparison is false against, would answer with
-/// a bracket nobody measured.
+/// **decrease** somewhere. That is `SampleClip`'s stated precondition, and it
+/// says the caller checks it: the search is binary, so a history out of order,
+/// or carrying a NaN every comparison is false against, would answer with a
+/// bracket nobody measured.
 ///
 /// Repeated timestamps are *not* refused, because the library's answer to them
 /// never leaves the samples it holds: a request at or past the end holds the
@@ -338,10 +339,11 @@ motion::HumanoidAnimation HistoryOfOne(const motion::HumanoidPose& pose);
 /// or between two adjacent samples. Which of two same-instant samples answers
 /// depends on where the request falls, and every answer is a measured sample or
 /// an interpolation between neighbours. A check stricter than that would be a
-/// policy of this bundle's -- `motion::PoseBuffer::Push`'s strictly-increasing
-/// rule is a property of how a buffer is *filled*, not of what can be sampled.
-std::optional<motion::PoseSampleResult> SampleHistory(const motion::HumanoidAnimation& history,
-                                                      double seconds);
+/// policy of this bundle's -- `openstrata::motion::PoseBuffer::Push`'s
+/// strictly-increasing rule is a property of how a buffer is *filled*, not of
+/// what can be sampled.
+std::optional<openstrata::motion::PoseSampleResult>
+SampleHistory(const openstrata::motion::MotionClip& history, double seconds);
 
 /// What a blend was handed, as plain values.
 ///
@@ -374,7 +376,7 @@ struct BlendInputs
 
     /// The poses that came back, in the order the fan-in delivered them --
     /// measured to be the relationship's authored target order.
-    std::vector<motion::HumanoidPose> poses;
+    std::vector<openstrata::motion::MotionPose> poses;
 
     /// `motion:blend:weights`, as authored: one per target, in target order.
     std::vector<float> weights;
@@ -400,8 +402,8 @@ enum class BlendRefusal
     /// *stated* no weights would be blended evenly.
     WeightCount,
 
-    /// A weight that is not finite. `motion::BlendPoses` would take a NaN
-    /// through its running total and answer NaN rotations.
+    /// A weight that is not finite. `openstrata::motion::BlendPoses` would take
+    /// a NaN through its running total and answer NaN rotations.
     WeightNotFinite,
 
     /// The sources were not stamped at one finite instant. Every source is
@@ -411,26 +413,26 @@ enum class BlendRefusal
     /// measured.
     InstantsDisagree,
 
-    /// No weight is positive, so the library's answer is a default-constructed
-    /// pose -- stamped 0.0, whatever instant the sources were sampled at.
+    /// No weight is positive. The library answers nullopt rather than a pose,
+    /// and this is that answer named: there is nothing to blend.
     NothingWeighted,
 };
 
 /// The pose `inputs` blend to, or the reason there is none.
 struct BlendOutcome
 {
-    std::optional<motion::HumanoidPose> pose;
+    std::optional<openstrata::motion::MotionPose> pose;
     BlendRefusal refusal = BlendRefusal::NoSource;
 };
 
-/// `motion::BlendPoses` over `inputs`, or a refusal.
+/// `openstrata::motion::BlendPoses` over `inputs`, or a refusal.
 ///
 /// **The whole node, and it is a wrapper**: the N-way `BlendPoses`, handed each
 /// pose with the weight authored at the same position. So every rule in the
-/// answer is the library's -- a negative weight counts as zero, a bone only some
-/// sources report is taken from those rather than blended toward identity
-/// (`motion::LerpPose`, fold by fold), and the result is stamped at the
-/// sources' own instant.
+/// answer is the library's -- a negative weight counts as zero, a joint only
+/// some sources report is taken from those rather than blended toward identity
+/// (`openstrata::motion::LerpPose`, fold by fold), and the result is stamped at
+/// the sources' own instant.
 ///
 /// **The order is part of the answer, not only of the pairing.** The library
 /// folds the poses in one at a time -- each at its share of the running total --
@@ -441,12 +443,13 @@ struct BlendOutcome
 /// `execMotion_pose` measures the second; `execMotion_blend` measures that 26.08
 /// delivers the first.
 ///
-/// Every refusal is somewhere the library *would* answer, and its answer would
-/// be a pose no consumer could tell from a measured one -- the bundle's refusal
-/// rule, applied six ways (`BlendRefusal`). The two that are about the library
-/// rather than about the fan-in are this node's boundary finding: over nothing
-/// weighted it answers a default-constructed pose, whose `timestamp` is a 0.0
-/// nobody sampled; and it does not refuse a weight that is not finite.
+/// Every refusal is somewhere the library would answer a pose no consumer
+/// could tell from a measured one, or could not be asked at all -- the
+/// bundle's refusal rule, applied six ways (`BlendRefusal`). Three of the six
+/// are the library's own statements rather than this layer's: nothing weighted
+/// is its nullopt, named here; and a weight that is not finite and sources
+/// that disagree about the instant are the two preconditions the N-way
+/// `BlendPoses` states for its caller to check.
 BlendOutcome BlendedPose(const BlendInputs& inputs);
 
 } // namespace execmotion

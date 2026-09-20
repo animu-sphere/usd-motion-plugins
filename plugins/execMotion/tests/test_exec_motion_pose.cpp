@@ -23,37 +23,38 @@ namespace
 {
 
 std::size_t
-CountValid(const motion::HumanoidPose& pose)
+CountValid(const openstrata::motion::MotionPose& pose)
 {
     return pose.validRotations.count();
 }
 
 bool
-Has(const motion::HumanoidPose& pose, motion::HumanBone bone)
+Has(const openstrata::motion::MotionPose& pose, openstrata::motion::HumanJoint joint)
 {
-    return pose.validRotations.test(static_cast<std::size_t>(bone));
+    return pose.validRotations.test(static_cast<std::size_t>(joint));
 }
 
 void
 TestLeafSegmentIsTheBone()
 {
-    // A joint path is UsdSkelAnimation's own spelling and the bone is its leaf:
+    // A joint path is UsdSkelAnimation's own spelling and the joint is its leaf:
     // "hips/spine/chest" is the chest, not something named after the whole path.
-    assert(execmotion::BoneForJointPath("hips") == motion::HumanBone::Hips);
-    assert(execmotion::BoneForJointPath("hips/spine") == motion::HumanBone::Spine);
-    assert(execmotion::BoneForJointPath("hips/spine/chest/neck/head") == motion::HumanBone::Head);
+    assert(execmotion::JointForPath("hips") == openstrata::motion::HumanJoint::Hips);
+    assert(execmotion::JointForPath("hips/spine") == openstrata::motion::HumanJoint::Spine);
+    assert(execmotion::JointForPath("hips/spine/chest/neck/head") ==
+           openstrata::motion::HumanJoint::Head);
 
-    // A path whose leaf is not a canonical bone maps to nothing, and so does a
+    // A path whose leaf is not a canonical joint maps to nothing, and so does a
     // trailing separator -- which names no leaf at all.
-    assert(!execmotion::BoneForJointPath("prop").has_value());
-    assert(!execmotion::BoneForJointPath("hips/").has_value());
-    assert(!execmotion::BoneForJointPath("").has_value());
+    assert(!execmotion::JointForPath("prop").has_value());
+    assert(!execmotion::JointForPath("hips/").has_value());
+    assert(!execmotion::JointForPath("").has_value());
 
     // The names are the canonical ones, so a differently-cased spelling is a
-    // different name rather than the same bone. Nothing normalizes here: the
+    // different name rather than the same joint. Nothing normalizes here: the
     // one table lives in motionCore and a second, laxer one in this bundle is
     // exactly the duplicate the workspace forbids.
-    assert(!execmotion::BoneForJointPath("Hips").has_value());
+    assert(!execmotion::JointForPath("Hips").has_value());
 }
 
 void
@@ -62,7 +63,7 @@ TestIdentityPoseNamesOnlyWhatItRecognized()
     const std::vector<std::string> joints = {"hips", "hips/spine", "hips/spine/chest",
                                              "hips/spine/chest/neck/head", "prop"};
 
-    const motion::HumanoidPose pose = execmotion::IdentityPoseForJoints(joints);
+    const openstrata::motion::MotionPose pose = execmotion::IdentityPoseForJoints(joints);
 
     // No timestamp, and no way to pass one: the pose says nothing about time
     // because a computation cannot learn the stage's timeCodesPerSecond, and a
@@ -70,13 +71,13 @@ TestIdentityPoseNamesOnlyWhatItRecognized()
     // missing one.
     assert(pose.timestamp == 0.0);
     assert(CountValid(pose) == 4);
-    assert(Has(pose, motion::HumanBone::Hips));
-    assert(Has(pose, motion::HumanBone::Spine));
-    assert(Has(pose, motion::HumanBone::Chest));
-    assert(Has(pose, motion::HumanBone::Head));
+    assert(Has(pose, openstrata::motion::HumanJoint::Hips));
+    assert(Has(pose, openstrata::motion::HumanJoint::Spine));
+    assert(Has(pose, openstrata::motion::HumanJoint::Chest));
+    assert(Has(pose, openstrata::motion::HumanJoint::Head));
 
-    // The unrecognized joint contributed nothing rather than a bone of its own.
-    assert(!Has(pose, motion::HumanBone::UpperChest));
+    // The unrecognized joint contributed nothing rather than a joint of its own.
+    assert(!Has(pose, openstrata::motion::HumanJoint::UpperChest));
 
     // Every rotation is the identity, including the four this pose claims.
     // "Identity computation" is the literal description of what this returns.
@@ -89,19 +90,19 @@ TestIdentityPoseNamesOnlyWhatItRecognized()
 void
 TestEmptyClipIsAPoseAndNotAFailure()
 {
-    const motion::HumanoidPose pose = execmotion::IdentityPoseForJoints({});
+    const openstrata::motion::MotionPose pose = execmotion::IdentityPoseForJoints({});
     assert(CountValid(pose) == 0);
 
     // An empty pose still compares equal to itself, which is not a tautology
     // here: exec requires equality comparability of every registered value type,
     // and this is the type execMotion registers.
-    assert(pose == motion::HumanoidPose{});
+    assert(pose == openstrata::motion::MotionPose{});
 }
 
 void
 TestARepeatedJointIsNotCountedTwice()
 {
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose pose =
         execmotion::IdentityPoseForJoints({"hips", "hips", "hips/spine"});
     assert(CountValid(pose) == 2);
 }
@@ -110,7 +111,7 @@ TestARepeatedJointIsNotCountedTwice()
 // The sampled pose
 // ---------------------------------------------------------------------------
 
-// The fixture clip, as plain values: four canonical bones, one joint that names
+// The fixture clip, as plain values: four canonical joints, one joint that names
 // none, and a rotation on the head so a pose that dropped the frame is visible.
 execmotion::ClipSample
 FourBonesAndAProp()
@@ -135,7 +136,7 @@ FourBonesAndAProp()
 void
 TestTheFrameBecomesASecond()
 {
-    const std::optional<motion::HumanoidPose> pose =
+    const std::optional<openstrata::motion::MotionPose> pose =
         execmotion::PoseFromClipSample(FourBonesAndAProp());
     assert(pose.has_value());
 
@@ -146,8 +147,8 @@ TestTheFrameBecomesASecond()
     assert(pose->timestamp == 2.0);
 
     assert(CountValid(*pose) == 4);
-    assert(Has(*pose, motion::HumanBone::Head));
-    assert(!Has(*pose, motion::HumanBone::UpperChest));
+    assert(Has(*pose, openstrata::motion::HumanJoint::Head));
+    assert(!Has(*pose, openstrata::motion::HumanJoint::UpperChest));
 
     // Only the hips carry body translation: the prop's 9,9,9 is in the array
     // and must not be anywhere in the pose.
@@ -181,7 +182,8 @@ TestTheDefaultTimeCodeCarriesNoSecond()
     sample.hasTimeCode = false;
     sample.timeCode = 100.0; // ignored: there is no numeric frame
 
-    const std::optional<motion::HumanoidPose> pose = execmotion::PoseFromClipSample(sample);
+    const std::optional<openstrata::motion::MotionPose> pose =
+        execmotion::PoseFromClipSample(sample);
     assert(pose.has_value());
     assert(pose->timestamp == 0.0 && "a frame was read from a sample that says it has none");
 
@@ -196,10 +198,11 @@ TestAnArrayThatDoesNotFitTheJointsIsNotGuessedAt()
     execmotion::ClipSample sample = FourBonesAndAProp();
     sample.rotations.pop_back();
 
-    const std::optional<motion::HumanoidPose> pose = execmotion::PoseFromClipSample(sample);
+    const std::optional<openstrata::motion::MotionPose> pose =
+        execmotion::PoseFromClipSample(sample);
     assert(pose.has_value());
 
-    // Not four bones with one dropped: none at all. A clip whose rotation array
+    // Not four joints with one dropped: none at all. A clip whose rotation array
     // is a different length than its joints has not said which joint any of
     // them belongs to, and pairing them by index anyway would silently put the
     // spine's rotation on the hips.
@@ -212,7 +215,7 @@ TestAnArrayThatDoesNotFitTheJointsIsNotGuessedAt()
 
     execmotion::ClipSample noTranslations = FourBonesAndAProp();
     noTranslations.translations.clear();
-    const std::optional<motion::HumanoidPose> rotationsOnly =
+    const std::optional<openstrata::motion::MotionPose> rotationsOnly =
         execmotion::PoseFromClipSample(noTranslations);
     assert(rotationsOnly.has_value());
     assert(CountValid(*rotationsOnly) == 4);
@@ -229,10 +232,11 @@ TestARotationIsNormalizedOnTheWayIn()
     // rather than to a scaled one.
     sample.rotations[3] = pxr::GfQuatf(1.4142136f, pxr::GfVec3f(0.0f, 1.4142136f, 0.0f));
 
-    const std::optional<motion::HumanoidPose> pose = execmotion::PoseFromClipSample(sample);
+    const std::optional<openstrata::motion::MotionPose> pose =
+        execmotion::PoseFromClipSample(sample);
     assert(pose.has_value());
     const pxr::GfQuatf& head =
-        pose->localRotations[static_cast<std::size_t>(motion::HumanBone::Head)];
+        pose->localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Head)];
     assert(std::abs(head.GetLength() - 1.0f) < 1e-5f);
     assert(std::abs(head.GetReal() - 0.70710678f) < 1e-5f);
 }
@@ -240,32 +244,33 @@ TestARotationIsNormalizedOnTheWayIn()
 // ---------------------------------------------------------------------------
 // The filter step
 // ---------------------------------------------------------------------------
-// One `motion::PoseFilter` step over two poses, with the state passed in. The
-// three checks here are the ones that decide whether the *node* is honest: that
-// an absent policy is the library's answer and not one this bundle invented,
-// that filtering against yourself is the identity, and that a step lands where
-// the library's own weight formula says.
+// One `openstrata::motion::PoseFilter` step over two poses, with the state
+// passed in. The three checks here are the ones that decide whether the *node*
+// is honest: that an absent policy is the library's answer and not one this
+// bundle invented, that filtering against yourself is the identity, and that a
+// step lands where the library's own weight formula says.
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 PoseWithHeadAndHips(double timestamp, float headAngleDeg, const pxr::GfVec3f& hips)
 {
-    motion::HumanoidPose pose;
+    openstrata::motion::MotionPose pose;
     pose.timestamp = timestamp;
     const float radians = headAngleDeg * float(M_PI) / 180.0f;
-    pose.localRotations[static_cast<std::size_t>(motion::HumanBone::Head)] =
+    pose.localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Head)] =
         pxr::GfQuatf(std::cos(radians * 0.5f), pxr::GfVec3f(0.0f, std::sin(radians * 0.5f), 0.0f));
-    pose.validRotations.set(static_cast<std::size_t>(motion::HumanBone::Head));
-    pose.validRotations.set(static_cast<std::size_t>(motion::HumanBone::Hips));
+    pose.validRotations.set(static_cast<std::size_t>(openstrata::motion::HumanJoint::Head));
+    pose.validRotations.set(static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips));
     pose.root.worldPosition = hips;
     pose.root.hasPosition = true;
     return pose;
 }
 
 float
-HeadAngleDegrees(const motion::HumanoidPose& pose)
+HeadAngleDegrees(const openstrata::motion::MotionPose& pose)
 {
     const pxr::GfQuatf head =
-        pose.localRotations[static_cast<std::size_t>(motion::HumanBone::Head)].GetNormalized();
+        pose.localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Head)]
+            .GetNormalized();
     const double w = std::min(1.0, std::max(-1.0, double(head.GetReal())));
     return float(2.0 * std::acos(w) * 180.0 / M_PI);
 }
@@ -273,7 +278,7 @@ HeadAngleDegrees(const motion::HumanoidPose& pose)
 void
 TestFilteringAgainstYourselfChangesNothing()
 {
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     // The same pose as both arguments is what the node computes when nobody
@@ -285,20 +290,21 @@ TestFilteringAgainstYourselfChangesNothing()
 
     // And so does a prior pose from the future, which is what a seek backwards
     // looks like.
-    const motion::HumanoidPose later = PoseWithHeadAndHips(2.0, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose later = PoseWithHeadAndHips(2.0, 0.0f, pxr::GfVec3f(0.0f));
     assert(execmotion::FilteredPose(later, pose, {}) == pose);
 }
 
 void
 TestAnAbsentPolicyIsTheLibrarysOwn()
 {
-    const motion::HumanoidPose prior = PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose prior =
+        PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
-    // 6 Hz is `motion::PoseFilter::Options`' default, and a policy stating
-    // nothing must land on exactly the same pose as one stating 6. If this
-    // bundle ever grew a default of its own, these two would part company.
+    // 6 Hz is `openstrata::motion::PoseFilter::Options`' default, and a policy
+    // stating nothing must land on exactly the same pose as one stating 6. If
+    // this bundle ever grew a default of its own, these two would part company.
     execmotion::FilterPolicy stated;
     stated.cutoffHz = 6.0f;
     assert(execmotion::FilteredPose(prior, pose, {}) ==
@@ -309,7 +315,7 @@ TestAnAbsentPolicyIsTheLibrarysOwn()
     // rotations about one axis moves the angle linearly.
     constexpr double kTwoPi = 6.2831853071795862;
     const double weight = 1.0 - std::exp(-kTwoPi * 6.0 * 0.02);
-    const motion::HumanoidPose filtered = execmotion::FilteredPose(prior, pose, {});
+    const openstrata::motion::MotionPose filtered = execmotion::FilteredPose(prior, pose, {});
     assert(std::abs(HeadAngleDegrees(filtered) - float(45.0 * weight)) < 1e-2f);
     assert(std::abs(filtered.root.worldPosition[2] - float(weight)) < 1e-4f);
 
@@ -321,8 +327,9 @@ TestAnAbsentPolicyIsTheLibrarysOwn()
 void
 TestEachPolicyFieldReachesTheOptionItNames()
 {
-    const motion::HumanoidPose prior = PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose prior =
+        PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     // A non-positive cutoff is the library's own pass-through, and it is the
@@ -343,7 +350,7 @@ TestEachPolicyFieldReachesTheOptionItNames()
     // the head goes on taking its step.
     execmotion::FilterPolicy heldRoot;
     heldRoot.filterRootPosition = false;
-    const motion::HumanoidPose held = execmotion::FilteredPose(prior, pose, heldRoot);
+    const openstrata::motion::MotionPose held = execmotion::FilteredPose(prior, pose, heldRoot);
     assert(held.root.worldPosition == pose.root.worldPosition);
     assert(std::abs(HeadAngleDegrees(held) -
                     HeadAngleDegrees(execmotion::FilteredPose(prior, pose, {}))) < 1e-4f);
@@ -353,28 +360,29 @@ TestEachPolicyFieldReachesTheOptionItNames()
 // What the round trip through a pose costs
 // ---------------------------------------------------------------------------
 // The one place the exec node and the streaming filter give different answers,
-// measured against `motion::PoseFilter` itself rather than argued about.
+// measured against `openstrata::motion::PoseFilter` itself rather than argued
+// about.
 //
-// `PoseFilter` retains a state strictly richer than the pose it returns: a bone
+// `PoseFilter` retains a state strictly richer than the pose it returns: a joint
 // a pose does not report keeps its stored rotation *in the state* and stays out
-// of the *result*, so a brief dropout does not restart that bone's history. Only
+// of the *result*, so a brief dropout does not restart that joint's history. Only
 // the result can travel back through `motion.priorPose`, so the retained half
-// does not survive the trip -- and a bone that comes back after a missing frame
+// does not survive the trip -- and a joint that comes back after a missing frame
 // is passed through unfiltered here where the streaming filter would slerp it
 // from what it kept.
 //
-// It costs nothing for a clip, whose `joints` are `uniform` and whose bones
+// It costs nothing for a clip, whose `joints` are `uniform` and whose joints
 // therefore never drop out, and it is real for a live source, which is what the
 // node is aimed at. So it is pinned here, in both directions, and it is the
 // sharpened half of this bundle's ask on `motionRuntime`: a one-step entry point
 // has to hand back the state as well as the result, or a caller cannot carry the
 // history that makes a dropout survivable.
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 PoseWithoutHead(double timestamp, const pxr::GfVec3f& hips)
 {
-    motion::HumanoidPose pose = PoseWithHeadAndHips(timestamp, 0.0f, hips);
-    pose.validRotations.reset(static_cast<std::size_t>(motion::HumanBone::Head));
+    openstrata::motion::MotionPose pose = PoseWithHeadAndHips(timestamp, 0.0f, hips);
+    pose.validRotations.reset(static_cast<std::size_t>(openstrata::motion::HumanJoint::Head));
     return pose;
 }
 
@@ -383,20 +391,22 @@ TestADropoutDoesNotSurviveTheRoundTrip()
 {
     // Three instants one frame apart at 50 Hz: the head is at identity, then
     // absent for one frame, then at 45 degrees.
-    const motion::HumanoidPose first = PoseWithHeadAndHips(0.00, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose dropout = PoseWithoutHead(0.02, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose back = PoseWithHeadAndHips(0.04, 45.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose first =
+        PoseWithHeadAndHips(0.00, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose dropout = PoseWithoutHead(0.02, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose back =
+        PoseWithHeadAndHips(0.04, 45.0f, pxr::GfVec3f(0.0f));
 
-    // ---- what motion::PoseFilter does, driven as the streaming operator ----
-    motion::PoseFilter streaming;
+    // ---- what openstrata::motion::PoseFilter does, driven as the streaming operator ----
+    openstrata::motion::PoseFilter streaming;
     streaming.Apply(first);
-    const motion::HumanoidPose streamedDropout = streaming.Apply(dropout);
-    const motion::HumanoidPose streamedBack = streaming.Apply(back);
+    const openstrata::motion::MotionPose streamedDropout = streaming.Apply(dropout);
+    const openstrata::motion::MotionPose streamedBack = streaming.Apply(back);
 
     // The dropout frame reports no head either way: the library does not invent
-    // a bone the pose did not carry, which is the behaviour the round trip is
+    // a joint the pose did not carry, which is the behaviour the round trip is
     // not allowed to change.
-    assert(!Has(streamedDropout, motion::HumanBone::Head));
+    assert(!Has(streamedDropout, openstrata::motion::HumanJoint::Head));
 
     // And the frame after it is smoothed from the head the filter kept.
     constexpr double kTwoPi = 6.2831853071795862;
@@ -404,22 +414,24 @@ TestADropoutDoesNotSurviveTheRoundTrip()
     assert(std::abs(HeadAngleDegrees(streamedBack) - float(45.0 * weight)) < 1e-2f);
 
     // ---- what the node does, with the result fed back as the prior pose ----
-    const motion::HumanoidPose steppedFirst = execmotion::FilteredPose(first, first, {});
-    const motion::HumanoidPose steppedDropout = execmotion::FilteredPose(steppedFirst, dropout, {});
-    const motion::HumanoidPose steppedBack = execmotion::FilteredPose(steppedDropout, back, {});
+    const openstrata::motion::MotionPose steppedFirst = execmotion::FilteredPose(first, first, {});
+    const openstrata::motion::MotionPose steppedDropout =
+        execmotion::FilteredPose(steppedFirst, dropout, {});
+    const openstrata::motion::MotionPose steppedBack =
+        execmotion::FilteredPose(steppedDropout, back, {});
 
-    assert(!Has(steppedDropout, motion::HumanBone::Head) &&
-           "the seam invented a bone the pose did not report");
+    assert(!Has(steppedDropout, openstrata::motion::HumanJoint::Head) &&
+           "the seam invented a joint the pose did not report");
 
     // The divergence, stated as a number rather than as a risk: the head comes
     // back at the full 45 degrees, because the pose that travelled back carried
     // no head for the step to start from.
     assert(std::abs(HeadAngleDegrees(steppedBack) - 45.0f) < 1e-2f &&
-           "a bone returning from a dropout was smoothed, so the seam is "
+           "a joint returning from a dropout was smoothed, so the seam is "
            "carrying history a pose cannot carry");
     assert(std::abs(HeadAngleDegrees(steppedBack) - HeadAngleDegrees(streamedBack)) > 1.0f &&
            "the two now agree -- either PoseFilter stopped retaining dropped "
-           "bones, or the seam grew a state, and the parity note that says they "
+           "joints, or the seam grew a state, and the parity note that says they "
            "differ (P0-6) is stale either way");
 
     // Everything the dropout did not touch is unaffected: the hips take their
@@ -431,21 +443,24 @@ TestADropoutDoesNotSurviveTheRoundTrip()
 // ---------------------------------------------------------------------------
 // The root intake
 // ---------------------------------------------------------------------------
-// `motion::RootMotionIntake`'s three policies over two instants. The library's
-// rule lives in a private method of a capture *session* (see ExecMotionPose.h),
-// so these checks are written against the rule's definition rather than against
-// a call -- which is exactly why they are here rather than taken on trust.
+// `openstrata::motion::RootMotionIntake`'s three policies over two instants.
+// The library's rule lives in a private method of a capture *session* (see
+// ExecMotionPose.h), so these checks are written against the rule's definition
+// rather than against a call -- which is exactly why they are here rather than
+// taken on trust.
 
 void
 TestTheIntakeTokenTableIsTheLibrarysEnum()
 {
-    assert(execmotion::RootIntakeForToken("passthrough") == motion::RootMotionIntake::Passthrough);
-    assert(execmotion::RootIntakeForToken("ignore") == motion::RootMotionIntake::Ignore);
+    assert(execmotion::RootIntakeForToken("passthrough") ==
+           openstrata::motion::RootMotionIntake::Passthrough);
+    assert(execmotion::RootIntakeForToken("ignore") ==
+           openstrata::motion::RootMotionIntake::Ignore);
     assert(execmotion::RootIntakeForToken("deriveVelocity") ==
-           motion::RootMotionIntake::DeriveVelocity);
+           openstrata::motion::RootMotionIntake::DeriveVelocity);
 
     // Nothing else is a policy. A differently-cased spelling is a different
-    // token, the same rule the bone table keeps: one vocabulary, and a laxer
+    // token, the same rule the joint table keeps: one vocabulary, and a laxer
     // second one here would be the duplicate the workspace forbids.
     assert(!execmotion::RootIntakeForToken("").has_value());
     assert(!execmotion::RootIntakeForToken("Passthrough").has_value());
@@ -456,15 +471,16 @@ TestTheIntakeTokenTableIsTheLibrarysEnum()
 void
 TestAnAbsentIntakeIsTheLibrarysOwn()
 {
-    const motion::HumanoidPose prior = PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose prior =
+        PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     // An absent policy is `LiveCaptureConfig`'s, read from the library rather
     // than restated -- so this assertion is against the library's own field and
     // moves with it if it ever moves.
     execmotion::RootPolicy stated;
-    stated.intake = motion::LiveCaptureConfig{}.rootMotion;
+    stated.intake = openstrata::motion::LiveCaptureConfig{}.rootMotion;
     assert(execmotion::RootMotionFrom(prior, pose, {}) ==
            execmotion::RootMotionFrom(prior, pose, stated));
 
@@ -472,7 +488,7 @@ TestAnAbsentIntakeIsTheLibrarysOwn()
     // which is what makes the line above worth asserting: a bundle that had
     // picked `Passthrough` would derive nothing here.
     execmotion::RootPolicy passthrough;
-    passthrough.intake = motion::RootMotionIntake::Passthrough;
+    passthrough.intake = openstrata::motion::RootMotionIntake::Passthrough;
     assert(execmotion::RootMotionFrom(prior, pose, {}) !=
            execmotion::RootMotionFrom(prior, pose, passthrough));
 }
@@ -480,12 +496,13 @@ TestAnAbsentIntakeIsTheLibrarysOwn()
 void
 TestPassthroughIsThePoseSOwnRoot()
 {
-    const motion::HumanoidPose prior = PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose prior =
+        PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     execmotion::RootPolicy policy;
-    policy.intake = motion::RootMotionIntake::Passthrough;
+    policy.intake = openstrata::motion::RootMotionIntake::Passthrough;
     assert(execmotion::RootMotionFrom(prior, pose, policy) == pose.root &&
            "passthrough is the one policy with nothing to do, and it did "
            "something");
@@ -494,17 +511,17 @@ TestPassthroughIsThePoseSOwnRoot()
 void
 TestIgnoreClearsRatherThanZeroes()
 {
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     execmotion::RootPolicy policy;
-    policy.intake = motion::RootMotionIntake::Ignore;
-    const motion::RootMotion root = execmotion::RootMotionFrom(pose, pose, policy);
+    policy.intake = openstrata::motion::RootMotionIntake::Ignore;
+    const openstrata::motion::RootMotion root = execmotion::RootMotionFrom(pose, pose, policy);
 
     // The difference matters downstream: a cleared root says "this clip does
     // not place the body", and a zeroed position with `hasPosition` set says
     // "the body is at the origin". The first lets a rig keep its own placement.
-    assert(root == motion::RootMotion{});
+    assert(root == openstrata::motion::RootMotion{});
     assert(!root.hasPosition && "ignore zeroed the position instead of clearing it");
 }
 
@@ -512,17 +529,18 @@ void
 TestAVelocityIsDerivedExactlyWhereTheLibraryDerivesOne()
 {
     execmotion::RootPolicy derive;
-    derive.intake = motion::RootMotionIntake::DeriveVelocity;
+    derive.intake = openstrata::motion::RootMotionIntake::DeriveVelocity;
 
-    const motion::HumanoidPose prior = PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose prior =
+        PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f));
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
     // The definition: the distance between two instants over the time between
     // them. Written out rather than called, because the rule this wraps has no
     // call to make (ExecMotionPose.h).
     {
-        const motion::RootMotion root = execmotion::RootMotionFrom(prior, pose, derive);
+        const openstrata::motion::RootMotion root = execmotion::RootMotionFrom(prior, pose, derive);
         assert(root.hasLinearVelocity);
         const pxr::GfVec3f expected = (pose.root.worldPosition - prior.root.worldPosition) / 0.02f;
         assert(std::abs(root.linearVelocity[1] - expected[1]) < 1e-2f);
@@ -533,7 +551,7 @@ TestAVelocityIsDerivedExactlyWhereTheLibraryDerivesOne()
 
     // The same instant twice, which is what an un-overridden node computes.
     {
-        const motion::RootMotion root = execmotion::RootMotionFrom(pose, pose, derive);
+        const openstrata::motion::RootMotion root = execmotion::RootMotionFrom(pose, pose, derive);
         assert(!root.hasLinearVelocity && "a velocity was derived between a pose and itself");
         assert(root == pose.root);
     }
@@ -541,7 +559,7 @@ TestAVelocityIsDerivedExactlyWhereTheLibraryDerivesOne()
     // A prior pose from the future: a seek backwards, and the same answer, for
     // the same reason the filter reseeds there.
     {
-        const motion::HumanoidPose later =
+        const openstrata::motion::MotionPose later =
             PoseWithHeadAndHips(2.0, 0.0f, pxr::GfVec3f(0.0f, 9.0f, 9.0f));
         assert(!execmotion::RootMotionFrom(later, pose, derive).hasLinearVelocity);
     }
@@ -550,10 +568,11 @@ TestAVelocityIsDerivedExactlyWhereTheLibraryDerivesOne()
     // velocity only where none arrived, and overwriting a measured value with a
     // differentiated one would be this bundle deciding it knows better.
     {
-        motion::HumanoidPose reported = pose;
+        openstrata::motion::MotionPose reported = pose;
         reported.root.linearVelocity = pxr::GfVec3f(1.0f, 2.0f, 3.0f);
         reported.root.hasLinearVelocity = true;
-        const motion::RootMotion root = execmotion::RootMotionFrom(prior, reported, derive);
+        const openstrata::motion::RootMotion root =
+            execmotion::RootMotionFrom(prior, reported, derive);
         assert(root.linearVelocity == pxr::GfVec3f(1.0f, 2.0f, 3.0f) &&
                "a reported velocity was replaced by a derived one");
     }
@@ -562,12 +581,12 @@ TestAVelocityIsDerivedExactlyWhereTheLibraryDerivesOne()
     // prior with none. Both leave the root as it arrived rather than inventing
     // a zero, which is the same rule the rest of the seam keeps.
     {
-        motion::HumanoidPose noPosition = pose;
-        noPosition.root = motion::RootMotion{};
+        openstrata::motion::MotionPose noPosition = pose;
+        noPosition.root = openstrata::motion::RootMotion{};
         assert(!execmotion::RootMotionFrom(prior, noPosition, derive).hasLinearVelocity);
 
-        motion::HumanoidPose priorNoPosition = prior;
-        priorNoPosition.root = motion::RootMotion{};
+        openstrata::motion::MotionPose priorNoPosition = prior;
+        priorNoPosition.root = openstrata::motion::RootMotion{};
         assert(!execmotion::RootMotionFrom(priorNoPosition, pose, derive).hasLinearVelocity);
     }
 }
@@ -586,14 +605,14 @@ TestAClearedRootIsTheIdentity()
     // `ignore`'s answer, and a clip whose hips carry no translation: nothing
     // stated, so nothing moves, and the Xformable stays at its parent.
     const std::optional<pxr::GfMatrix4d> transform =
-        execmotion::RootTransform(motion::RootMotion{});
+        execmotion::RootTransform(openstrata::motion::RootMotion{});
     assert(transform && *transform == pxr::GfMatrix4d(1.0) && "an unstated root placed something");
 }
 
 void
 TestTheOrientationTurnsInPlace()
 {
-    motion::RootMotion root;
+    openstrata::motion::RootMotion root;
     root.worldPosition = pxr::GfVec3f(1.0f, 2.0f, 3.0f);
     root.hasPosition = true;
     // A quarter turn about +Y, which takes +X to -Z.
@@ -617,7 +636,7 @@ TestTheOrientationTurnsInPlace()
            "the orientation and the position compose in the wrong order");
 
     // An orientation alone turns and does not move.
-    motion::RootMotion turned = root;
+    openstrata::motion::RootMotion turned = root;
     turned.hasPosition = false;
     const std::optional<pxr::GfMatrix4d> onlyTurned = execmotion::RootTransform(turned);
     assert(onlyTurned && onlyTurned->ExtractTranslation() == pxr::GfVec3d(0.0));
@@ -626,10 +645,10 @@ TestTheOrientationTurnsInPlace()
 void
 TestAnOrientationIsNormalizedAndNotScaled()
 {
-    motion::RootMotion unit;
+    openstrata::motion::RootMotion unit;
     unit.worldOrientation = pxr::GfQuatf(1.0f, 0.0f, 0.0f, 0.0f);
     unit.hasOrientation = true;
-    motion::RootMotion doubled = unit;
+    openstrata::motion::RootMotion doubled = unit;
     doubled.worldOrientation = pxr::GfQuatf(2.0f, 0.0f, 0.0f, 0.0f);
 
     // A quaternion off the unit sphere would scale whatever it placed, and a
@@ -645,14 +664,14 @@ TestAPlacementNobodyStatedIsRefused()
     const float nan = std::numeric_limits<float>::quiet_NaN();
     const float inf = std::numeric_limits<float>::infinity();
 
-    motion::RootMotion position;
+    openstrata::motion::RootMotion position;
     position.hasPosition = true;
     position.worldPosition = pxr::GfVec3f(0.0f, nan, 0.0f);
     assert(!execmotion::RootTransform(position));
     position.worldPosition = pxr::GfVec3f(inf, 0.0f, 0.0f);
     assert(!execmotion::RootTransform(position));
 
-    motion::RootMotion orientation;
+    openstrata::motion::RootMotion orientation;
     orientation.hasOrientation = true;
     orientation.worldOrientation = pxr::GfQuatf(nan, 0.0f, 0.0f, 0.0f);
     assert(!execmotion::RootTransform(orientation));
@@ -665,7 +684,7 @@ TestAPlacementNobodyStatedIsRefused()
     // The flags decide what is read. A field the root does not state is never
     // looked at, and neither is a velocity, which a placement at one instant
     // does not depend on.
-    motion::RootMotion unstated;
+    openstrata::motion::RootMotion unstated;
     unstated.worldPosition = pxr::GfVec3f(nan);
     unstated.worldOrientation = pxr::GfQuatf(0.0f, 0.0f, 0.0f, 0.0f);
     unstated.linearVelocity = pxr::GfVec3f(nan);
@@ -677,18 +696,18 @@ TestAPlacementNobodyStatedIsRefused()
 // ---------------------------------------------------------------------------
 // The history, and what it states at one instant
 // ---------------------------------------------------------------------------
-// `SampleHistory` is a wrapper -- `motion::ClipSource::Sample` over the
-// snapshot -- so what these check is that the library's answer arrives whole:
-// the bracket, the hold, the stamp and the status. The expected values are
-// written from the definitions (half of a 90-degree turn about one axis is 45
-// degrees; the lag is the request minus the newest sample), for the reason every
-// suite here gives: an expected value produced by the code under test asserts
-// only that it equals itself.
+// `SampleHistory` is a wrapper -- `openstrata::motion::ClipSource::Sample` over
+// the snapshot -- so what these check is that the library's answer arrives
+// whole: the bracket, the hold, the stamp and the status. The expected values
+// are written from the definitions (half of a 90-degree turn about one axis is
+// 45 degrees; the lag is the request minus the newest sample), for the reason
+// every suite here gives: an expected value produced by the code under test
+// asserts only that it equals itself.
 
-motion::HumanoidAnimation
-HistoryOf(std::vector<motion::HumanoidPose> samples)
+openstrata::motion::MotionClip
+HistoryOf(std::vector<openstrata::motion::MotionPose> samples)
 {
-    motion::HumanoidAnimation history;
+    openstrata::motion::MotionClip history;
     history.samples = std::move(samples);
     return history;
 }
@@ -696,10 +715,10 @@ HistoryOf(std::vector<motion::HumanoidPose> samples)
 void
 TestAHistoryOfOneAnswersItsOwnPose()
 {
-    const motion::HumanoidPose pose =
+    const openstrata::motion::MotionPose pose =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
 
-    const motion::HumanoidAnimation history = execmotion::HistoryOfOne(pose);
+    const openstrata::motion::MotionClip history = execmotion::HistoryOfOne(pose);
     assert(history.samples.size() == 1);
     assert(history.samples.front() == pose);
     assert(history.startTime == 1.0 && history.endTime == 1.0 &&
@@ -708,10 +727,10 @@ TestAHistoryOfOneAnswersItsOwnPose()
     // What the node computes when nobody overrides `motion.poseHistory`: the
     // pose itself, **sampled** -- the instant is the one sample's, so there is
     // neither a bracket nor a hold -- with no lag. Nothing special-cases it.
-    const std::optional<motion::PoseSampleResult> result =
+    const std::optional<openstrata::motion::PoseSampleResult> result =
         execmotion::SampleHistory(history, pose.timestamp);
     assert(result.has_value());
-    assert(result->status == motion::PoseSampleStatus::Sampled);
+    assert(result->status == openstrata::motion::PoseSampleStatus::Sampled);
     assert(result->pose && *result->pose == pose &&
            "a history of one pose, sampled at its own instant, answered "
            "something other than that pose");
@@ -725,15 +744,16 @@ TestAnInstantBetweenTwoSamplesIsInterpolated()
     // bracketing the instant the system evaluates at. The head turns 90
     // degrees about +Y between them and the hips move from the origin to
     // (0, 1, 2).
-    const motion::HumanoidAnimation history =
+    const openstrata::motion::MotionClip history =
         HistoryOf({PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f)),
                    PoseWithHeadAndHips(1.02, 90.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f))});
 
-    const std::optional<motion::PoseSampleResult> result = execmotion::SampleHistory(history, 1.0);
+    const std::optional<openstrata::motion::PoseSampleResult> result =
+        execmotion::SampleHistory(history, 1.0);
     assert(result.has_value() && result->pose);
-    assert(result->status == motion::PoseSampleStatus::Sampled);
+    assert(result->status == openstrata::motion::PoseSampleStatus::Sampled);
 
-    const motion::HumanoidPose& pose = *result->pose;
+    const openstrata::motion::MotionPose& pose = *result->pose;
     assert(std::abs(HeadAngleDegrees(pose) - 45.0f) < 1e-3f &&
            "halfway between 0 and 90 degrees about one axis is not 45");
     assert(std::abs(pose.root.worldPosition[1] - 0.5f) < 1e-5f);
@@ -751,14 +771,15 @@ void
 TestAnInstantOutsideTheHistoryIsHeldAndSaysSo()
 {
     // A source that stopped delivering at 0.9 s, asked about 1.0 s.
-    const motion::HumanoidPose newest =
+    const openstrata::motion::MotionPose newest =
         PoseWithHeadAndHips(0.9, 90.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f));
-    const motion::HumanoidAnimation history =
+    const openstrata::motion::MotionClip history =
         HistoryOf({PoseWithHeadAndHips(0.5, 0.0f, pxr::GfVec3f(0.0f)), newest});
 
-    const std::optional<motion::PoseSampleResult> held = execmotion::SampleHistory(history, 1.0);
+    const std::optional<openstrata::motion::PoseSampleResult> held =
+        execmotion::SampleHistory(history, 1.0);
     assert(held.has_value() && held->pose);
-    assert(held->status == motion::PoseSampleStatus::Held &&
+    assert(held->status == openstrata::motion::PoseSampleStatus::Held &&
            "an instant past the newest sample was not reported as a hold");
     assert(std::abs(HeadAngleDegrees(*held->pose) - 90.0f) < 1e-3f &&
            "a hold did not repeat the newest sample");
@@ -775,29 +796,32 @@ TestAnInstantOutsideTheHistoryIsHeldAndSaysSo()
            "this node returns the status as well needs restating");
 
     // And the other edge: before the oldest sample, the oldest is held.
-    const std::optional<motion::PoseSampleResult> early = execmotion::SampleHistory(history, 0.1);
+    const std::optional<openstrata::motion::PoseSampleResult> early =
+        execmotion::SampleHistory(history, 0.1);
     assert(early.has_value() && early->pose);
-    assert(early->status == motion::PoseSampleStatus::Held);
+    assert(early->status == openstrata::motion::PoseSampleStatus::Held);
     assert(std::abs(HeadAngleDegrees(*early->pose)) < 1e-3f);
 }
 
 void
 TestAMissingBoneIsHeldAcrossTheBracket()
 {
-    // The library's rule, arriving through the wrapper unchanged: a bone one
+    // The library's rule, arriving through the wrapper unchanged: a joint one
     // bracketing sample reports and the other does not is held at the value it
     // was reported with, never faded toward identity.
-    motion::HumanoidPose headless = PoseWithHeadAndHips(1.02, 0.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f));
-    headless.validRotations.reset(static_cast<std::size_t>(motion::HumanBone::Head));
+    openstrata::motion::MotionPose headless =
+        PoseWithHeadAndHips(1.02, 0.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f));
+    headless.validRotations.reset(static_cast<std::size_t>(openstrata::motion::HumanJoint::Head));
 
-    const motion::HumanoidAnimation history =
+    const openstrata::motion::MotionClip history =
         HistoryOf({PoseWithHeadAndHips(0.98, 60.0f, pxr::GfVec3f(0.0f)), headless});
 
-    const std::optional<motion::PoseSampleResult> result = execmotion::SampleHistory(history, 1.0);
+    const std::optional<openstrata::motion::PoseSampleResult> result =
+        execmotion::SampleHistory(history, 1.0);
     assert(result.has_value() && result->pose);
-    assert(Has(*result->pose, motion::HumanBone::Head));
+    assert(Has(*result->pose, openstrata::motion::HumanJoint::Head));
     assert(std::abs(HeadAngleDegrees(*result->pose) - 60.0f) < 1e-3f &&
-           "a bone only one sample reported was faded rather than held");
+           "a joint only one sample reported was faded rather than held");
 }
 
 void
@@ -807,13 +831,13 @@ TestAnEmptyHistoryIsAnAnswerAndNotARefusal()
     // *answer* -- the history holds nothing, and the type can say so -- which
     // makes it the first result in this bundle with an absent state of its own,
     // and so the first one with nothing for a refusal to protect.
-    const std::optional<motion::PoseSampleResult> result =
-        execmotion::SampleHistory(motion::HumanoidAnimation{}, 1.0);
+    const std::optional<openstrata::motion::PoseSampleResult> result =
+        execmotion::SampleHistory(openstrata::motion::MotionClip{}, 1.0);
     assert(result.has_value() && "an empty history was refused, which spends the bundle's one "
                                  "refusal on something the library already answers");
-    assert(result->status == motion::PoseSampleStatus::Unavailable);
+    assert(result->status == openstrata::motion::PoseSampleStatus::Unavailable);
     assert(!result->pose);
-    assert(*result == motion::PoseSampleResult{});
+    assert(*result == openstrata::motion::PoseSampleResult{});
 }
 
 void
@@ -821,7 +845,7 @@ TestAHistoryOutOfOrderIsRefused()
 {
     // Decreasing: the library's binary search would bracket the instant with
     // samples that do not surround it, and answer with a pose nobody measured.
-    const motion::HumanoidAnimation backwards =
+    const openstrata::motion::MotionClip backwards =
         HistoryOf({PoseWithHeadAndHips(1.02, 90.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f)),
                    PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f))});
     assert(!execmotion::SampleHistory(backwards, 1.0).has_value());
@@ -829,11 +853,12 @@ TestAHistoryOutOfOrderIsRefused()
     // Repeated is not decreasing, and is not refused: the library answers it.
     // A stricter check would be this bundle's policy -- `PoseBuffer::Push`'s
     // strictly-increasing rule is about filling a buffer, not sampling one.
-    const motion::HumanoidAnimation repeated =
+    const openstrata::motion::MotionClip repeated =
         HistoryOf({PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f)),
                    PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f)),
                    PoseWithHeadAndHips(1.02, 90.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f))});
-    const std::optional<motion::PoseSampleResult> result = execmotion::SampleHistory(repeated, 1.0);
+    const std::optional<openstrata::motion::PoseSampleResult> result =
+        execmotion::SampleHistory(repeated, 1.0);
     assert(result.has_value() && result->pose);
     assert(std::abs(HeadAngleDegrees(*result->pose) - 45.0f) < 1e-3f);
 }
@@ -846,14 +871,14 @@ TestARepeatedNewestSampleHoldsTheLastOfThePair()
     // A request at or past that instant holds `samples.back()` -- the second of
     // the pair, not the first -- and either way the answer is a sample somebody
     // measured, which is why a repeat is answered rather than refused.
-    const motion::HumanoidAnimation history =
+    const openstrata::motion::MotionClip history =
         HistoryOf({PoseWithHeadAndHips(0.98, 0.0f, pxr::GfVec3f(0.0f)),
                    PoseWithHeadAndHips(1.02, 60.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f)),
                    PoseWithHeadAndHips(1.02, 90.0f, pxr::GfVec3f(0.0f, 1.0f, 2.0f))});
 
     for (const double instant : {1.02, 1.1})
     {
-        const std::optional<motion::PoseSampleResult> result =
+        const std::optional<openstrata::motion::PoseSampleResult> result =
             execmotion::SampleHistory(history, instant);
         assert(result.has_value() && result->pose);
         assert(std::abs(HeadAngleDegrees(*result->pose) - 90.0f) < 1e-3f &&
@@ -873,7 +898,7 @@ TestATimestampThatIsNotFiniteIsRefused()
     const double inf = std::numeric_limits<double>::infinity();
     const pxr::GfVec3f origin(0.0f);
 
-    const motion::HumanoidAnimation histories[] = {
+    const openstrata::motion::MotionClip histories[] = {
         HistoryOf({PoseWithHeadAndHips(0.98, 0.0f, origin), PoseWithHeadAndHips(nan, 30.0f, origin),
                    PoseWithHeadAndHips(1.02, 60.0f, origin)}),
         HistoryOf(
@@ -884,7 +909,7 @@ TestATimestampThatIsNotFiniteIsRefused()
         HistoryOf(
             {PoseWithHeadAndHips(0.98, 0.0f, origin), PoseWithHeadAndHips(inf, 60.0f, origin)}),
     };
-    for (const motion::HumanoidAnimation& history : histories)
+    for (const openstrata::motion::MotionClip& history : histories)
     {
         assert(!execmotion::SampleHistory(history, 1.0).has_value() &&
                "a history carrying a timestamp that is not finite was "
@@ -895,15 +920,15 @@ TestATimestampThatIsNotFiniteIsRefused()
 // ---------------------------------------------------------------------------
 // The blend, over what the fan-in handed back
 // ---------------------------------------------------------------------------
-// `BlendedPose` is a wrapper -- `motion::BlendPoses` over the poses with the
-// weights at the same positions -- plus the refusals that keep the fan-in's two
-// silent drops from turning into a wrong pairing. Expected values are written
-// from the library's documented fold: each pose is folded in at its share of
-// the running total, which for one head turning about one axis is an angle
-// interpolated linearly.
+// `BlendedPose` is a wrapper -- `openstrata::motion::BlendPoses` over the poses
+// with the weights at the same positions -- plus the refusals that keep the
+// fan-in's two silent drops from turning into a wrong pairing. Expected values
+// are written from the library's documented fold: each pose is folded in at its
+// share of the running total, which for one head turning about one axis is an
+// angle interpolated linearly.
 
 execmotion::BlendInputs
-BlendOf(std::vector<motion::HumanoidPose> poses, std::vector<float> weights)
+BlendOf(std::vector<openstrata::motion::MotionPose> poses, std::vector<float> weights)
 {
     execmotion::BlendInputs inputs;
     inputs.sourceCount = poses.size();
@@ -915,9 +940,9 @@ BlendOf(std::vector<motion::HumanoidPose> poses, std::vector<float> weights)
 void
 TestABlendIsTheLibrarysWeightedFold()
 {
-    const motion::HumanoidPose walk =
+    const openstrata::motion::MotionPose walk =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
-    const motion::HumanoidPose turn =
+    const openstrata::motion::MotionPose turn =
         PoseWithHeadAndHips(1.0, 90.0f, pxr::GfVec3f(2.0f, 0.0f, 0.0f));
 
     const execmotion::BlendOutcome outcome =
@@ -950,25 +975,25 @@ TestABlendIsTheLibrarysWeightedFold()
 void
 TestTheOrderIsPartOfTheAnswer()
 {
-    // Three sources turning one bone about three different axes, at equal
+    // Three sources turning one joint about three different axes, at equal
     // weights. The library folds them in one at a time, so the order is an
     // input to the answer, not only to the pairing: reversing the sources --
     // and moving each weight along with its source, so the pairing is intact --
     // lands somewhere else. That is why the fan-in has to arrive in the
     // relationship's order for more than the weights' sake, and why
     // `execMotion_blend` measures that it does.
-    constexpr auto head = static_cast<std::size_t>(motion::HumanBone::Head);
+    constexpr auto head = static_cast<std::size_t>(openstrata::motion::HumanJoint::Head);
     const float half = float(M_PI) / 4.0f; // half of a 90-degree turn
-    motion::HumanoidPose aboutX;
-    motion::HumanoidPose aboutY;
-    motion::HumanoidPose aboutZ;
+    openstrata::motion::MotionPose aboutX;
+    openstrata::motion::MotionPose aboutY;
+    openstrata::motion::MotionPose aboutZ;
     aboutX.localRotations[head] =
         pxr::GfQuatf(std::cos(half), pxr::GfVec3f(std::sin(half), 0.0f, 0.0f));
     aboutY.localRotations[head] =
         pxr::GfQuatf(std::cos(half), pxr::GfVec3f(0.0f, std::sin(half), 0.0f));
     aboutZ.localRotations[head] =
         pxr::GfQuatf(std::cos(half), pxr::GfVec3f(0.0f, 0.0f, std::sin(half)));
-    for (motion::HumanoidPose* pose : {&aboutX, &aboutY, &aboutZ})
+    for (openstrata::motion::MotionPose* pose : {&aboutX, &aboutY, &aboutZ})
     {
         pose->validRotations.set(head);
         pose->timestamp = 1.0;
@@ -995,9 +1020,9 @@ void
 TestEachBlendRefusalIsTheOneThatApplies()
 {
     using execmotion::BlendRefusal;
-    const motion::HumanoidPose walk =
+    const openstrata::motion::MotionPose walk =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
-    const motion::HumanoidPose turn =
+    const openstrata::motion::MotionPose turn =
         PoseWithHeadAndHips(1.0, 90.0f, pxr::GfVec3f(2.0f, 0.0f, 0.0f));
     const float nan = std::numeric_limits<float>::quiet_NaN();
     const float inf = std::numeric_limits<float>::infinity();
@@ -1029,10 +1054,10 @@ TestEachBlendRefusalIsTheOneThatApplies()
 
     // Two instants, and one instant that is not finite -- an infinity agrees
     // with itself exactly, so equality alone would let it through.
-    motion::HumanoidPose half = turn;
+    openstrata::motion::MotionPose half = turn;
     half.timestamp = 0.5;
     assert(refused(BlendOf({walk, half}, {0.5f, 0.5f}), BlendRefusal::InstantsDisagree));
-    motion::HumanoidPose never = walk;
+    openstrata::motion::MotionPose never = walk;
     never.timestamp = std::numeric_limits<double>::infinity();
     assert(refused(BlendOf({never, never}, {0.5f, 0.5f}), BlendRefusal::InstantsDisagree));
 
@@ -1047,33 +1072,54 @@ TestEachBlendRefusalIsTheOneThatApplies()
 }
 
 void
-TestWhatTheLibraryWouldHaveAnswered()
+TestWhatTheLibraryAnswers()
 {
-    // The two refusals that are about the library rather than the fan-in, and
-    // so the boundary finding: what `motion::BlendPoses` answers where this node
-    // refuses. Pinned so the day the library changes, this suite says the
-    // refusals may have become answers.
-    const motion::HumanoidPose walk =
+    // What `BlendPoses` answers where this node refuses. Pinned so the day the
+    // library changes, this suite says the refusals may have become answers --
+    // and two of them already did, when the N-way blend arrived here as a
+    // function that can say there was nothing to blend.
+    const openstrata::motion::MotionPose walk =
         PoseWithHeadAndHips(1.0, 45.0f, pxr::GfVec3f(0.0f, 0.5f, 1.0f));
-    const motion::HumanoidPose turn =
+    const openstrata::motion::MotionPose turn =
         PoseWithHeadAndHips(1.0, 90.0f, pxr::GfVec3f(2.0f, 0.0f, 0.0f));
 
-    // Nothing weighted: a default pose, stamped 0.0 -- not at the 1.0 s both
-    // sources were sampled at. A second nobody sampled, with nothing in the
-    // value to say so.
-    const motion::HumanoidPose nothing =
-        motion::BlendPoses(std::vector<motion::WeightedPose>{{walk, 0.0f}, {turn, 0.0f}});
-    assert(nothing == motion::HumanoidPose{});
-    assert(nothing.timestamp == 0.0 && walk.timestamp == 1.0);
+    // Nothing weighted: nullopt, not a default pose stamped at a 0.0 nobody
+    // sampled. `BlendedPose` reads that answer rather than looking for the
+    // case first, so `NothingWeighted` is the library's own answer named.
+    assert(!openstrata::motion::BlendPoses(
+        std::vector<openstrata::motion::WeightedPose>{{walk, 0.0f}, {turn, 0.0f}}));
 
-    // A weight that is not a number: carried through the running total into
-    // the rotation, which comes back NaN.
-    const motion::HumanoidPose poisoned = motion::BlendPoses(std::vector<motion::WeightedPose>{
-        {walk, std::numeric_limits<float>::quiet_NaN()}, {turn, 1.0f}});
+    // A weight that is not a number counts as no weight, like a negative one,
+    // so the blend is the other source alone -- stamped at the instant it was
+    // sampled at, and indistinguishable from a clip that authored one source.
+    // This node refuses it all the same: a weights array with a NaN in it is a
+    // clip stating a weight nobody can read, and blending what is left would
+    // answer something other than what was authored.
+    const std::optional<openstrata::motion::MotionPose> dropped =
+        openstrata::motion::BlendPoses(std::vector<openstrata::motion::WeightedPose>{
+            {walk, std::numeric_limits<float>::quiet_NaN()}, {turn, 1.0f}});
+    assert(dropped && *dropped == turn);
+
+    // An infinity is weight, and what it does depends on where it sits. First,
+    // it becomes the base and every later fold gets a share of 1/inf = 0, so
+    // the answer is that source alone. Later, the running total is infinite
+    // and its own share is inf/inf, so the rotation comes back NaN. Neither is
+    // the blend anyone authored, which is why `WeightNotFinite` is a refusal
+    // rather than a case this layer lets through.
+    const float inf = std::numeric_limits<float>::infinity();
+    const std::optional<openstrata::motion::MotionPose> first =
+        openstrata::motion::BlendPoses(
+            std::vector<openstrata::motion::WeightedPose>{{walk, inf}, {turn, 1.0f}});
+    assert(first && *first == walk);
+
+    const std::optional<openstrata::motion::MotionPose> poisoned =
+        openstrata::motion::BlendPoses(
+            std::vector<openstrata::motion::WeightedPose>{{walk, 1.0f}, {turn, inf}});
+    assert(poisoned);
     const pxr::GfQuatf head =
-        poisoned.localRotations[static_cast<std::size_t>(motion::HumanBone::Head)];
+        poisoned->localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Head)];
     assert(std::isnan(head.GetReal()) &&
-           "a NaN weight no longer poisons the library's blend -- the "
+           "an infinite weight no longer poisons the library's blend -- the "
            "refusal may be redundant now");
 }
 
@@ -1115,7 +1161,7 @@ main()
     TestABlendIsTheLibrarysWeightedFold();
     TestTheOrderIsPartOfTheAnswer();
     TestEachBlendRefusalIsTheOneThatApplies();
-    TestWhatTheLibraryWouldHaveAnswered();
+    TestWhatTheLibraryAnswers();
     std::printf("execMotion pose: all checks passed\n");
     return 0;
 }

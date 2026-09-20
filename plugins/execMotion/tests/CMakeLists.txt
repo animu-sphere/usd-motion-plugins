@@ -21,7 +21,8 @@ target_include_directories(execMotion_pose_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_pose_tests PRIVATE
     motionCore::motionCore
-    motionRuntime::motionRuntime)
+    motionSampling::motionSampling
+    motionRecording::motionRecording)
 target_compile_options(execMotion_pose_tests
     PRIVATE ${_exec_motion_assertions})
 if(MSVC)
@@ -106,7 +107,8 @@ add_test(NAME execMotion_sample
 # half a caller supplies, so a red result here is about chaining, overrides or
 # the filter's policy -- never about reading a clip.
 #
-# It does NOT link motionRuntime, although the computation under test wraps it.
+# It does NOT link motionSampling, although the computation under test wraps
+# it.
 # An expected value produced by the same function would assert that the library
 # equals itself; the suite writes out `PoseFilter`'s documented step weight
 # instead, so a clip's stated cutoff failing to reach the library is a red test
@@ -127,7 +129,7 @@ target_link_libraries(execMotion_filter_tests
 
 # Two fixtures differing by one thing: filtered_clip.usda is sampled_clip.usda
 # plus the three `motion:filter:*` attributes. So the pair separates the policy
-# a clip states from the default `motion::PoseFilter` applies when it states
+# a clip states from the default `PoseFilter` applies when it states
 # none -- which is the only way to tell the library's default from a default
 # this bundle might have invented.
 add_test(NAME execMotion_filter
@@ -140,14 +142,13 @@ add_test(NAME execMotion_filter
 # ---------------------------------------------------------------------------
 # The first computation that returns something other than a pose, so this is
 # where the bundle's SECOND registered value type is exercised: one request
-# hands back a `motion::HumanoidPose` and a `motion::RootMotion` side by side,
+# hands back a `MotionPose` and a `RootMotion` side by side,
 # and the dependent value key is a different type from the one it reads.
 #
-# Like the filter suite it does not link motionRuntime. The rule under test has
-# no library call to wrap at all -- it lives in a private method of
-# `LiveCaptureSource` -- so the expected values are written out from the rule's
-# definition, which is the only way this suite can say anything the seam did not
-# already say to itself.
+# Like the filter suite it does not link motionRecording, although the rule
+# under test is `ConditionRootMotion`. The expected values are written out from
+# the rule's definition, which is the only way this suite can say anything the
+# seam did not already say to itself.
 add_executable(execMotion_root_tests test_exec_motion_root.cpp)
 target_include_directories(execMotion_root_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
@@ -164,7 +165,7 @@ target_link_libraries(execMotion_root_tests
 
 # Two fixtures differing by one thing again: rooted_clip.usda is
 # sampled_clip.usda plus `motion:root:intake`. The pair is what separates the
-# policy a clip states from `motion::LiveCaptureConfig`'s own default -- and the
+# policy a clip states from `LiveCaptureConfig`'s own default -- and the
 # fixture states `passthrough` rather than the default precisely so the two
 # cannot agree by accident.
 add_test(NAME execMotion_root
@@ -178,12 +179,12 @@ add_test(NAME execMotion_root
 # The first node whose input a driver hands in rather than feeds back: a
 # timestamped history, supplied as an override on `motion.poseHistory` and
 # sampled at the evaluated instant. So this is where the bundle's third and
-# fourth registered value types are exercised -- `motion::HumanoidAnimation` in,
-# `motion::PoseSampleResult` out -- and where an override of a key that is not a
+# fourth registered value types are exercised -- `MotionClip` in,
+# `PoseSampleResult` out -- and where an override of a key that is not a
 # pose, two overrides in one call, and an override of the wrong type are
 # measured.
 #
-# Unlike the filter and root suites it links motionRuntime, because the result
+# Unlike the filter and root suites it links motionSampling, because the result
 # type is declared there -- and it calls none of the library's functions. The
 # suite reads a `PoseSampleResult`'s plain fields, so every expected value is
 # still written from a definition rather than produced by the code under test.
@@ -192,7 +193,7 @@ target_include_directories(execMotion_interpolate_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_interpolate_tests PRIVATE
     motionCore::motionCore
-    motionRuntime::motionRuntime)
+    motionSampling::motionSampling)
 target_compile_options(execMotion_interpolate_tests
     PRIVATE ${_exec_motion_assertions})
 if(MSVC)
@@ -220,8 +221,8 @@ add_test(NAME execMotion_interpolate
 # relationship itself, and an override of one prim's key reaching a node on
 # another.
 #
-# Like the filter and root suites it does not link motionRuntime, although the
-# computation under test is `motion::BlendPoses`. The fixture turns one head about
+# Like the filter and root suites it does not link motionSampling, although the
+# computation under test is `BlendPoses`. The fixture turns one head about
 # one axis, so every expected blend is an angle interpolated along it, written
 # out from the library's documented fold rather than produced by the library.
 add_executable(execMotion_blend_tests test_exec_motion_blend.cpp)
@@ -249,7 +250,7 @@ add_test(NAME execMotion_blend
 # ---------------------------------------------------------------------------
 # The display slice, through the built bundle and usdExecImaging
 # ---------------------------------------------------------------------------
-# The plan's P0-7: a clip's root motion placing an Xformable, through
+# The display case: a clip's root motion placing an Xformable, through
 # `execGeom`'s own transform computation and `usdExecImaging`'s stage scene
 # index -- the object UsdImagingGLEngine merges over the USD one when
 # USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX is set. Driven directly, with an
@@ -296,7 +297,8 @@ add_test(NAME execMotion_display
 # Motion policy §11.4: no socket, file, clock, thread or mutable global state in
 # a computation. check_boundaries.py reads the rule off the source, the built
 # library's imports, the target's link libraries and the plugInfo.json schema
-# declarations, and execVrm's check imports its tables from here.
+# declarations. A consumer's exec bundle keeps its own copy of the rule's
+# tables; this one is the vendor-neutral half.
 #
 # The link libraries are handed in from the target itself, because the
 # workspace libraries a bundle could reach a socket through are static: no
@@ -351,7 +353,7 @@ set(_plug_resources "${_bundle_dir}/plugin/resources/execMotion")
 
 # motionCore is static, so nothing of it is loaded at run time; OpenUSD is not,
 # and on Windows a plain-CMake ctest run finds none of it without this. Same
-# reason as libs/motionRuntime's block: an activated `ost` session already has
+# reason as libs/motionSampling's block: an activated `ost` session already has
 # these on PATH and a bare ctest exits 0xC0000135 without them.
 set(_exec_motion_env
     "PATH=path_list_prepend:${_usd_root}/bin"
@@ -374,15 +376,15 @@ set_tests_properties(execMotion_blend PROPERTIES
 set_tests_properties(execMotion_display PROPERTIES
     ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
 
-# The seam suite needs no plugin and no plugin path, but it does link motionCore
-# and motionRuntime and -- through Gf -- loads usd_gf.dll on Windows all the
-# same.
+# The seam suite needs no plugin and no plugin path, but it does link
+# motionCore, motionSampling and motionRecording and -- through Gf -- loads
+# usd_gf.dll on Windows all the same.
 set_tests_properties(execMotion_pose PROPERTIES
     ENVIRONMENT_MODIFICATION
         "PATH=path_list_prepend:${_usd_root}/bin;PATH=path_list_prepend:${_usd_root}/lib")
 
-# Motion Phase E's label, so the OpenExec half of the suite can be run and
-# reported on its own (the plan's P0-2 CTest labels).
+# One label, so the OpenExec half of the suite can be run and reported on its
+# own.
 set_tests_properties(execMotion_pose execMotion_mechanism execMotion_sample
                      execMotion_filter execMotion_root execMotion_interpolate
                      execMotion_blend execMotion_display

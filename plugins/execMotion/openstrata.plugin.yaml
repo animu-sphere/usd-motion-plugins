@@ -3,59 +3,58 @@ manifest:
   schema: openstrata.plugin/v1alpha1
 plugin:
   name: execMotion
-  version: 0.9.0
+  # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
+  version: 0.1.0
   kind: usd-exec
 license: Apache-2.0
 runtime:
-  # The one OpenUSD version this plugin supports; see usdVrmFileFormat's
-  # manifest for why the tolerated range was retired in v0.6.0. This bundle is
-  # the first that would not build at all without the OpenExec half of it.
+  # The one OpenUSD version this plugin supports (DEPENDENCIES.md §1). It is
+  # also the one member here that would not build at all without the OpenExec
+  # half of that release.
   openusd: "==26.08"
   cxx_abi: inherit
 provides:
   # One schema, and exactly one plugin in a session may declare it. 26.08 keys
   # its Exec.Schemas metadata by schema type and refuses a second declarer with
   # a coding error, dropping that plugin's computations for the schema -- so
-  # `UsdSkelAnimation` belongs to this bundle and `execVrm` reaches an animation
-  # through an input rather than by registering on it (WORKSPACE.md §2).
+  # `UsdSkelAnimation` belongs to this bundle, and a consumer's bundle
+  # (usd-vrm-plugins' execVrm) reaches an animation through an input rather
+  # than by registering on it (WORKSPACE.md §2).
   - usd-exec:UsdSkelAnimation
 requires:
   capabilities: [usd-stage-read]
   libraries:
-    # The vendor-neutral half of the motion layer, and the one every node needs:
-    # a computation is a thin wrapper, so the value that crosses the boundary is
-    # motionCore's own (WORKSPACE.md §2, motion policy §11).
+    # The vendor-neutral core of the motion layer, and the one every node
+    # needs: a computation is a thin wrapper, so the value that crosses the
+    # boundary is motionCore's own (WORKSPACE.md §2, design policy §21).
     #
-    # `motion.sampleAnimation` does not change that, which was a surprise rather
-    # than a plan. An exec input arrives already resolved at the evaluated frame,
-    # so the node interpolates nothing and has no `motionRuntime` call to wrap
-    # (docs/reports/openusd/26.08-openexec-sampling.md §5).
+    # `motion.sampleAnimation` does not change that, which was a surprise
+    # rather than a plan. An exec input arrives already resolved at the
+    # evaluated frame, so the node interpolates nothing and has no sampling
+    # call to wrap.
     - id: motionCore
-      version: ">=0.9,<0.10"
-    # And the runtime half, from `motion.filterPose` onward: the node is one
-    # step of `motion::PoseFilter` and the algorithm stays in the library. The
-    # state that filter normally keeps does not come with it -- an OpenExec
-    # callback is pure, so the prior pose is an input the driver supplies
-    # (README, "A filter is a recurrence").
-    #
-    # `motion.extractRootMotion` needs it for the vocabulary rather than for a
-    # call: `motion::RootMotionIntake` and `LiveCaptureConfig`'s default are the
-    # library's, and the rule they select sits in a private method of a capture
-    # session with no entry point a pure computation can reach -- the third
-    # finding this bundle has produced for boundary consolidation.
+      version: ">=0.1,<0.2"
+    # The sampling half, from `motion.filterPose` onward: the node is one step
+    # of `PoseFilter` and the algorithm stays in the library. The state that
+    # filter normally keeps does not come with it -- an OpenExec callback is
+    # pure, so the prior pose is an input the driver supplies (README, "A
+    # filter is a recurrence").
     #
     # `motion.interpolatePose` needs it for both a call and a type: the node is
-    # `motion::ClipSource::Sample` over a driver's history, and it answers the
-    # library's own `motion::PoseSampleResult` whole, because the status in it
-    # is part of the answer. That type's `operator==`, which the registry
-    # requires, was added after the v0.8.0 tag, which is why v0.9.0 is a minor
-    # release: this range excludes the 0.8.0 package that lacks it
-    # (PACKAGE_CONTRACT.md §3.1).
+    # `SampleClip` over a driver's history, and it answers the library's own
+    # `PoseSampleResult` whole, because the status in it is part of the answer.
+    # That type's `operator==` is what the exec type registry requires.
     #
     # `motion.blendPoses` needs it for a call and nothing else: the node is the
-    # N-way `motion::BlendPoses` over the clips a relationship targets.
-    - id: motionRuntime
-      version: ">=0.9,<0.10"
+    # N-way `BlendPoses` over the clips a relationship targets.
+    - id: motionSampling
+      version: ">=0.1,<0.2"
+    # The recording half, for one node: `motion.extractRootMotion` is
+    # `ConditionRootMotion`, the intake rule a capture session applies to every
+    # frame it accepts, with `LiveCaptureConfig`'s own default for a clip that
+    # states nothing. Nothing else here reaches into a session.
+    - id: motionRecording
+      version: ">=0.1,<0.2"
 usd:
   plug_info: plugin/resources/execMotion/plugInfo.json
 tests:

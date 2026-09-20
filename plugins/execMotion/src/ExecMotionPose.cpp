@@ -12,10 +12,10 @@
 namespace execmotion
 {
 
-std::optional<motion::HumanBone>
-BoneForJointPath(const std::string& jointPath)
+std::optional<openstrata::motion::HumanJoint>
+JointForPath(const std::string& jointPath)
 {
-    // A joint path is `parent/child/leaf`; the bone is the leaf. A path with no
+    // A joint path is `parent/child/leaf`; the joint is the leaf. A path with no
     // separator is already a leaf, which is what a flat rig authors.
     const std::size_t slash = jointPath.rfind('/');
     const std::string_view leaf = slash == std::string::npos
@@ -25,27 +25,27 @@ BoneForJointPath(const std::string& jointPath)
     {
         return std::nullopt;
     }
-    return motion::FindHumanBone(leaf);
+    return openstrata::motion::FindHumanJoint(leaf);
 }
 
-motion::HumanoidPose
+openstrata::motion::MotionPose
 IdentityPoseForJoints(const std::vector<std::string>& jointPaths)
 {
-    motion::HumanoidPose pose;
-    // HumanoidPose's default constructor already fills localRotations with the
+    openstrata::motion::MotionPose pose;
+    // MotionPose's default constructor already fills localRotations with the
     // identity quaternion and clears validRotations, so this loop only says
-    // which bones the clip named -- it authors no rotation at all.
+    // which joints the clip named -- it authors no rotation at all.
     for (const std::string& jointPath : jointPaths)
     {
-        if (const std::optional<motion::HumanBone> bone = BoneForJointPath(jointPath))
+        if (const std::optional<openstrata::motion::HumanJoint> joint = JointForPath(jointPath))
         {
-            pose.validRotations.set(static_cast<std::size_t>(*bone));
+            pose.validRotations.set(static_cast<std::size_t>(*joint));
         }
     }
     return pose;
 }
 
-std::optional<motion::HumanoidPose>
+std::optional<openstrata::motion::MotionPose>
 PoseFromClipSample(const ClipSample& sample)
 {
     if (!(sample.timeCodesPerSecond > 0.0))
@@ -53,7 +53,7 @@ PoseFromClipSample(const ClipSample& sample)
         return std::nullopt;
     }
 
-    motion::HumanoidPose pose;
+    openstrata::motion::MotionPose pose;
 
     // The default time code is not frame zero, and this is the one place the
     // difference does not produce a wrong number: a pose resolved outside a
@@ -72,12 +72,13 @@ PoseFromClipSample(const ClipSample& sample)
 
     for (std::size_t i = 0; i < jointCount; ++i)
     {
-        const std::optional<motion::HumanBone> bone = BoneForJointPath(sample.jointPaths[i]);
-        if (!bone)
+        const std::optional<openstrata::motion::HumanJoint> joint =
+            JointForPath(sample.jointPaths[i]);
+        if (!joint)
         {
             continue;
         }
-        const auto slot = static_cast<std::size_t>(*bone);
+        const auto slot = static_cast<std::size_t>(*joint);
 
         if (rotationsUsable)
         {
@@ -92,7 +93,7 @@ PoseFromClipSample(const ClipSample& sample)
         // one per joint, but the rest of it is the rest pose the source rig was
         // authored with, which a retargeter re-derives for the rig it is aiming
         // at (motion contract; tools/motionRetarget reads a clip the same way).
-        if (translationsUsable && *bone == motion::HumanBone::Hips)
+        if (translationsUsable && *joint == openstrata::motion::HumanJoint::Hips)
         {
             pose.root.worldPosition = sample.translations[i];
             pose.root.hasPosition = true;
@@ -102,14 +103,14 @@ PoseFromClipSample(const ClipSample& sample)
     return pose;
 }
 
-motion::HumanoidPose
-FilteredPose(const motion::HumanoidPose& prior, const motion::HumanoidPose& pose,
-             const FilterPolicy& policy)
+openstrata::motion::MotionPose
+FilteredPose(const openstrata::motion::MotionPose& prior,
+             const openstrata::motion::MotionPose& pose, const FilterPolicy& policy)
 {
     // The library's defaults, then whatever the clip actually stated. Each
     // field is overwritten independently, so a clip that authors a cutoff and
     // nothing else keeps the library's answer for the other two.
-    motion::PoseFilter::Options options;
+    openstrata::motion::PoseFilter::Options options;
     if (policy.cutoffHz)
     {
         options.cutoffHz = *policy.cutoffHz;
@@ -123,84 +124,65 @@ FilteredPose(const motion::HumanoidPose& prior, const motion::HumanoidPose& pose
         options.filterRootOrientation = *policy.filterRootOrientation;
     }
 
-    // The whole node, and it is a wrapper: a filter constructed here, seeded
-    // with the prior pose, stepped once. The first Apply is the seed -- a
-    // PoseFilter with no state returns its argument and keeps it -- and the
-    // second is the step whose weight the two timestamps decide.
+    // The whole node, and it is one library call: `PoseFilter::Step`, the
+    // streaming filter as a pure function, handed the prior pose as the state
+    // it steps from. That entry point is what this bundle asked motionSampling
+    // for and it arrived with the library: seeding a local filter with `prior`
+    // and applying `pose` to it answered the same pose, and had to construct an
+    // object to do it.
     //
-    // The filter is a local rather than a member of anything: it lives for one
-    // call, sees exactly the two poses it was given, and is destroyed. That is
-    // what makes this callable from a computation at all.
-    motion::PoseFilter filter(options);
-    filter.Apply(prior);
-    return filter.Apply(pose);
+    // Only the pose travels back out. `StepResult::state` is the richer half --
+    // a joint the pose did not report keeps its last smoothed rotation there --
+    // and an exec computation's value is a pose, so carrying the state is a
+    // driver's to do over a value key this bundle does not yet publish. The
+    // difference that costs is measured in `execMotion_filter`.
+    return openstrata::motion::PoseFilter::Step(&prior, pose, options).pose;
 }
 
-std::optional<motion::RootMotionIntake>
+std::optional<openstrata::motion::RootMotionIntake>
 RootIntakeForToken(std::string_view token)
 {
     // Three spellings and no synonyms. A table rather than a chain of ifs
-    // because the set is closed: it is `motion::RootMotionIntake`, and a fourth
-    // policy is a change to the library that has to reach this list.
+    // because the set is closed: it is `openstrata::motion::RootMotionIntake`,
+    // and a fourth policy is a change to the library that has to reach this
+    // list.
     if (token == "passthrough")
     {
-        return motion::RootMotionIntake::Passthrough;
+        return openstrata::motion::RootMotionIntake::Passthrough;
     }
     if (token == "ignore")
     {
-        return motion::RootMotionIntake::Ignore;
+        return openstrata::motion::RootMotionIntake::Ignore;
     }
     if (token == "deriveVelocity")
     {
-        return motion::RootMotionIntake::DeriveVelocity;
+        return openstrata::motion::RootMotionIntake::DeriveVelocity;
     }
     return std::nullopt;
 }
 
-motion::RootMotion
-RootMotionFrom(const motion::HumanoidPose& prior, const motion::HumanoidPose& pose,
-               const RootPolicy& policy)
+openstrata::motion::RootMotion
+RootMotionFrom(const openstrata::motion::MotionPose& prior,
+               const openstrata::motion::MotionPose& pose, const RootPolicy& policy)
 {
     // The library's default, read from the library. `LiveCaptureConfig` is what
     // every other caller of this rule is configured with, so a clip that states
     // nothing gets exactly what a live session that states nothing gets --
     // including on the day that default changes.
-    const motion::RootMotionIntake intake =
-        policy.intake ? *policy.intake : motion::LiveCaptureConfig{}.rootMotion;
+    const openstrata::motion::RootMotionIntake intake =
+        policy.intake ? *policy.intake : openstrata::motion::LiveCaptureConfig{}.rootMotion;
 
-    if (intake == motion::RootMotionIntake::Ignore)
-    {
-        return motion::RootMotion();
-    }
-
-    motion::RootMotion root = pose.root;
-    if (intake != motion::RootMotionIntake::DeriveVelocity)
-    {
-        return root;
-    }
-
-    // Four conditions, and each is the library's: a velocity is derived only
-    // where there is a position to differentiate, no velocity the source
-    // already reported, a previous position to differentiate against, and time
-    // between the two. A pose that fails any of them keeps whatever the clip
-    // stated -- nothing is invented, which is the same rule the rest of this
-    // bundle keeps for a value nobody measured.
-    if (!root.hasPosition || root.hasLinearVelocity || !prior.root.hasPosition)
-    {
-        return root;
-    }
-    const double elapsed = pose.timestamp - prior.timestamp;
-    if (elapsed > 0.0)
-    {
-        root.linearVelocity =
-            (root.worldPosition - prior.root.worldPosition) / static_cast<float>(elapsed);
-        root.hasLinearVelocity = true;
-    }
-    return root;
+    // The whole node, and it is one library call: the intake rule as a pure
+    // function, beside the capture session that applies it to every frame it
+    // accepts. It arrived with the library (usd-motion-plugins #6); until it
+    // did, the three conditions were reproduced here against the contract,
+    // because the rule lived in a private method of a session that owns a
+    // buffer, a filter and statistics, and there was no call to make.
+    return openstrata::motion::ConditionRootMotion(prior, pose, intake);
 }
 
 std::optional<pxr::GfMatrix4d>
-RootTransform(const motion::RootMotion& root)
+RootTransform(const openstrata::motion::RootMotion& root)
 {
     pxr::GfMatrix4d transform(1.0);
 
@@ -237,18 +219,18 @@ RootTransform(const motion::RootMotion& root)
     return transform;
 }
 
-motion::HumanoidAnimation
-HistoryOfOne(const motion::HumanoidPose& pose)
+openstrata::motion::MotionClip
+HistoryOfOne(const openstrata::motion::MotionPose& pose)
 {
-    motion::HumanoidAnimation history;
+    openstrata::motion::MotionClip history;
     history.samples.push_back(pose);
     history.startTime = pose.timestamp;
     history.endTime = pose.timestamp;
     return history;
 }
 
-std::optional<motion::PoseSampleResult>
-SampleHistory(const motion::HumanoidAnimation& history, double seconds)
+std::optional<openstrata::motion::PoseSampleResult>
+SampleHistory(const openstrata::motion::MotionClip& history, double seconds)
 {
     // The precondition the library's binary search relies on, and nothing
     // stricter: a pair of equal timestamps is something it answers, a pair that
@@ -258,7 +240,7 @@ SampleHistory(const motion::HumanoidAnimation& history, double seconds)
     // with a NaN is false: `a < NaN` would let it through, and a NaN newest
     // sample would reach the caller as a NaN lag, which compares unequal even
     // to itself.
-    const std::vector<motion::HumanoidPose>& samples = history.samples;
+    const std::vector<openstrata::motion::MotionPose>& samples = history.samples;
     for (std::size_t i = 0; i < samples.size(); ++i)
     {
         if (!std::isfinite(samples[i].timestamp))
@@ -271,15 +253,13 @@ SampleHistory(const motion::HumanoidAnimation& history, double seconds)
         }
     }
 
-    // A source constructed here, asked once, and destroyed -- the same shape
-    // `FilteredPose` gives its `PoseFilter`, and for the same reason: it sees
-    // exactly the value it was handed, so the call is pure. It does cost a copy
-    // of the history, because `ClipSource` owns the animation it serves; the
-    // status-carrying answer exists only as a method on such a source, and
-    // `motion::SampleAnimation`, the free function beneath it, returns the pose
-    // without the status. That is this node's boundary finding.
-    motion::ClipSource source(history);
-    return source.Sample(seconds);
+    // The whole node, and it is one library call: `SampleClip`, which answers
+    // the question `IMotionSource::Sample` asks, from a clip held by reference.
+    // It arrived with the library (usd-motion-plugins #6) and this node is why:
+    // the status-carrying answer used to exist only as a method on a
+    // `ClipSource`, so a pure computation had to construct one and copy the
+    // history into it to get a status the contract says is part of the answer.
+    return openstrata::motion::SampleClip(history, seconds);
 }
 
 BlendOutcome
@@ -323,7 +303,7 @@ BlendedPose(const BlendInputs& inputs)
     // +inf agree with each other exactly. (A NaN never agrees, even with
     // itself, so equality would catch that one on its own.)
     const double instant = inputs.poses.front().timestamp;
-    for (const motion::HumanoidPose& pose : inputs.poses)
+    for (const openstrata::motion::MotionPose& pose : inputs.poses)
     {
         if (!std::isfinite(pose.timestamp) || pose.timestamp != instant)
         {
@@ -332,31 +312,27 @@ BlendedPose(const BlendInputs& inputs)
         }
     }
 
-    // The library treats a negative weight as zero and answers a
-    // default-constructed pose when nothing is left -- documented, and stamped
-    // 0.0 whatever instant the sources were sampled at. So the one case this
-    // layer has to see before the call is the one where the call's answer would
-    // carry a second nobody sampled; everything else is the library's.
-    bool anythingWeighted = false;
-    for (const float weight : inputs.weights)
+    // The whole node: one library call. Paired by position, which the fan-in's
+    // authored order and the count check above are what make safe.
+    std::vector<openstrata::motion::WeightedPose> weighted;
+    weighted.reserve(inputs.poses.size());
+    for (std::size_t i = 0; i < inputs.poses.size(); ++i)
     {
-        anythingWeighted = anythingWeighted || weight > 0.0f;
+        weighted.push_back(
+            openstrata::motion::WeightedPose{inputs.poses[i], inputs.weights[i]});
     }
-    if (!anythingWeighted)
+
+    // Nothing weighted is the library's own answer now -- nullopt rather than a
+    // default-constructed pose stamped at a 0.0 nobody sampled -- so this layer
+    // reads it instead of looking for it first (usd-motion-plugins #6).
+    std::optional<openstrata::motion::MotionPose> blended =
+        openstrata::motion::BlendPoses(weighted);
+    if (!blended)
     {
         outcome.refusal = BlendRefusal::NothingWeighted;
         return outcome;
     }
-
-    // The whole node: one library call. Paired by position, which the fan-in's
-    // authored order and the count check above are what make safe.
-    std::vector<motion::WeightedPose> weighted;
-    weighted.reserve(inputs.poses.size());
-    for (std::size_t i = 0; i < inputs.poses.size(); ++i)
-    {
-        weighted.push_back(motion::WeightedPose{inputs.poses[i], inputs.weights[i]});
-    }
-    outcome.pose = motion::BlendPoses(weighted);
+    outcome.pose = *blended;
     return outcome;
 }
 

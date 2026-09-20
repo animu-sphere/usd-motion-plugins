@@ -2,14 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Enforce execMotion's dependency boundary and the snapshot rule.
 
-Motion policy §11.4 and WORKSPACE.md §2 forbid, inside an OpenExec
-computation callback: socket or device I/O, file I/O and file watching, a wall
-clock, a private thread pool, and mutable global state. A callback is a pure
-function of the inputs exec resolves for it, and one that read a socket or a
-clock would make cache reuse and invalidation unverifiable -- the one reason to
-be on OpenExec at all. Until this check, both bundles obeyed that rule and
-nothing would have noticed the first node that did not
-(docs/roadmap/openexec-foundation.md §9).
+Design policy §21 and WORKSPACE.md §2 forbid, inside an OpenExec computation
+callback: socket or device I/O, file I/O and file watching, a wall clock, a
+private thread pool, and mutable global state. A callback is a pure function of
+the inputs exec resolves for it, and one that read a socket or a clock would
+make cache reuse and invalidation unverifiable -- the one reason to be on
+OpenExec at all. Nothing but this check would notice the first node that did
+not obey it.
 
 Four halves, because each sees something the others cannot:
 
@@ -27,9 +26,9 @@ Four halves, because each sees something the others cannot:
            WORKSPACE.md §2 states -- a schema has exactly one declarer per
            session, and a second declarer loses its computations silently
 
-execVrm's check imports the source and import rules from this file rather than
-restating them: the rule is one rule for both bundles, and execVrm may reach
-this bundle's tree (it requires execMotion; the reverse edge is forbidden).
+This is the only exec bundle here. A consumer's bundle -- usd-vrm-plugins'
+execVrm -- reaches this one by requiring it and reading its nodes by name; the
+reverse edge is forbidden, and the neighbour scan below is what says so.
 
 Usage: check_boundaries.py <bundle-source-dir> <built-library> <link-libraries>
 
@@ -192,7 +191,7 @@ def source_files(source: pathlib.Path) -> list[pathlib.Path]:
 
 
 # ---------------------------------------------------------------------------
-# The snapshot rule, by source (motion policy §11.4)
+# The snapshot rule, by source (design policy §21)
 # ---------------------------------------------------------------------------
 # Each category is matched twice: by the header that brings the capability in,
 # and by the name that uses it -- a header can arrive transitively, and a name
@@ -465,10 +464,10 @@ def purity_import_errors(library: pathlib.Path) -> list[str]:
 # Links and schemas
 # ---------------------------------------------------------------------------
 
-# The OpenUSD half both bundles may link: the libraries cmake/UsdVrmOpenUsd.cmake
-# probes for, plus the base and stage-value libraries under them. A new OpenUSD
-# library is one line here, on purpose: imaging, for one, is the presentation
-# layer's and not a computation's.
+# The OpenUSD half this bundle may link: the libraries
+# `usdmotion_require_openexec()` probes for, plus the base and stage-value
+# libraries under them. A new OpenUSD library is one line here, on purpose:
+# imaging, for one, is the presentation layer's and not a computation's.
 OPENUSD_ALLOWED = {"arch", "tf", "gf", "vt", "plug", "sdf", "usd", "usdSkel",
                    "vdf", "ef", "esf", "esfUsd", "exec", "execUsd"}
 
@@ -491,16 +490,15 @@ def link_errors(bundle: str, links: str, workspace_allowed: set[str]) -> list[st
     return errors
 
 
-# WORKSPACE.md §2's partition. `=:` there is "the OpenExec schemas it declares",
-# and a schema this table does not assign is one the contract has not placed:
-# it goes into WORKSPACE.md first, then here.
+# WORKSPACE.md §2's partition, this repository's half of it. A schema has
+# exactly one declarer per session across the whole composed process, so the
+# vendor-neutral bundle declares `UsdSkelAnimation` and nothing else: the rig
+# schemas and every vendor API belong to a consumer's bundle (usd-vrm-plugins'
+# execVrm declares `UsdSkelSkeleton`, `UsdSkelBindingAPI` and the VRM APIs).
+# Taking one of those here would silently drop that bundle's computations.
 def schema_owner(schema: str) -> str | None:
     if schema == "UsdSkelAnimation":
         return "execMotion"
-    if schema in {"UsdSkelSkeleton", "UsdSkelBindingAPI"}:
-        return "execVrm"
-    if re.fullmatch(r"(?:Usd)?Vrm\w*API", schema):
-        return "execVrm"
     return None
 
 
@@ -541,8 +539,10 @@ def schema_errors(bundle: str, source: pathlib.Path) -> tuple[set[str], list[str
         owner = schema_owner(schema)
         if owner is None:
             errors.append(
-                f"{bundle} declares {schema}, which WORKSPACE.md section 2 assigns to "
-                f"neither exec bundle")
+                f"{bundle} declares {schema}, which WORKSPACE.md section 2 does "
+                f"not assign to this repository: a schema has one declarer per "
+                f"session, so this takes it from the consumer's bundle that "
+                f"does declare it")
         elif owner != bundle:
             errors.append(
                 f"{bundle} declares {schema}, which WORKSPACE.md section 2 assigns to "
@@ -567,15 +567,20 @@ def main() -> int:
     errors += purity_import_errors(library)
     errors += link_errors(
         "execMotion", sys.argv[3],
-        {"motionCore::motionCore", "motionRuntime::motionRuntime"})
+        {"motionCore::motionCore", "motionSampling::motionSampling",
+         "motionRecording::motionRecording"})
     errors += schema_errors("execMotion", source)[1]
 
-    # Vendor-neutral by specification: nothing VRM-shaped, no live leaf, and
-    # never execVrm, whose edge to this bundle is the one direction allowed.
+    # Vendor-neutral by specification, and downstream of nothing: the
+    # dependency direction is one way (WORKSPACE.md §2.3), so a name from
+    # usd-vrm-plugins, usd-mmd-plugins or motion-connectors in this tree is
+    # that edge reversing. `execVrm` is in the list although it requires this
+    # bundle: it reaches these nodes by name through exec, never by linking.
     forbidden_neighbours = re.compile(
         r"\b(?:vrmSchema|vrmContainer|vrmRetarget|usdVrm\w*|UsdVrm\w*|execVrm|"
-        r"ExecVrm\w*|cgltf|mocopi|vrchat|ardy|liveTransport|motionTracking|"
-        r"vrmAdapter\w*)\b|\bosc::|\bosc/",
+        r"ExecVrm\w*|cgltf|mocopi|vrchat|ardy|motionConnector\w*|"
+        r"motionTracking|vrmAdapter\w*|mmdCore|usdMmd\w*|vmdReader)\b"
+        r"|\bosc::|\bosc/",
         re.IGNORECASE)
     for path in source_files(source):
         if forbidden_neighbours.search(code_only(path.read_text(encoding="utf-8"))):
@@ -586,11 +591,11 @@ def main() -> int:
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         errors.append(f"could not inspect execMotion dependencies: {exc}")
         dependencies = ""
-    if re.search(r"vrmSchema|vrmContainer|UsdVrm|ExecVrm|liveTransport|"
-                 r"motionTracking|vrmAdapter|(?:^|[\s/\\])(?:lib)?osc[._]",
+    if re.search(r"vrmSchema|vrmContainer|UsdVrm|ExecVrm|motionConnector|"
+                 r"motionTracking|vrmAdapter|usdMmd|(?:^|[\s/\\])(?:lib)?osc[._]",
                  dependencies, re.IGNORECASE | re.MULTILINE):
         errors.append(
-            "execMotion binary imports a VRM, live or sibling-bundle library")
+            "execMotion binary imports a consumer repository's library")
 
     if errors:
         if hasattr(sys.stderr, "reconfigure"):

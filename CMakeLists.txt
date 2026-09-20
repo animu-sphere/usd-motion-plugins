@@ -46,6 +46,12 @@ endif()
 
 option(USDMOTION_BUILD_TESTS "Build usd-motion-plugins tests" ${PROJECT_IS_TOP_LEVEL})
 
+# The one optional member (WORKSPACE.md §1.2). Every library and tool here
+# builds against an OpenUSD with no OpenExec at all; plugins/execMotion is the
+# only one that cannot, and it is the only one a consumer may not want. Turning
+# it off is how a runtime without the exec libraries builds the rest.
+option(USDMOTION_BUILD_EXEC_MOTION "Build the optional plugins/execMotion bundle" ON)
+
 if(USDMOTION_BUILD_TESTS)
     # At the top level, so tests registered by components are discoverable by
     # `ctest` from this build tree.
@@ -83,6 +89,10 @@ add_subdirectory("libs/motionBvh")
 add_subdirectory("tools/motionBvhInspect")
 add_subdirectory("tools/motionConvert")
 add_subdirectory("tools/motionRecord")
+
+if(USDMOTION_BUILD_EXEC_MOTION)
+    add_subdirectory("plugins/execMotion")
+endif()
 
 # Workspace-level tests: the documentation, and the installed-consumer lane.
 if(USDMOTION_BUILD_TESTS)
