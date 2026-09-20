@@ -154,6 +154,15 @@ ReadMetadata(const pxr::UsdPrim& prim, MotionStageMetadata* metadata)
             }
             return entry->second.UncheckedGet<int>();
         };
+        const auto readDouble = [&dictionary](const char* key) -> std::optional<double>
+        {
+            const auto entry = dictionary.find(key);
+            if (entry == dictionary.end() || !entry->second.IsHolding<double>())
+            {
+                return std::nullopt;
+            }
+            return entry->second.UncheckedGet<double>();
+        };
         const auto readString = [&dictionary](const char* key) -> std::string
         {
             const auto entry = dictionary.find(key);
@@ -168,6 +177,7 @@ ReadMetadata(const pxr::UsdPrim& prim, MotionStageMetadata* metadata)
         metadata->sourceFormat = readString("sourceFormat");
         metadata->sourceProvider = readString("sourceProvider");
         metadata->rootMotionSource = readString("rootMotionSource");
+        metadata->nominalFrameRate = readDouble("nominalFrameRate");
     }
 
     const pxr::VtValue source = prim.GetCustomDataByKey(kSource);
@@ -548,7 +558,15 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
 
     read->clip.startTime = read->clip.samples.front().timestamp;
     read->clip.endTime = read->clip.samples.back().timestamp;
-    read->clip.nominalFrameRate = read->timeCodesPerSecond;
+    // The producer's rate when the stage states one, and the stage's only as a
+    // fallback. They differ by design: a 60 Hz capture is written at 30 time
+    // codes per second (§4.1), so taking the encoding here would report a
+    // measurement the producer never made. A non-positive stated rate is no
+    // statement at all.
+    read->clip.nominalFrameRate =
+        read->metadata.nominalFrameRate && *read->metadata.nominalFrameRate > 0.0
+            ? *read->metadata.nominalFrameRate
+            : read->timeCodesPerSecond;
     read->clip.source.kind = MotionSourceKind::Clip;
     read->clip.source.provider = read->metadata.sourceProvider;
     read->clip.source.sourceId = stage->GetRootLayer() ? stage->GetRootLayer()->GetIdentifier()

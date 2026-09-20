@@ -130,8 +130,8 @@ was removed in the adapting commit rather than carried
   (`PoseFromStageSample`, taking values so an exec node can call it);
   `RootMotion::worldOrientation` carried, which both of the copies it arrived
   from dropped; and the skeleton answered as the two arrays
-  `BuildSkeletonDescriptor` and `BuildSourceRestPose` take, so reading a stage
-  links no retargeter.
+  `BuildSkeletonDescriptor` takes, whose descriptor `BuildSourceRestPose`
+  takes after it, so reading a stage links no retargeter.
 - ✅ The `Channels` prim is authored as well as read, which is the other half
   of USD-O4 and what makes the round trip checkable. A channel is read back
   only where the stage keyed it, because USD holds the last key forward.

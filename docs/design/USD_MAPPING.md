@@ -218,11 +218,17 @@ than guessed at.
 - `ReadMotionStage` and `OpenMotionStage` answer a `MotionClip`, the
   skeleton's joint tokens and rest transforms, §5's metadata and a list of
   warnings. A warning is never a refusal.
-- **The skeleton comes back as values**, not as a `SkeletonDescriptor`: those
-  two arrays are what `BuildSkeletonDescriptor` and `BuildSourceRestPose`
-  take ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)), so reading a
-  stage does not link a retargeter and `motionUsd` keeps its one edge
+- **The skeleton comes back as values**, not as a `SkeletonDescriptor`: the
+  joint tokens and rest transforms are what `BuildSkeletonDescriptor` takes,
+  and the descriptor it answers is what `BuildSourceRestPose` takes after it
+  ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)). So reading a stage
+  does not link a retargeter and `motionUsd` keeps its one edge
   ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository)).
+- **The producer's rate is not the stage's.** `timeCodesPerSecond` is where
+  the samples were written and is always 30 (§4.1); the rate they were taken
+  at is `customData.motion.nominalFrameRate`, and a read puts it back on
+  `MotionClip::nominalFrameRate`. A reader that took the encoding for the
+  measurement would report every 60 Hz capture as 30 Hz.
 - **`PoseFromStageSample` is the rule, taking values.** In `usd-vrm-plugins`
   the reading lived only in a CLI, where an OpenExec bundle cannot call it, so
   the bundle carried a second copy; this is the library home that ends it (its

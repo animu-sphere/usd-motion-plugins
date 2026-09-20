@@ -71,8 +71,12 @@ Each was adapted to the mapping after its move.
 - **A semantic skeleton reads; any other is a retarget.** A skeleton no joint
   token of which names the vocabulary is refused, not guessed at (USD §7).
 - **The skeleton comes back as values.** `jointTokens` and `restTransforms`
-  are what `motionRetarget`'s `BuildSkeletonDescriptor` and
-  `BuildSourceRestPose` take, so reading a stage links no retargeter.
+  are what `motionRetarget`'s `BuildSkeletonDescriptor` takes, and its
+  descriptor is what `BuildSourceRestPose` takes after it, so reading a stage
+  links no retargeter.
+- **The producer's rate is not the stage's.** `timeCodesPerSecond` says where
+  the samples were written, always 30; `customData.motion.nominalFrameRate`
+  says what they were taken at, and that is what the clip comes back with.
 - **The hips are read twice**, which is the contract's rule: their rotation is
   `root.worldOrientation` as well as the local rotation
   (MOTION_CONTRACT.md §5.3).

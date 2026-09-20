@@ -113,8 +113,13 @@ separate from the package version
   - `RootMotion::worldOrientation` is carried. The hips rotation is the body's
     orientation as well as the local rotation (MOTION_CONTRACT.md §5.3), and
     both of the copies it arrived from kept only the place.
-  - The skeleton comes back as the two arrays `BuildSkeletonDescriptor` and
-    `BuildSourceRestPose` take, so reading a stage links no retargeter.
+  - The skeleton comes back as the two arrays `BuildSkeletonDescriptor`
+    takes — and its descriptor is what `BuildSourceRestPose` takes after it —
+    so reading a stage links no retargeter.
+  - `customData.motion.nominalFrameRate` is read back onto the clip. It is
+    the producer's rate and the stage's `timeCodesPerSecond` is not: a 60 Hz
+    capture is authored at 30 (§4.1), and a reader that took the encoding
+    would report a measurement nobody made.
   - The exit codes stayed behind: they classify an input for a CLI.
   - `motionUsd/MotionStage.h` now holds `MotionStageContractVersion` and
     `MotionStageTimeCodesPerSecond`, so the reading half does not include the

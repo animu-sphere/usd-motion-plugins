@@ -405,6 +405,54 @@ TestAStageReadsBackAsTheClipItWasWrittenFrom()
     assert(read.clip.samples[0].channels.entries.empty());
 }
 
+// The rate the samples were taken at is not the rate they were written at
+// (USD_MAPPING.md §4.1): a 60 Hz capture is authored at 30 time codes per
+// second and says 60 in `customData.motion`. A reader that answered the
+// encoding would report a measurement nobody made.
+void
+TestTheProducersRateSurvivesTheStagesRate()
+{
+    MotionClip clip = MakeClip();
+    // Six samples at 60 Hz, so the stage's 30 and the producer's 60 differ.
+    clip.samples.clear();
+    for (int frame = 0; frame < 6; ++frame)
+    {
+        clip.samples.push_back(MakePose(frame / 60.0, 10.0f * static_cast<float>(frame),
+                                        pxr::GfVec3f(0.0f, 0.9f, 0.0f)));
+    }
+    clip.startTime = 0.0;
+    clip.endTime = 5.0 / 60.0;
+    clip.nominalFrameRate = 60.0;
+
+    const std::string path = TempPath("motionUsd_rate.usda");
+    std::string error;
+    assert(openstrata::motion::WriteMotionStage(path, clip, {}, nullptr, &error));
+
+    MotionStageRead read;
+    assert(openstrata::motion::OpenMotionStage(path, "", &read, &error));
+    assert(read.timeCodesPerSecond == 30.0);
+    assert(read.metadata.nominalFrameRate && *read.metadata.nominalFrameRate == 60.0);
+    assert(read.clip.nominalFrameRate == 60.0);
+    // The samples keep their own seconds either way.
+    assert(NearlyEqual(read.clip.samples.back().timestamp, 5.0 / 60.0));
+
+    // A stage that states no rate falls back to the stage's, which is the
+    // only number left.
+    const pxr::UsdStageRefPtr bare = pxr::UsdStage::CreateInMemory();
+    bare->SetTimeCodesPerSecond(24.0);
+    const pxr::VtTokenArray joints({pxr::TfToken("hips")});
+    const pxr::UsdSkelSkeleton skeleton =
+        pxr::UsdSkelSkeleton::Define(bare, pxr::SdfPath("/Rig"));
+    skeleton.CreateJointsAttr(pxr::VtValue(joints));
+    const pxr::UsdSkelAnimation animation =
+        pxr::UsdSkelAnimation::Define(bare, pxr::SdfPath("/Rig/Anim"));
+    animation.CreateJointsAttr(pxr::VtValue(joints));
+    animation.CreateRotationsAttr().Set(pxr::VtQuatfArray({RotationX(10.0f)}), 12.0);
+    assert(openstrata::motion::ReadMotionStage(bare, "", &read, &error));
+    assert(!read.metadata.nominalFrameRate);
+    assert(read.clip.nominalFrameRate == 24.0);
+}
+
 // A skeleton whose tokens are not the vocabulary's is a retarget, not a read
 // (USD_MAPPING.md §7), and a stage with no skeleton at all is neither.
 void
@@ -687,6 +735,7 @@ main()
     TestAProducerRestIsTheSkeleton();
     TestRewritingReplacesThePreviousStage();
     TestAStageReadsBackAsTheClipItWasWrittenFrom();
+    TestTheProducersRateSurvivesTheStagesRate();
     TestWhatTheReaderRefuses();
     TestPoseFromStageSampleIsTheSameRuleWithoutAStage();
     TestAStageThatClaimsNothingStillReads();

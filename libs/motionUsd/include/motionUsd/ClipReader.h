@@ -37,10 +37,11 @@ namespace openstrata::motion
 //
 // Values and not a `SkeletonDescriptor`: that type is `motionRetarget`'s, and
 // this library depends on `motionCore` alone among the retarget's neighbours
-// (WORKSPACE.md §2.1). `BuildSkeletonDescriptor` and `BuildSourceRestPose`
-// take exactly these two arrays, so a caller that wants either hands them
-// over unchanged, and a caller that wants neither does not link a retargeter
-// to read a stage.
+// (WORKSPACE.md §2.1). These two arrays are exactly what
+// `BuildSkeletonDescriptor` takes, and its descriptor is what
+// `BuildSourceRestPose` takes after it, so a caller that wants either hands
+// this over unchanged and a caller that wants neither does not link a
+// retargeter to read a stage.
 struct MotionStageSkeleton
 {
     // The skeleton prim the clip was read against.
@@ -73,6 +74,12 @@ struct MotionStageMetadata
     std::string sourceProvider;
     std::string rootMotionSource;
 
+    // The producer's rate, which is not the stage's: a 60 Hz capture is
+    // authored at 30 time codes per second (§4.1, USD-O2) and says so here.
+    // Without it a read would answer 30, and a consumer would take the
+    // encoding for the measurement.
+    std::optional<double> nominalFrameRate;
+
     // `customData.source`, verbatim (MOTION_CONTRACT.md §7.1). Nothing here
     // reads it to decide anything.
     std::map<std::string, std::string> provenance;
@@ -87,9 +94,11 @@ struct MotionStageRead
     // The `UsdSkelAnimation` prim the samples came from.
     std::string animationPath;
 
-    // The stage's, which `MotionStageTimeCodesPerSecond` is only the rate this
-    // library *writes*: a stage authored elsewhere may state another, and the
-    // samples' seconds are this number's quotient either way.
+    // The stage's, of which `MotionStageTimeCodesPerSecond` is only the rate
+    // this library *writes*: a stage authored elsewhere may state another, and
+    // the samples' seconds are this number's quotient either way. It is where
+    // the samples were written, never the rate they were taken at — that is
+    // `metadata.nominalFrameRate`, and `clip.nominalFrameRate` carries it.
     double timeCodesPerSecond = MotionStageTimeCodesPerSecond;
 
     MotionStageMetadata metadata;
