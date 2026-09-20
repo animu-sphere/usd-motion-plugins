@@ -10,7 +10,8 @@
 // computation. Four things are measured here that no earlier suite could:
 //
 //   * a **third and fourth** registered value type: `openstrata::motion::MotionClip`
-//     crosses as the snapshot, and `openstrata::motion::PoseSampleResult` -- `motionRuntime`'s
+//     crosses as the snapshot, and `openstrata::motion::PoseSampleResult`
+//     -- `motionSampling`'s
 //     type rather than `motionCore`'s -- comes back as the answer;
 //   * an override of a value key whose type is **not a pose** reaches its
 //     dependents the way the pose-typed one does (the root-motion report §8 left
@@ -24,7 +25,7 @@
 //     node's "nothing" had to be a refusal.
 //
 // Like every suite here but `execMotion_pose`, this executable does not link
-// the plugin. It does link motionRuntime, because
+// the plugin. It does link motionSampling, because
 // `openstrata::motion::PoseSampleResult` is declared there -- and it calls none
 // of the library's functions: it reads the result's plain fields, so an
 // expected value cannot come from the code under test.
@@ -166,7 +167,7 @@ ResultAt(const ExecUsdCacheView& view, int index)
     const VtValue value = view.Get(index);
     assert(!value.IsEmpty() && "no value came back -- if the plugInfo is unstaged this is what it "
                                "looks like, not a load error");
-    // The fourth registered type, and the first that is motionRuntime's. A
+    // The fourth registered type, and the first that is motionSampling's. A
     // callback whose declared result type had drifted from what it sets would
     // surface here and nowhere earlier.
     assert(value.IsHolding<openstrata::motion::PoseSampleResult>() &&

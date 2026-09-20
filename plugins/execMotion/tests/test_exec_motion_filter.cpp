@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // `motion.filterPose` through the built bundle: the first node that wraps
-// `motionRuntime`, the first that consumes another computation's result, and
+// `motionSampling`, the first that consumes another computation's result,
+// and
 // the first whose missing half the *caller* supplies.
 //
-// A filter is a recurrence -- this frame's answer is a function of the last
-// one -- and an OpenExec callback is handed exactly one time with no way to
-// reach another (docs/reports/openusd/26.08-openexec-sampling.md §5). Holding
-// the previous pose inside the callback would be the mutable state exec's
-// purity rule forbids and invalidation cannot see, so the prior pose is a value
-// key of its own -- `motion.priorPose` -- and the driver replaces it through
-// `ExecUsdSystem::ComputeWithOverrides`. This suite is where that mechanism is
-// measured rather than assumed:
+// A filter is a recurrence -- this frame's answer is a function of the last one
+// -- and an OpenExec callback is handed exactly one time with no way to reach
+// another (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-sampling.md
+// §5). Holding the previous pose inside the callback would be the mutable state
+// exec's purity rule forbids and invalidation cannot see, so the prior pose is
+// a value key of its own -- `motion.priorPose` -- and the driver replaces it
+// through `ExecUsdSystem::ComputeWithOverrides`. This suite is where that
+// mechanism is measured rather than assumed:
 //
 //   * un-overridden, `motion.filterPose` is `motion.sampleAnimation`;
 //   * overridden, it is one step of `openstrata::motion::PoseFilter` at the clip's stated
@@ -126,7 +127,8 @@ NearlyEqual(const GfVec3f& a, const GfVec3f& b, double tolerance)
 // `openstrata::motion::PoseFilter`'s step weight, written out rather than
 // called.
 //
-// The suite does not link motionRuntime on purpose: an expected value computed
+// The suite does not link motionSampling on purpose: an expected value
+// computed
 // by the same function under test would assert that the library equals itself
 // and say nothing about whether the cutoff the clip stated ever reached it.
 // This is the exponential-smoothing weight from the library's documented

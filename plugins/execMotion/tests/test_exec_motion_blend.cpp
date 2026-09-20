@@ -21,7 +21,8 @@
 //     the one route by which a pose a driver holds, rather than one a clip
 //     states, enters a blend.
 //
-// Like the filter and root suites it does not link motionRuntime. The node is
+// Like the filter and root suites it does not link motionSampling. The node
+// is
 // `openstrata::motion::BlendPoses`, and an expected value produced by that
 // function would assert that the library equals itself; the fixture's two clips
 // turn one head about one axis, so the blend of two of them is an angle

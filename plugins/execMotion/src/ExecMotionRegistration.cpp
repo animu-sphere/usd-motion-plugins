@@ -9,7 +9,7 @@
 // plan's "a node is a thin wrapper" rule made structural rather than intended
 // (design policy §21) -- and it is what let this bundle record, rather than
 // hide, that `motion.sampleAnimation` has no library call to wrap
-// (docs/reports/openusd/26.08-openexec-sampling.md §5).
+// (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-sampling.md §5).
 //
 // # Why a registered aggregate
 //
@@ -19,7 +19,7 @@
 // since v0.6.0. So the canonical type crosses unchanged, which is the only
 // shape under which a node stays a wrapper -- the alternatives dissolve the
 // pose into channels and put the joint-ordering contract into masks
-// (docs/reports/openusd/26.08-openexec-migration.md §4).
+// (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-migration.md §4).
 //
 // # How a computation here refuses
 //
@@ -100,8 +100,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     // will not deliver the stage metadata that means the same thing: the
     // builder accepts `Stage().Metadata<double>(timeCodesPerSecond)`, does not
     // refuse it with `.Required()`, and still yields no value at evaluation
-    // (docs/reports/openusd/26.08-openexec-mechanism.md §5). This input is the
-    // shim for that gap and is meant to go away when it closes.
+    // (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-mechanism.md §5).
+    // This input is the shim for that gap and is meant to go away when it
+    // closes.
     ((timeCodesPerSecond, "motion:timeCodesPerSecond"))
     // What a clip states about how it wants to be smoothed. All three are
     // optional and an absent one keeps `openstrata::motion::PoseFilter`'s own
@@ -183,11 +184,11 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                                             // `.Required()`, and still delivers no value -- so the only rate a
                                             // callback could apply would be a guess, and a guessed rate is a
                                             // wrong second that every consumer downstream would take at face
-                                            // value. `tools/motionRetarget` converts with the rate because it
-                                            // holds the stage; exec does not, which is why
+                                            // value. usd-vrm-plugins' `motion_retarget` converts with the rate
+                                            // because it holds the stage; exec does not, which is why
                                             // `motion.sampleAnimation` below is *given* one, as an attribute
-                                            // the clip states
-                                            // (docs/reports/openusd/26.08-openexec-mechanism.md §5).
+                                            // the clip states (usd-vrm-plugins'
+                                            // docs/reports/openusd/26.08-openexec-mechanism.md §5).
                                             //
                                             // The identity pose is the same pose at every time, so this
                                             // computation declares no time input either: reading `computeTime`
@@ -213,7 +214,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // USD, not by this bundle, which is why this node is not a wrapper over
     // `openstrata::motion::SampleAnimation` -- that function is handed a whole
     // `MotionClip` and performs its own lookup, and an exec input arrives
-    // already resolved at one time. The two answers are compared by usd-vrm-plugins' parity rows rather
+    // already resolved at one time. The two answers are compared by
+    // usd-vrm-plugins' parity rows rather
     // than assumed equal.
     self.PrimComputation(_tokens->sampleAnimation)
         .Callback<openstrata::motion::MotionPose>(
@@ -412,7 +414,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // `LiveCaptureSource` conditions the root of the frame as it *arrived* and
     // smooths afterwards, so a node deriving its velocity from a filtered
     // position would answer a different question from the one `motionRecording`
-    // answers, and those parity rows would have to explain the difference rather than
+    // answers, and those parity rows would have to explain the difference
+    // rather than
     // measure it.
     //
     // The prior pose is the same `motion.priorPose` the filter takes, and it is
@@ -756,7 +759,8 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
     // motion:root:transform -- the root's placement, where a display reads it
     // -----------------------------------------------------------------------
     //
-    // The display case, and not a computation: an **attribute expression**, which
+    // The display case, and not a computation: an **attribute expression**,
+    // which
     // replaces what `computeValue` answers for `motion:root:transform` on a clip
     // that declares it. That is the one route 26.08 leaves from this bundle to a
     // picture. `usdExecImaging` adapts exactly two schemas, and the one we can

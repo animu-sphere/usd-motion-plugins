@@ -65,7 +65,8 @@ openstrata::motion::MotionPose IdentityPoseForJoints(const std::vector<std::stri
 /// the one behavioural difference from `openstrata::motion::SampleAnimation`,
 /// which is handed a whole `MotionClip` and does its own hold-at-the-edges
 /// lookup; which of the two answers a frame between keys is USD's question here
-/// and `motionSampling`'s there, and usd-vrm-plugins' parity rows are where the two get compared.
+/// and `motionSampling`'s there, and usd-vrm-plugins' parity rows are where
+/// the two get compared.
 struct ClipSample
 {
     /// `UsdSkelAnimation`'s `joints`, in the order the clip authored them.
@@ -74,7 +75,8 @@ struct ClipSample
     /// `rotations` and `translations` at `timeCode`. An array whose length
     /// disagrees with `jointPaths` contributes nothing, because a clip that
     /// cannot say which joint a value belongs to has not said it -- the same
-    /// rule the offline reader applies (tools/motionRetarget StageIo.cpp).
+    /// rule the offline reader applies (usd-vrm-plugins' motion_retarget,
+    /// whose reading half arrives here as motionUsd's).
     std::vector<pxr::GfQuatf> rotations;
     std::vector<pxr::GfVec3f> translations;
 
@@ -88,7 +90,7 @@ struct ClipSample
     /// The rate that turns `timeCode` into the seconds `MotionPose::timestamp`
     /// is expressed in. It is an authored input rather than stage metadata
     /// because a computation cannot reach `timeCodesPerSecond`
-    /// (docs/reports/openusd/26.08-openexec-mechanism.md §5).
+    /// (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-mechanism.md §5).
     double timeCodesPerSecond = 0.0;
 };
 
@@ -117,7 +119,7 @@ struct ClipSample
 /// clip that keys nothing samples to hips at identity and a root **at the
 /// origin**, and from inside this function the fallback and an authored origin
 /// are the same value
-/// ([the humanoid report](../../../docs/reports/openusd/26.08-openexec-humanoid.md)
+/// ([the humanoid report](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-humanoid.md)
 /// §4). Kept rather than refused, decided for v0.9.0: `execMotion_sample`
 /// pins it, and the driver contract in MOTION_CONTRACT.md states it.
 std::optional<openstrata::motion::MotionPose> PoseFromClipSample(const ClipSample& sample);
@@ -163,7 +165,7 @@ struct FilterPolicy
 /// One step of `openstrata::motion::PoseFilter`, and the state it needs is
 /// passed in rather than kept. That is forced rather than chosen: an OpenExec
 /// callback is handed exactly one time and no way to reach another ([the
-/// sampling report](../../../docs/reports/openusd/26.08-openexec-sampling.md)
+/// sampling report](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-sampling.md)
 /// §5), and a filter that remembered the last pose in a static would be the
 /// mutable state the purity rule forbids and invalidation cannot see. So the
 /// recurrence

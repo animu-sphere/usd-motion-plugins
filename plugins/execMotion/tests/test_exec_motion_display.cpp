@@ -30,7 +30,7 @@
 // prop's authored value without an error, the precondition breaks in a second
 // direction the audit did not name, and a driver's root orientation -- which no
 // clip states -- reaches `execGeom` as a turn about the root's own origin
-// (docs/reports/openusd/26.08-openexec-display.md).
+// (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-display.md).
 //
 // The display half is `usdExecImaging`'s stage scene index driven directly:
 // the same object `UsdImagingGLEngine` merges over the USD scene index when

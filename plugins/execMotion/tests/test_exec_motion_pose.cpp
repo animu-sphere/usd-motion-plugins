@@ -142,8 +142,8 @@ TestTheFrameBecomesASecond()
 
     // 100 frames at 50 time codes per second is two seconds. This is the one
     // arithmetic step in the node, and it is the whole reason the rate has to
-    // be an input: nothing inside a computation can find it
-    // (docs/reports/openusd/26.08-openexec-mechanism.md section 5).
+    // be an input: nothing inside a computation can find it (usd-vrm-plugins'
+    // docs/reports/openusd/26.08-openexec-mechanism.md section 5).
     assert(pose->timestamp == 2.0);
 
     assert(CountValid(*pose) == 4);
@@ -373,10 +373,10 @@ TestEachPolicyFieldReachesTheOptionItNames()
 //
 // It costs nothing for a clip, whose `joints` are `uniform` and whose joints
 // therefore never drop out, and it is real for a live source, which is what the
-// node is aimed at. So it is pinned here, in both directions, and it is the
-// sharpened half of this bundle's ask on `motionRuntime`: a one-step entry point
-// has to hand back the state as well as the result, or a caller cannot carry the
-// history that makes a dropout survivable.
+// node is aimed at. So it is pinned here, in both directions. The ask it once
+// carried is closed: `PoseFilter::Step` hands the state back beside the result,
+// and what is still lost is lost in the graph, because an exec computation's
+// value is a pose and no node publishes the state as a value of its own.
 
 openstrata::motion::MotionPose
 PoseWithoutHead(double timestamp, const pxr::GfVec3f& hips)

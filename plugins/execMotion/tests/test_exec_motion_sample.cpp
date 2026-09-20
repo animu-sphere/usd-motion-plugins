@@ -12,7 +12,7 @@
 //
 //   * a clip states the rate its frames are counted at, as an authored
 //     attribute, because exec delivers no stage metadata to a callback
-//     (docs/reports/openusd/26.08-openexec-mechanism.md §5); and
+//     (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-mechanism.md §5); and
 //   * a clip that states none is refused rather than stamped with a guess.
 //
 // Like the mechanism suite, this executable does not link the plugin: the
@@ -348,12 +348,13 @@ TestAClipThatHoldsStill(const std::string& fixture)
     // change that changes none of its attribute values.
     //
     // Which of the node's inputs carries it was settled with a throwaway probe
-    // rather than here, because separating the two candidates needs a build with
-    // one of them deleted and no shipped bundle should carry a computation that
-    // exists to be measured. With `computeTime` removed, this clip stops being
-    // reported and the keyed one goes on being reported -- so a keyed attribute
-    // and `computeTime` are each sufficient alone, and neither is necessary
-    // (docs/reports/openusd/26.08-openexec-sampling.md §3 has the four cells).
+    // rather than here, because separating the two candidates needs a build
+    // with one of them deleted and no shipped bundle should carry a computation
+    // that exists to be measured. With `computeTime` removed, this clip stops
+    // being reported and the keyed one goes on being reported -- so a keyed
+    // attribute and `computeTime` are each sufficient alone, and neither is
+    // necessary (usd-vrm-plugins'
+    // docs/reports/openusd/26.08-openexec-sampling.md §3 has the four cells).
     //
     // The cell that matters for the later nodes is this one: a node that
     // declares `computeTime` is recomputed on every frame change even when

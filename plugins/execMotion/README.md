@@ -44,10 +44,10 @@ bundle's load-bearing signature decision:
   out.
 
 It is the first, because the second breaks the next node rather than this one.
-`motion.filterPose` wraps `openstrata::motion::PoseFilter`, whose whole point is that its
-cutoff is frame-rate independent — it derives each step's weight from the time
-elapsed between poses. A pose stamped after it leaves the graph reaches that
-filter as time zero, so the rate has to be *in* the graph.
+`motion.filterPose` wraps `openstrata::motion::PoseFilter`, whose whole point is
+that its cutoff is frame-rate independent — it derives each step's weight from
+the time elapsed between poses. A pose stamped after it leaves the graph reaches
+that filter as time zero, so the rate has to be *in* the graph.
 
 So `motion.sampleAnimation` reads `motion:timeCodesPerSecond` off the clip, as a
 `.Required()` input, and **a clip that states none is refused rather than
@@ -67,12 +67,12 @@ delivers stage metadata to a callback, this input goes away.
 
 ## A filter is a recurrence, and the graph has no history
 
-`openstrata::motion::PoseFilter` derives each step's weight from the seconds elapsed since
-the pose before it. A computation is handed exactly one time and no way to reach
-another, so the state that filter normally keeps has nowhere in the graph to
-live: a static in the callback is the mutable state exec's cache-safety contract
-and the design policy both forbid, and an authored "previous pose" attribute
-would put a derived value into the scene.
+`openstrata::motion::PoseFilter` derives each step's weight from the seconds
+elapsed since the pose before it. A computation is handed exactly one time and
+no way to reach another, so the state that filter normally keeps has nowhere in
+the graph to live: a static in the callback is the mutable state exec's
+cache-safety contract and the design policy both forbid, and an authored
+"previous pose" attribute would put a derived value into the scene.
 
 So it is **passed in**. `motion.priorPose` is a computation whose ordinary value
 is the clip's own pose at the evaluated frame, and whose purpose is to be
@@ -89,8 +89,8 @@ previousAnswer = view.Get(0).UncheckedGet<openstrata::motion::MotionPose>();
 ```
 
 **Exec does the step and the driver owns the sequence.** For a live source that
-is where the state already is — `motionRuntime`'s pose buffer holds it — and for
-a clip it is the loop above. Exec never sees two frames at once.
+is where the state already is — `motionSampling`'s pose buffer holds it — and
+for a clip it is the loop above. Exec never sees two frames at once.
 
 Two things a driver has to know, because no computation declares them
 ([the filtering report](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-filtering.md)
@@ -104,13 +104,14 @@ reseeds and returns its argument. Nothing here special-cases that.
 
 ### What the round trip costs
 
-A pose is not the whole of a filter's state. `openstrata::motion::PoseFilter` retains a
-state strictly richer than what it returns — a joint a pose does not report keeps
-its stored rotation *in the state* and stays out of the *result*, so a brief
-dropout does not restart that joint's history — and only a result can travel back
-in as the next prior pose. So a joint returning after a missing frame is passed
-through here, where the streaming filter would slerp it from what it kept: **45°
-against 23.8°** in the case `execMotion_pose` pins, in both directions.
+A pose is not the whole of a filter's state. `openstrata::motion::PoseFilter`
+retains a state strictly richer than what it returns — a joint a pose does not
+report keeps its stored rotation *in the state* and stays out of the *result*,
+so a brief dropout does not restart that joint's history — and only a result can
+travel back in as the next prior pose. So a joint returning after a missing
+frame is passed through here, where the streaming filter would slerp it from
+what it kept: **45° against 23.8°** in the case `execMotion_pose` pins, in both
+directions.
 
 That costs nothing for a clip, whose `joints` are `uniform` so no joint ever
 drops out, and it is real for a live source — which is what this node is aimed
@@ -136,9 +137,9 @@ caller of `openstrata::motion::PoseFilter` already gets.
 
 ## What a clip may state about its root
 
-`motion.extractRootMotion` answers with a `openstrata::motion::RootMotion` — the bundle's
-**second** registered value type, and the first result here that is not a pose.
-One attribute decides it:
+`motion.extractRootMotion` answers with a `openstrata::motion::RootMotion` —
+the bundle's **second** registered value type, and the first result here that
+is not a pose. One attribute decides it:
 
 | `motion:root:intake` | What comes back |
 | --- | --- |
@@ -154,10 +155,10 @@ with `hasPosition` set says *the body is at the origin*. Only the first leaves a
 rig its own placement.
 
 That is also why the last row sets **no value** rather than a cleared one: a
-cleared `openstrata::motion::RootMotion` is `ignore`'s answer bit for bit, so a refusal
-producing one would be a deliberate `ignore` as far as any consumer could tell.
-This node is the reason the bundle states its refusal shape
-[once, below](#how-a-computation-refuses).
+cleared `openstrata::motion::RootMotion` is `ignore`'s answer bit for bit, so a
+refusal producing one would be a deliberate `ignore` as far as any consumer
+could tell. This node is the reason the bundle states its refusal shape [once,
+below](#how-a-computation-refuses).
 
 The last row is the other half of the rule above, and the two together are one
 rule rather than two moods. An **absent** attribute is a clip that said nothing,
@@ -168,11 +169,11 @@ absent value selects the library's documented behaviour, refuse where it would
 produce a number no consumer can tell from a measured one, and never default a
 value the clip stated.
 
-The node reads `motion.sampleAnimation` rather than `motion.filterPose`, and that
-is the **library's** ordering rather than a preference: `LiveCaptureSource`
+The node reads `motion.sampleAnimation` rather than `motion.filterPose`, and
+that is the **library's** ordering rather than a preference: `LiveCaptureSource`
 conditions the root of a frame as it arrived and smooths afterwards, so a node
 differentiating a filtered position would answer a different question from the
-one `motionRuntime` answers — and those parity rows would have to explain the
+one `motionSampling` answers — and those parity rows would have to explain the
 difference instead of measuring it.
 
 Its prior pose is the same `motion.priorPose` the filter takes, so **one override
@@ -236,10 +237,10 @@ neither.
 pose.** `ClipSource` stamps a hold at the requested instant exactly as it stamps
 a sample, so a pose alone cannot say whether the source reached that instant —
 and a source that has stopped delivering keeps answering `Held` forever. The
-status is part of the answer ([motion contract](../../docs/design/MOTION_CONTRACT.md),
-live-capture semantics), and a wrapper does not get to drop a field of the thing
-it wraps. Registering the type needed an exact `operator==` on it, which
-`motionRuntime` now carries.
+status is part of the answer ([motion
+contract](../../docs/design/MOTION_CONTRACT.md), live-capture semantics), and a
+wrapper does not get to drop a field of the thing it wraps. Registering the type
+needed an exact `operator==` on it, which `motionSampling` now carries.
 
 **An empty history is an answer, not a refusal**, and that is the bundle's
 refusal rule applied rather than bent: this is the first result type here with an
@@ -299,8 +300,9 @@ def SkelAnimation "Blend"
 ```
 
 It reads each target's `motion.sampleAnimation`, the pose that clip states at
-the evaluated frame, and hands the poses to the N-way `openstrata::motion::BlendPoses`, each
-with the weight at the same position. That one library call is the whole node.
+the evaluated frame, and hands the poses to the N-way
+`openstrata::motion::BlendPoses`, each with the weight at the same position.
+That one library call is the whole node.
 
 The sources arrive through a **relationship** rather than connections, because a
 relationship is what carries fan-in in 26.08. `computeValue` over two
@@ -475,8 +477,8 @@ edges lookup. The two are compared by usd-vrm-plugins' parity rows rather than a
 What `motion.interpolatePose` interpolates is a **history a driver hands in**,
 which the graph cannot see any other way — and through it the library's sampler
 does run inside exec: a driver that supplies a clip's own key poses as the
-history evaluates `openstrata::motion::SampleAnimation`'s rule beside USD's, at the same
-instant, in one request.
+history evaluates `openstrata::motion::SampleAnimation`'s rule beside USD's, at
+the same instant, in one request.
 
 ## What this bundle may not do
 
@@ -544,10 +546,12 @@ above in four places, because each place shows something the others cannot:
   passed until the pattern said so. On Linux and macOS a socket, a thread and a
   clock all live in libc, so the check is by symbol there as well.
 - **The target's link libraries.** The allowed set is `motionCore`,
-  `motionRuntime` and the OpenUSD exec and value libraries. This half exists
-  because the workspace libraries that open sockets are static. With
-  `liveTransport` linked, the built DLL imported neither it nor `ws2_32`, and
-  only this half failed.
+  `motionSampling`, `motionRecording` and the OpenUSD exec and value libraries.
+  This half exists because the workspace libraries a bundle could reach a
+  socket through are static, so no dependency list of the built binary ever
+  names them. It was measured in `usd-vrm-plugins`, where linking that
+  repository's `liveTransport` made the built DLL import neither it nor
+  `ws2_32`, and only this half failed.
 - **The schema declarations.** Every schema this bundle registers computations
   for must be declared in `plugInfo.json`, and it may declare nothing else.
   Nothing it declares may belong to a consumer's bundle under the partition

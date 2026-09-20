@@ -10,13 +10,13 @@
 // this test exists at all: a missing block does not fail loudly at load, it
 // presents as "computation not found" (the 26.08 audit, §2.1).
 //
-// What it cannot assert, and why: that a cached value was not *recomputed*.
-// A callback is required to be pure, so the only way to count invocations is to
-// instrument one — and a counter exported from a shipped plugin is a worse thing
-// to own than a slightly weaker test. What is asserted instead is the observable
-// half: no invalidation was reported and the value is identical. The stronger
-// measurement was taken with a throwaway probe and is recorded in
-// docs/reports/openusd/26.08-openexec-mechanism.md §3.
+// What it cannot assert, and why: that a cached value was not *recomputed*. A
+// callback is required to be pure, so the only way to count invocations is to
+// instrument one — and a counter exported from a shipped plugin is a worse
+// thing to own than a slightly weaker test. What is asserted instead is the
+// observable half: no invalidation was reported and the value is identical. The
+// stronger measurement was taken with a throwaway probe and is recorded in
+// usd-vrm-plugins' docs/reports/openusd/26.08-openexec-mechanism.md §3.
 
 #include "pxr/pxr.h"
 
@@ -218,7 +218,7 @@ main(int argc, char** argv)
     // **InvalidateAll also resets the system's time**, and this suite can no
     // longer see it: the only witness was a pose that carried the frame it was
     // computed at, and carrying one meant writing a frame into a field that
-    // means seconds. The measurement is kept in
+    // means seconds. The measurement is kept in usd-vrm-plugins'
     // docs/reports/openusd/26.08-openexec-mechanism.md §4 with the method that
     // produced it, rather than kept here at the price of a wrong number and a
     // time dependency this computation does not have.

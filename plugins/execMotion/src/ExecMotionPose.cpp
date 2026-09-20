@@ -92,7 +92,8 @@ PoseFromClipSample(const ClipSample& sample)
         // Only the hips carry body translation. A `translations` array states
         // one per joint, but the rest of it is the rest pose the source rig was
         // authored with, which a retargeter re-derives for the rig it is aiming
-        // at (motion contract; tools/motionRetarget reads a clip the same way).
+        // at (motion contract; usd-vrm-plugins' motion_retarget reads a
+        // clip the same way).
         if (translationsUsable && *joint == openstrata::motion::HumanJoint::Hips)
         {
             pose.root.worldPosition = sample.translations[i];
@@ -135,7 +136,7 @@ FilteredPose(const openstrata::motion::MotionPose& prior,
     // a joint the pose did not report keeps its last smoothed rotation there --
     // and an exec computation's value is a pose, so carrying the state is a
     // driver's to do over a value key this bundle does not yet publish. The
-    // difference that costs is measured in `execMotion_filter`.
+    // difference that costs is measured in `execMotion_pose`.
     return openstrata::motion::PoseFilter::Step(&prior, pose, options).pose;
 }
 
