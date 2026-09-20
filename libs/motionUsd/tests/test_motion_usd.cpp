@@ -354,6 +354,14 @@ TestAStageReadsBackAsTheClipItWasWrittenFrom()
     std::string error;
     assert(openstrata::motion::WriteMotionStage(path, clip, options, nullptr, &error));
 
+    // Reload from disk first: WriteMotionStage leaves the saved layer in the
+    // registry, so an Open() without this reads the layer the writer still
+    // holds and the round trip never goes through the file's text at all.
+    pxr::SdfLayerRefPtr saved = pxr::SdfLayer::FindOrOpen(path);
+    assert(saved);
+    saved->Reload(/* force */ true);
+    saved.Reset();
+
     MotionStageRead read;
     const bool ok = openstrata::motion::OpenMotionStage(path, "", &read, &error);
     if (!ok)

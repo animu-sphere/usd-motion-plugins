@@ -508,20 +508,26 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     }
 
     read->clip.samples.reserve(timeCodes.size());
+    // The joint tokens are the same at every instant, so the sample is built
+    // once and only its values change. A clip is thousands of frames over
+    // dozens of joints, and copying the token vector per frame would be a
+    // string allocation per joint per frame for a list that never moves.
+    MotionStageSample sample;
+    sample.jointTokens = jointTokens;
+    sample.hasTimeCode = true;
+    sample.timeCodesPerSecond = read->timeCodesPerSecond;
     for (const double timeCode : timeCodes)
     {
-        MotionStageSample sample;
-        sample.jointTokens = jointTokens;
         sample.timeCode = timeCode;
-        sample.hasTimeCode = true;
-        sample.timeCodesPerSecond = read->timeCodesPerSecond;
 
         pxr::VtQuatfArray rotations;
+        sample.rotations.clear();
         if (rotationsAttr.Get(&rotations, timeCode))
         {
             sample.rotations.assign(rotations.begin(), rotations.end());
         }
         pxr::VtVec3fArray translations;
+        sample.translations.clear();
         if (translationsAttr.Get(&translations, timeCode))
         {
             sample.translations.assign(translations.begin(), translations.end());

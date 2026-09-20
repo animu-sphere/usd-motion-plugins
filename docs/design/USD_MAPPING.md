@@ -248,6 +248,18 @@ than guessed at.
   no `customData.motion`; an absent `contractVersion` is a fact about the
   stage, not a defect in it.
 
+**What a read cannot recover**, because the stage does not carry it. A
+`UsdSkelAnimation` states a rotation for every joint at every key: §4.2's
+writer authors an unobserved joint at its rest, and nothing distinguishes
+that from an observed one. So a read answers `validRotations` set for every
+joint the skeleton carries, and `MissingJointPolicy` is not inferable from a
+stage. The same rule makes `RootMotion::hasOrientation` true wherever the
+hips turn, whether or not the producer stated a root orientation — which is
+§5.3's duplication read in the only direction a stage allows. A clip that
+must keep which joints were observed keeps its trace
+([MOTION_CONTRACT.md §10](MOTION_CONTRACT.md#10-recording-and-the-trace-format)),
+not its stage.
+
 ## 8. Versioning
 
 The mapping carries `contractVersion`, starting at 1 with the first release
