@@ -232,8 +232,9 @@ than guessed at.
 - **`PoseFromStageSample` is the rule, taking values.** In `usd-vrm-plugins`
   the reading lived only in a CLI, where an OpenExec bundle cannot call it, so
   the bundle carried a second copy; this is the library home that ends it (its
-  OpenExec sampling finding). `execMotion` still holds its own copy until it
-  is switched over, which adds an edge WORKSPACE.md §2.1 does not draw yet.
+  OpenExec sampling finding). `execMotion` calls it since 2026-09-20 and holds
+  no copy. The switch changed what that bundle answers, which is the point and
+  not a side effect: see §7.1.
 - **`RootMotion::worldOrientation` is carried.** Both copies dropped it. The
   hips rotation is the body's orientation *and* stays the local rotation
   ([MOTION_CONTRACT.md §5.3](MOTION_CONTRACT.md#53-root-motion-and-the-hips)),
@@ -247,6 +248,29 @@ than guessed at.
   `.vrma` stage is standard `UsdSkel` over the same joint tokens and carries
   no `customData.motion`; an absent `contractVersion` is a fact about the
   stage, not a defect in it.
+
+### 7.1 What the shared rule changed for `execMotion`
+
+The copy the bundle carried left `root.hasOrientation` false, reasoning that a
+`UsdSkelAnimation` states rotations per joint and no separate root
+orientation. [MOTION_CONTRACT.md §5.3](MOTION_CONTRACT.md#53-root-motion-and-the-hips)
+overrules it: the hips rotation **is** the body's orientation, and the
+duplication is the record rather than an encoding accident. So a clip-sourced
+pose now carries one, and two node behaviours moved with it:
+
+- **`motion.filterPose` smooths the root orientation by default.**
+  `PoseFilter::Options::filterRootOrientation` defaults to true, and the field
+  it names was previously absent from every clip-sourced pose, so the flag was
+  inert whatever a clip authored. A clip that authors no filter policy now has
+  its root orientation slerped, on the same step as every other rotation.
+  `execMotion_pose` pins both the default and the explicit refusal.
+- **`motion.extractRootMotion` carries an orientation it used to drop.**
+  `ConditionRootMotion` does not branch on the field, so the rule is unchanged
+  and only the value it returns is fuller.
+
+`motion.rootTransform`'s answer is unchanged in the fixtures because theirs do
+not turn their hips; a clip that turns them now places an Xformable rotated
+rather than translated only, which is what §6's bake already does.
 
 **What a read cannot recover**, because the stage does not carry it. A
 `UsdSkelAnimation` states a rotation for every joint at every key: §4.2's

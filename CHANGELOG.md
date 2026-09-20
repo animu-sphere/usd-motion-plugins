@@ -224,6 +224,29 @@ separate from the package version
   `vrm:expressionType` does not come across: a format's classification of its
   own channel belongs in that format's namespace.
 
+- **`execMotion` calls `PoseFromStageSample` and holds no copy of it**
+  (USD_MAPPING.md §7.1). The bundle carried the sampling rule because it lived
+  in `usd-vrm-plugins`' retarget CLI and a computation cannot call a CLI; the
+  reading half's arrival ended that, and `WORKSPACE.md` §2.1 gains the edge.
+  The switch **changes what two nodes answer**, which is the point of it:
+  - `motion.filterPose` smooths the root orientation. The shared rule sets
+    `root.hasOrientation` from the hips rotation (MOTION_CONTRACT.md §5.3),
+    where the copy left it false, so `motion:filter:rootOrientation` stopped
+    being inert — and it defaults to true, so a clip authoring no policy is
+    affected. `execMotion_pose` pins the default and the explicit refusal.
+  - `motion.extractRootMotion` returns a root motion carrying that
+    orientation. `ConditionRootMotion` does not branch on it, so only the
+    value is fuller.
+
+  The eight L0–L5 goldens are unchanged, because no fixture turns its hips.
+  The bundle links `motionUsd`, which carries OpenUSD's `usdGeom` in
+  transitively; `execMotion_boundaries` allows it and says why.
+
+- **`motionCore` gains `FindHumanJointByPath`**, `HumanJointPath`'s inverse.
+  The leaf-segment rule had a copy in `motionUsd`, one in `execMotion` and two
+  more in `usd-vrm-plugins`; the vocabulary owns the spelling of its own
+  paths, so the rule lives beside it and the copies are gone.
+
 - **The `Channels` prim is authored and read** (USD_MAPPING.md §4.3), with the
   reading half. One typeless prim per channel under `/Animation/Channels`, the
   semantic verbatim on `uniform string motion:channelName` and the value on a

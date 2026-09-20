@@ -16,6 +16,7 @@
 #include <motionSampling/Filter.h>
 #include <motionRecording/LiveCaptureSource.h>
 #include <motionSampling/MotionSource.h>
+#include <motionUsd/ClipReader.h>
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/quatf.h"
@@ -29,19 +30,6 @@
 
 namespace execmotion
 {
-
-/// The joint a `UsdSkelAnimation` joint path names, or nullopt.
-///
-/// A joint path is `UsdSkelAnimation`'s own spelling, e.g. `hips/spine/chest`,
-/// of which only the last segment is a joint name
-/// (`openstrata::motion::HumanJointPath` authors the same shape). A path whose
-/// leaf names no canonical joint contributes nothing and is not an error: this
-/// layer reports what it recognized, and whoever knows which clip it is decides
-/// whether a gap matters.
-///
-/// Exposed for the tests, which check the leaf-segment rule directly rather than
-/// through a pose.
-std::optional<openstrata::motion::HumanJoint> JointForPath(const std::string& jointPath);
 
 /// The identity pose for `jointPaths`.
 ///
@@ -57,7 +45,29 @@ std::optional<openstrata::motion::HumanJoint> JointForPath(const std::string& jo
 /// wrong mechanism, because there is no algorithm to blame.
 openstrata::motion::MotionPose IdentityPoseForJoints(const std::vector<std::string>& jointPaths);
 
-/// What a `UsdSkelAnimation` states at one instant, as plain values.
+/// What a `UsdSkelAnimation` states at one instant, and the pose it states:
+/// `motionUsd`'s, not this bundle's.
+///
+/// `openstrata::motion::MotionStageSample` and `PoseFromStageSample` are the
+/// rule, and this bundle calls them. It used to carry its own copy, because
+/// the rule lived in `usd-vrm-plugins`' retarget CLI and a computation cannot
+/// call a CLI; the reading half moved into `motionUsd` on 2026-09-20 and the
+/// copy went with it (USD_MAPPING.md section 7, its OpenExec sampling
+/// finding).
+///
+/// Two things the shared rule states that the copy did not, and they change
+/// what this bundle answers -- see the changelog and USD_MAPPING.md section 7:
+///
+/// - The hips rotation is `RootMotion::worldOrientation` as well as the local
+///   rotation (MOTION_CONTRACT.md section 5.3). The copy left
+///   `root.hasOrientation` false on the reasoning that a `UsdSkelAnimation`
+///   states no separate root orientation, which the contract overrules: the
+///   duplication is the record, not an encoding accident.
+/// - A clip of exactly one joint keeps the fallback this bundle measured. An
+///   unauthored `rotations` or `translations` reaches a callback as ONE
+///   element of Sdf's fallback rather than as nothing, so against one joint it
+///   pairs and a hips-only clip that keys nothing samples to a root at the
+///   origin. `PoseFromStageSample` states it; `execMotion_sample` pins it.
 ///
 /// `rotations` and `translations` are already resolved **at** `timeCode`: exec
 /// resolves a time-sampled attribute input at the time the computation is
@@ -67,62 +77,8 @@ openstrata::motion::MotionPose IdentityPoseForJoints(const std::vector<std::stri
 /// lookup; which of the two answers a frame between keys is USD's question here
 /// and `motionSampling`'s there, and usd-vrm-plugins' parity rows are where
 /// the two get compared.
-struct ClipSample
-{
-    /// `UsdSkelAnimation`'s `joints`, in the order the clip authored them.
-    std::vector<std::string> jointPaths;
-
-    /// `rotations` and `translations` at `timeCode`. An array whose length
-    /// disagrees with `jointPaths` contributes nothing, because a clip that
-    /// cannot say which joint a value belongs to has not said it -- the same
-    /// rule the offline reader applies (usd-vrm-plugins' motion_retarget,
-    /// whose reading half arrives here as motionUsd's).
-    std::vector<pxr::GfQuatf> rotations;
-    std::vector<pxr::GfVec3f> translations;
-
-    /// The frame this sample was resolved at. `hasTimeCode` is false for the
-    /// **default** time code, which is what an exec system evaluates at until
-    /// `ChangeTime` is called -- so it is the common case rather than an edge
-    /// one, and `UsdTimeCode::GetValue()` is a coding error on it.
-    double timeCode = 0.0;
-    bool hasTimeCode = false;
-
-    /// The rate that turns `timeCode` into the seconds `MotionPose::timestamp`
-    /// is expressed in. It is an authored input rather than stage metadata
-    /// because a computation cannot reach `timeCodesPerSecond`
-    /// (usd-vrm-plugins' docs/reports/openusd/26.08-openexec-mechanism.md §5).
-    double timeCodesPerSecond = 0.0;
-};
-
-/// The pose `sample` states, or nullopt when it cannot be stamped.
-///
-/// Returns nullopt for a non-positive `timeCodesPerSecond`, which covers both an
-/// absent rate and a nonsense one. That is a refusal rather than a fallback on
-/// purpose: `MotionPose::timestamp` is a plain double with no absent state, so
-/// a pose produced without a rate would carry a second every consumer downstream
-/// would take at face value, and there is no value of the field that spells
-/// "unknown". A clip whose rate is missing is a clip this layer will not sample.
-///
-/// Everything else is a partial answer rather than a refusal, because a clip is
-/// allowed to be sparse: a joint path naming no canonical joint contributes
-/// nothing, an array whose length disagrees with `joints` contributes nothing,
-/// and a clip that authors no translations produces a pose with no root
-/// position. Only `hips` carries body translation (motion contract); the rest of
-/// a `translations` array is rest-pose data a retargeter re-derives per rig.
-///
-/// **Except for a clip of exactly one joint**, measured on 2026-09-13 and not
-/// fixable here. `rotations` and `translations` are `UsdSkelAnimation`'s own
-/// attributes, and OpenExec hands an unauthored one to the callback as ONE
-/// element of Sdf's fallback -- an identity quaternion, a zero vector -- rather
-/// than as nothing. Against several joints that one element disagrees in length
-/// and contributes nothing, as above. Against one joint it pairs: a hips-only
-/// clip that keys nothing samples to hips at identity and a root **at the
-/// origin**, and from inside this function the fallback and an authored origin
-/// are the same value
-/// ([the humanoid report](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-humanoid.md)
-/// §4). Kept rather than refused, decided for v0.9.0: `execMotion_sample`
-/// pins it, and the driver contract in MOTION_CONTRACT.md states it.
-std::optional<openstrata::motion::MotionPose> PoseFromClipSample(const ClipSample& sample);
+using openstrata::motion::MotionStageSample;
+using openstrata::motion::PoseFromStageSample;
 
 /// What a clip states about how it wants to be smoothed.
 ///
@@ -149,13 +105,12 @@ struct FilterPolicy
 
     /// `motion:filter:rootPosition` / `motion:filter:rootOrientation`.
     ///
-    /// The orientation flag is inert over a clip-sourced pose and is carried
-    /// anyway: `PoseFromClipSample` never sets `root.hasOrientation`, because a
-    /// `UsdSkelAnimation` states rotations per joint and no separate root
-    /// orientation, and `PoseFilter` skips a field the pose does not carry. It
-    /// is here because `Options` has it, and a wrapper does not get to drop a
-    /// field of the thing it wraps -- a pose reaching this node from a live
-    /// source (P0-4's later inputs) does carry one.
+    /// The orientation flag **used to be inert** over a clip-sourced pose,
+    /// because the copy of the sampling rule this bundle carried never set
+    /// `root.hasOrientation` and `PoseFilter` skips a field the pose does not
+    /// carry. Since `PoseFromStageSample` (2026-09-20) a clip that turns its
+    /// hips carries a root orientation, so the flag smooths one: turning it on
+    /// now changes what this node answers, where before it changed nothing.
     std::optional<bool> filterRootPosition;
     std::optional<bool> filterRootOrientation;
 };

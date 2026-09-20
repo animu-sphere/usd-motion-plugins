@@ -361,18 +361,35 @@ TestAClipWithAPolicy(const std::string& fixture)
     }
     assert(clip.GetAttribute(kRootPosition).Set(true));
 
-    // The third flag is authored and inert, and that is worth stating once: a
-    // pose read from a `UsdSkelAnimation` carries no root orientation, so
-    // `PoseFilter` has nothing to apply it to. It exists because the wrapper
-    // carries the whole of `PoseFilter::Options` and a live source does report
-    // one.
+    // ---- the third flag stopped being inert on 2026-09-20 -----------------
+    // It used to be authored and do nothing: the copy of the sampling rule
+    // this bundle carried never set `root.hasOrientation`, so `PoseFilter` had
+    // nothing to apply it to. `PoseFromStageSample` reads the hips rotation as
+    // the body's orientation too (MOTION_CONTRACT.md §5.3), so a clip-sourced
+    // pose now carries the field the flag names.
+    //
+    // What this fixture can show is that it arrives: its hips never turn, so
+    // the orientation here is identity and smoothing it is a no-op whichever
+    // way the flag is set. That the flag now *changes* the answer is pinned in
+    // `execMotion_pose`, over a sample whose hips do turn -- the seam is where
+    // a pose can be built to order, and inventing a hips track in this fixture
+    // would move the goldens of every other suite that reads it.
     bool authoredRootOrientation = true;
     assert(clip.GetAttribute(kRootOrientation).Get(&authoredRootOrientation));
     assert(!authoredRootOrientation);
     {
         ExecUsdCacheView view = system.ComputeWithOverrides(request, PriorOverride(clip, prior));
-        assert(!PoseAt(view, kFiltered).root.hasOrientation &&
-               "a clip-sourced pose grew a root orientation");
+        const openstrata::motion::MotionPose filtered = PoseAt(view, kFiltered);
+        const openstrata::motion::MotionPose sampled = PoseAt(view, kSampled);
+        assert(sampled.root.hasOrientation &&
+               "a clip-sourced pose carries no root orientation, so the switch to "
+               "PoseFromStageSample did not take");
+        assert(NearlyEqual(AngleDegrees(sampled.root.worldOrientation),
+                           AngleDegrees(RotationOf(sampled, openstrata::motion::HumanJoint::Hips)),
+                           1e-3) &&
+               "the root orientation is not the hips rotation the clip states");
+        assert(filtered.root.hasOrientation &&
+               "the filter dropped the root orientation it was handed");
     }
 
     std::printf("execMotion filter: a clip's policy reaches openstrata::motion::PoseFilter, "

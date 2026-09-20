@@ -232,6 +232,19 @@ NearestPresentAncestor(HumanJoint joint, const std::bitset<HumanJointCount>& pre
     return std::nullopt;
 }
 
+std::optional<HumanJoint>
+FindHumanJointByPath(std::string_view path) noexcept
+{
+    const std::size_t separator = path.rfind('/');
+    const std::string_view leaf =
+        separator == std::string_view::npos ? path : path.substr(separator + 1);
+    if (leaf.empty())
+    {
+        return std::nullopt;
+    }
+    return FindHumanJoint(leaf);
+}
+
 std::string
 HumanJointPath(HumanJoint joint, const std::bitset<HumanJointCount>& present)
 {

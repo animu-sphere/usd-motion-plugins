@@ -22,7 +22,10 @@ target_include_directories(execMotion_pose_tests PRIVATE
 target_link_libraries(execMotion_pose_tests PRIVATE
     motionCore::motionCore
     motionSampling::motionSampling
-    motionRecording::motionRecording)
+    motionRecording::motionRecording
+    # The seam's sampling rule is motionUsd's since 2026-09-20, so the suite
+    # that exercises the seam with no stage links it too.
+    motionUsd::motionUsd)
 target_compile_options(execMotion_pose_tests
     PRIVATE ${_exec_motion_assertions})
 if(MSVC)

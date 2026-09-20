@@ -55,6 +55,18 @@ requires:
     # states nothing. Nothing else here reaches into a session.
     - id: motionRecording
       version: ">=0.1,<0.2"
+    # The stage bridge, for one thing and a decisive one:
+    # `PoseFromStageSample`, the rule that turns a `UsdSkelAnimation`'s
+    # already-resolved arrays into a pose. `motion.sampleAnimation` is that
+    # call. It lived in `usd-vrm-plugins`' retarget CLI, which a computation
+    # cannot call, so this bundle carried a copy until the reading half
+    # arrived here (USD_MAPPING.md §7).
+    #
+    # It is the only edge here that reaches a library holding stage API, and
+    # it does not make this bundle a stage reader: the values still arrive
+    # through exec inputs, and the call takes values.
+    - id: motionUsd
+      version: ">=0.1,<0.2"
 usd:
   plug_info: plugin/resources/execMotion/plugInfo.json
 tests:
