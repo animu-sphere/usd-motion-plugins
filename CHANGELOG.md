@@ -228,15 +228,21 @@ separate from the package version
   (USD_MAPPING.md §7.1). The bundle carried the sampling rule because it lived
   in `usd-vrm-plugins`' retarget CLI and a computation cannot call a CLI; the
   reading half's arrival ended that, and `WORKSPACE.md` §2.1 gains the edge.
-  The switch **changes what two nodes answer**, which is the point of it:
+  The switch **changes what the nodes that read `RootMotion` answer**, which
+  is the point of it (USD_MAPPING.md §7.1 lists them):
   - `motion.filterPose` smooths the root orientation. The shared rule sets
     `root.hasOrientation` from the hips rotation (MOTION_CONTRACT.md §5.3),
     where the copy left it false, so `motion:filter:rootOrientation` stopped
     being inert — and it defaults to true, so a clip authoring no policy is
     affected. `execMotion_pose` pins the default and the explicit refusal.
+  - `motion.interpolatePose` slerps it between two bracketing samples, where
+    before neither sample carried one.
   - `motion.extractRootMotion` returns a root motion carrying that
     orientation. `ConditionRootMotion` does not branch on it, so only the
     value is fuller.
+  - `motion.rootTransform` rotates a placement for a clip that turns its
+    hips. `motion.blendPoses` is unaffected: `BlendPoses` does not read
+    `root`.
 
   The eight L0–L5 goldens are unchanged, because no fixture turns its hips.
   The bundle links `motionUsd`, which carries OpenUSD's `usdGeom` in
