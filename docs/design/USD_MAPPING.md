@@ -256,7 +256,9 @@ The copy the bundle carried left `root.hasOrientation` false, reasoning that a
 orientation. [MOTION_CONTRACT.md §5.3](MOTION_CONTRACT.md#53-root-motion-and-the-hips)
 overrules it: the hips rotation **is** the body's orientation, and the
 duplication is the record rather than an encoding accident. So a clip-sourced
-pose now carries one, and two node behaviours moved with it:
+pose now carries one, and every node that reads `RootMotion` sees it.
+
+Which nodes that is, from the libraries rather than from inspection:
 
 - **`motion.filterPose` smooths the root orientation by default.**
   `PoseFilter::Options::filterRootOrientation` defaults to true, and the field
@@ -264,13 +266,17 @@ pose now carries one, and two node behaviours moved with it:
   inert whatever a clip authored. A clip that authors no filter policy now has
   its root orientation slerped, on the same step as every other rotation.
   `execMotion_pose` pins both the default and the explicit refusal.
+- **`motion.interpolatePose` interpolates it.** `SampleClip` between two
+  bracketing samples slerps the root orientation when both carry one, and
+  before the switch neither ever did.
 - **`motion.extractRootMotion` carries an orientation it used to drop.**
   `ConditionRootMotion` does not branch on the field, so the rule is unchanged
   and only the value it returns is fuller.
-
-`motion.rootTransform`'s answer is unchanged in the fixtures because theirs do
-not turn their hips; a clip that turns them now places an Xformable rotated
-rather than translated only, which is what §6's bake already does.
+- **`motion.rootTransform` rotates the placement** for a clip that turns its
+  hips, where it used to translate only — which is what §6's bake already
+  does. The fixtures do not turn theirs, so no golden moved.
+- **`motion.blendPoses` is unaffected**: `BlendPoses` does not read `root` at
+  all.
 
 **What a read cannot recover**, because the stage does not carry it. A
 `UsdSkelAnimation` states a rotation for every joint at every key: §4.2's

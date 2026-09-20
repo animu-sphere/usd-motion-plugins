@@ -138,11 +138,13 @@ was removed in the adapting commit rather than carried
 - ✅ `execMotion` calls it and holds no copy (2026-09-20, in a change of its
   own). The `motionUsd` edge is drawn in
   [WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository),
-  and the switch changed what two nodes answer
-  ([USD_MAPPING.md §7.1](../design/USD_MAPPING.md#71-what-the-shared-rule-changed-for-execmotion)):
-  `motion.filterPose` smooths the root orientation, by default, and
-  `motion.extractRootMotion` carries one. The goldens did not move, because no
-  fixture turns its hips.
+  and the switch changed what every node that reads `RootMotion` answers
+  ([USD_MAPPING.md §7.1](../design/USD_MAPPING.md#71-what-the-shared-rule-changed-for-execmotion)
+  lists them): `motion.filterPose` smooths the root orientation by default,
+  `motion.interpolatePose` slerps it, `motion.extractRootMotion` carries it
+  and `motion.rootTransform` would rotate a placement. The goldens did not
+  move: only `displayed_clip` authors a computed transform, and it turns its
+  head.
 - ⬜ `usd-vrm-plugins` deletes `StageIo`'s reading half in its consuming
   change, which waits on `ost` (its report 41). The bake stays there.
 
