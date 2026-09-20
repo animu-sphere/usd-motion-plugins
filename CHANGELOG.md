@@ -94,10 +94,31 @@ separate from the package version
   - `customData.motion`
 
   `AuthorMotionStage` fills a stage a caller holds, and `WriteMotionStage`
-  writes a file. Channels and look-at targets are reported in
-  `MotionStageReport` and not authored, until USD-O4 names the channel
-  attributes. `motionCore` gains `HumanJointVocabularyVersion`. The package is
-  `SameMinorVersion`, and it is the installed-consumer lane's fourth row.
+  writes a file. `motionCore` gains `HumanJointVocabularyVersion`. The package
+  is `SameMinorVersion`, and it is the installed-consumer lane's fourth row.
+
+- **`motionUsd`'s reading half** (USD_MAPPING.md §7), imported from
+  `usd-vrm-plugins`' `motion_retarget` with its history. 13 commits came
+  through `git filter-repo`; a move-only commit and the adaptation followed.
+  Only the clip and skeleton reading arrived — the avatar reading, the
+  expressions, the look-at and the bake onto a VRM rig are that repository's.
+  - `ReadMotionStage` and `OpenMotionStage` answer a `MotionClip`, the
+    skeleton's `jointTokens` and `restTransforms`, the §5 metadata and a list
+    of warnings. A skeleton whose tokens are not the vocabulary's is refused:
+    it reads only through a retarget.
+  - `PoseFromStageSample` is the rule a stage reader and an OpenExec node
+    share, taking values rather than a prim. It is the library home
+    `usd-vrm-plugins` had nowhere to put, which is why that repository carried
+    the rule twice.
+  - `RootMotion::worldOrientation` is carried. The hips rotation is the body's
+    orientation as well as the local rotation (MOTION_CONTRACT.md §5.3), and
+    both of the copies it arrived from kept only the place.
+  - The skeleton comes back as the two arrays `BuildSkeletonDescriptor` and
+    `BuildSourceRestPose` take, so reading a stage links no retargeter.
+  - The exit codes stayed behind: they classify an input for a CLI.
+  - `motionUsd/MotionStage.h` now holds `MotionStageContractVersion` and
+    `MotionStageTimeCodesPerSecond`, so the reading half does not include the
+    writer's header to learn the contract version.
 
 - **The recorded-source layer, imported from `usd-vrm-plugins` with its
   history (vrm MIG-3)**, ahead of the v0.4.0 release that carries it. This
@@ -196,9 +217,20 @@ separate from the package version
   prim is typeless, a writer must make the prim names unique rather than let
   one channel overwrite another, and a reader keys on the attribute.
   `vrm:expressionType` does not come across: a format's classification of its
-  own channel belongs in that format's namespace. Nothing authors the prim
-  yet; `motionUsd` still reports the channels it did not author, and authoring
-  and reading arrive with the reading half in v0.2.0.
+  own channel belongs in that format's namespace.
+
+- **The `Channels` prim is authored and read** (USD_MAPPING.md §4.3), with the
+  reading half. One typeless prim per channel under `/Animation/Channels`, the
+  semantic verbatim on `uniform string motion:channelName` and the value on a
+  time-sampled `float motion:channelValue`. Two semantics that sanitize to one
+  prim name are refused rather than authored over each other, and a channel is
+  read back only at an instant the stage keyed it — USD holds the last key
+  forward, and reading at every body key would give later samples a value the
+  producer never reported. `MotionStageReport::unauthoredChannels` is
+  `channels`, the ones it wrote, and `motion_record` counts them instead of
+  warning that they were dropped. This does not bump `contractVersion`: a
+  consumer that read a stage without a `Channels` prim is unaffected by one
+  gaining it (§8).
 
 ### Changed
 

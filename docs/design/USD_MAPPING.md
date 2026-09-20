@@ -1,13 +1,11 @@
 # USD mapping
 
-> Status: **proposed**, 2026-09-17. **§2–§5 are authored** by `motionUsd`
-> since 2026-09-19, except the `Channels` prim, whose names §4.3 decided on
-> 2026-09-20 and which nothing authors yet. §6–§7 are not
-> implemented here. `usd-vrm-plugins` authors two stages of this family: the
-> `.vrma` importer's and the capture recorder's semantic clip. It also bakes
-> retargeted animation onto avatars. `motionUsd`'s writer arrived from that
-> capture recorder, and the reading half (`motion_retarget`'s `StageIo`)
-> arrives with v0.2.0
+> Status: **proposed**, 2026-09-17. **§2–§5 are authored and read** by
+> `motionUsd` since 2026-09-20, the `Channels` prim of §4.3 included. §6 is
+> not implemented here. `usd-vrm-plugins` authors two stages of this family:
+> the `.vrma` importer's and the capture recorder's semantic clip. It also
+> bakes retargeted animation onto avatars. `motionUsd`'s writer arrived from
+> that capture recorder and its reader from `motion_retarget`'s `StageIo`
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
 >
 > This document owns how motion becomes OpenUSD and back: the standalone
@@ -155,12 +153,17 @@ What does **not** come across is `vrm:expressionType`: it classifies a VRM
 expression, and a format's classification of its own channel belongs in that
 format's namespace, not in the generic mapping.
 
-`motionUsd` does not author the prim yet; it still reports the channel names
-it did not author (`MotionStageReport::unauthoredChannels`). Authoring them,
-and reading them back, arrive with the reading half in v0.2.0. That does not
-bump `contractVersion`: a consumer that read a stage without a `Channels` prim
-is unaffected by one gaining it, which is the §8 case that adds an optional
-prim.
+`motionUsd` authors and reads the prim since 2026-09-20, with the reading
+half. That did not bump `contractVersion`: a consumer that read a stage
+without a `Channels` prim is unaffected by one gaining it, which is the §8
+case that adds an optional prim.
+
+**A channel is read back only where the stage keyed it.** USD holds the last
+key forward, so asking a channel's value at every body key would give every
+later sample a value the producer never reported, and "an unreported name is
+not a value" (MOTION_CONTRACT.md §6) would not survive one trip through a
+stage. A channel stated once, without time samples, applies to every sample:
+that is what stating it once means.
 
 ## 5. Metadata
 
@@ -206,13 +209,38 @@ never authored.
 
 ## 7. Reading USD back
 
-`UsdSkelAnimation` → `MotionClip` is `motionUsd`'s too: a skeleton whose
-joint tokens are semantic paths reads directly; any other skeleton needs a
-`RetargetMap` in reverse and is a retarget, not a read. In `usd-vrm-plugins`
-the reading lives only in a CLI, where an OpenExec bundle cannot call it, so
-the bundle carries a second copy; one library home ends that (its OpenExec
-sampling finding). Both copies also drop `RootMotion::worldOrientation`,
-which a reader here must carry.
+`UsdSkelAnimation` → `MotionClip` is `motionUsd`'s too, and it arrived on
+2026-09-20 from `usd-vrm-plugins`' `motion_retarget`. A skeleton whose joint
+tokens are semantic paths reads directly; any other skeleton needs a
+`RetargetMap` in reverse and is a retarget, not a read, and is refused rather
+than guessed at.
+
+- `ReadMotionStage` and `OpenMotionStage` answer a `MotionClip`, the
+  skeleton's joint tokens and rest transforms, §5's metadata and a list of
+  warnings. A warning is never a refusal.
+- **The skeleton comes back as values**, not as a `SkeletonDescriptor`: those
+  two arrays are what `BuildSkeletonDescriptor` and `BuildSourceRestPose`
+  take ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)), so reading a
+  stage does not link a retargeter and `motionUsd` keeps its one edge
+  ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository)).
+- **`PoseFromStageSample` is the rule, taking values.** In `usd-vrm-plugins`
+  the reading lived only in a CLI, where an OpenExec bundle cannot call it, so
+  the bundle carried a second copy; this is the library home that ends it (its
+  OpenExec sampling finding). `execMotion` still holds its own copy until it
+  is switched over, which adds an edge WORKSPACE.md §2.1 does not draw yet.
+- **`RootMotion::worldOrientation` is carried.** Both copies dropped it. The
+  hips rotation is the body's orientation *and* stays the local rotation
+  ([MOTION_CONTRACT.md §5.3](MOTION_CONTRACT.md#53-root-motion-and-the-hips)),
+  so a reader that kept only the local rotation lost the body's facing.
+- **The rate is the stage's.** `Body`'s `motion:timeCodesPerSecond` is a shim
+  for a computation that cannot read stage metadata (EXEC_CONTRACT.md §5.1),
+  and a reader that quietly preferred one of the two would make a stage on
+  which they disagree sample at two rates without saying so. The stage's is
+  used and the disagreement is a warning.
+- **A stage that claims none of this mapping still reads.** `usd-vrm-plugins`'
+  `.vrma` stage is standard `UsdSkel` over the same joint tokens and carries
+  no `customData.motion`; an absent `contractVersion` is a fact about the
+  stage, not a defect in it.
 
 ## 8. Versioning
 
