@@ -398,35 +398,67 @@ def check_malformed_trace_is_rejected(tool: str, directory: pathlib.Path,
                    f"{result.stderr.strip()}")
 
 
-def check_unauthored_channels_are_reported(tool: str, corpus: pathlib.Path,
-                                           directory: pathlib.Path,
-                                           failures: Failures) -> None:
-    """Channels the stage cannot hold yet are named, not dropped in silence.
+def check_channels_reach_the_stage(tool: str, corpus: pathlib.Path,
+                                   directory: pathlib.Path,
+                                   failures: Failures) -> None:
+    """A session's channels are authored, keyed by their semantic.
 
-    The motion stage has no `Channels` prim until USD-O4 is decided, so a
-    session that carried expression weights loses them on the way to disk.
-    That is acceptable while it is said; a clean exit with nothing on stderr
-    would let a caller believe the face was recorded.
+    Until USD-O4 was decided the stage had no `Channels` prim and a recorded
+    face was dropped with a warning. It is authored now (USD_MAPPING.md §4.3),
+    so the check is what reached the stage: one prim per channel, the semantic
+    verbatim on `motion:channelName`, and a value keyed at the frames that
+    reported it.
     """
     trace = corpus / "expressions-30hz.trace"
     if not failures.check(trace.is_file(), f"missing fixture {trace}"):
         return
-    result = capture(tool, trace, directory / "expressions.usda")
+    output = directory / "expressions.usda"
+    result = capture(tool, trace, output)
     if not failures.check(result.returncode == 0,
                           f"motion_record failed on {trace.name}: "
                           f"{result.stderr.strip()}"):
         return
+
+    stage = Usd.Stage.Open(str(output))
+    channels = stage.GetPrimAtPath("/Animation/Channels")
+    if not failures.check(bool(channels),
+                          f"{trace.name} carries channels and the stage has no "
+                          f"/Animation/Channels prim"):
+        return
+    names = {}
+    for prim in channels.GetChildren():
+        attribute = prim.GetAttribute("motion:channelName")
+        if not failures.check(bool(attribute),
+                              f"channel {prim.GetPath()} states no "
+                              f"motion:channelName"):
+            continue
+        names[attribute.Get()] = prim
+    failures.check(len(names) > 0,
+                   f"{trace.name} authored no channel under /Animation/Channels")
     failures.check(
-        "channel(s) were not authored" in result.stderr,
-        f"{trace.name} carries channels, and motion_record did not say it "
-        f"dropped them: {result.stderr.strip()!r}")
+        str(len(names)) + " channel(s)" in result.stderr,
+        f"motion_record did not report the {len(names)} channel(s) it wrote: "
+        f"{result.stderr.strip()!r}")
+    for name, prim in names.items():
+        value = prim.GetAttribute("motion:channelValue")
+        if not failures.check(bool(value),
+                              f"channel '{name}' states no motion:channelValue"):
+            continue
+        failures.check(
+            len(value.GetTimeSamples()) > 0,
+            f"channel '{name}' is authored with no time sample at all")
 
     quiet = capture(tool, corpus / "walk-clean-30hz.trace",
                     directory / "no_channels.usda")
     failures.check(
-        "channel(s)" not in quiet.stderr,
-        f"a session without channels warned about them: "
+        "0 channel(s)" in quiet.stderr,
+        f"a session without channels did not report zero of them: "
         f"{quiet.stderr.strip()!r}")
+    failures.check(
+        not Usd.Stage.Open(
+            str(directory / "no_channels.usda")).GetPrimAtPath(
+                "/Animation/Channels"),
+        "a session without channels authored a Channels prim")
 
 
 def check_stage_resolves_and_moves(clip: pathlib.Path,
@@ -516,8 +548,8 @@ def main() -> int:
         check_a_frame_without_a_root_holds_the_placement(
             options.tool, directory, failures)
         check_malformed_trace_is_rejected(options.tool, directory, failures)
-        check_unauthored_channels_are_reported(options.tool, corpus,
-                                               directory, failures)
+        check_channels_reach_the_stage(options.tool, corpus, directory,
+                                       failures)
         check_stage_resolves_and_moves(clip, failures)
 
     return failures.report()

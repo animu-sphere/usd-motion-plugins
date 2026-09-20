@@ -251,15 +251,9 @@ main(int argc, char** argv)
         return 1;
     }
 
-    // What the stage cannot hold yet is said, not dropped in silence: the
-    // `Channels` prim waits on USD-O4, and a look-at target has no place in the
-    // mapping.
-    if (!options.quiet && !stageReport.unauthoredChannels.empty())
-    {
-        std::cerr << "motion_record: warning: " << stageReport.unauthoredChannels.size()
-                  << " channel(s) were not authored; the motion stage has no channel "
-                     "prim yet\n";
-    }
+    // What the stage cannot hold yet is said, not dropped in silence: a look-at
+    // target still has no place in the mapping. Channels do, since USD-O4, so
+    // they are counted below rather than warned about.
     if (!options.quiet && stageReport.unauthoredLookAtTargets != 0)
     {
         std::cerr << "motion_record: warning: " << stageReport.unauthoredLookAtTargets
@@ -269,8 +263,9 @@ main(int argc, char** argv)
     if (!options.quiet)
     {
         std::cerr << "motion_record: wrote " << recorded.samples.size() << " frame(s) over "
-                  << source.GetObservedJoints().count() << " observed joint(s) to "
-                  << options.outputPath << "\n";
+                  << source.GetObservedJoints().count() << " observed joint(s) and "
+                  << stageReport.channels.size() << " channel(s) to " << options.outputPath
+                  << "\n";
     }
     return 0;
 }

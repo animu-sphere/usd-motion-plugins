@@ -7,6 +7,7 @@
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec3h.h"
+#include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/array.h"
 #include "pxr/base/vt/dictionary.h"
@@ -24,7 +25,9 @@
 
 #include <bitset>
 #include <cmath>
+#include <map>
 #include <set>
+#include <string>
 
 namespace openstrata::motion
 {
@@ -44,6 +47,19 @@ TimeCodeFor(double seconds)
     const double timeCode = seconds * MotionStageTimeCodesPerSecond;
     const double frame = std::round(timeCode);
     return std::fabs(timeCode - frame) <= kFrameSnap ? frame : timeCode;
+}
+
+// A channel's prim name, from its semantic (USD_MAPPING.md §4.3). The name
+// attribute is the key and this is not, so the only thing asked of it is that
+// it be a valid identifier and that no two channels land on the same one --
+// which `TfMakeValidIdentifier` cannot promise, because `vrm:happy` and
+// `vrm.happy` both become `vrm_happy`. The caller refuses rather than
+// disambiguating: a generated suffix would make the path carry information
+// and invite a reader to parse it.
+std::string
+PrimNameForChannel(const std::string& name)
+{
+    return pxr::TfMakeValidIdentifier(name);
 }
 
 } // namespace
@@ -168,6 +184,26 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
     {
         *error = "the clip observes no joint and no root";
         return false;
+    }
+
+    // Still before any authoring: two channels on one prim path would leave
+    // one of them on the stage, silently, under the other's name.
+    std::map<std::string, std::string> channelByPrimName;
+    for (const std::string& channel : channels)
+    {
+        const std::string primName = PrimNameForChannel(channel);
+        if (primName.empty())
+        {
+            *error = "channel '" + channel + "' has no valid prim name";
+            return false;
+        }
+        const auto claimed = channelByPrimName.emplace(primName, channel);
+        if (!claimed.second)
+        {
+            *error = "channels '" + claimed.first->second + "' and '" + channel +
+                     "' both name the prim '" + primName + "'";
+            return false;
+        }
     }
 
     std::vector<HumanJoint> joints;
@@ -322,11 +358,43 @@ AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
 
     pxr::UsdSkelBindingAPI::Apply(skeleton.GetPrim()).CreateAnimationSourceRel().SetTargets({bodyPath});
 
+    // §4.3. One typeless prim per channel: the semantic verbatim on
+    // `motion:channelName`, which is the key, and the value time-sampled
+    // beside it. A sample that reported nothing for a channel authors nothing
+    // at that time code -- an unreported name is the producer saying nothing,
+    // and a zero would be it saying the channel is off.
+    if (!channels.empty())
+    {
+        const pxr::SdfPath channelsPath = rootPath.AppendChild(pxr::TfToken("Channels"));
+        pxr::UsdGeomScope::Define(stage, channelsPath);
+        std::map<std::string, pxr::UsdAttribute> valueByChannel;
+        for (const std::string& channel : channels)
+        {
+            const pxr::UsdPrim prim = stage->DefinePrim(
+                channelsPath.AppendChild(pxr::TfToken(PrimNameForChannel(channel))));
+            prim.CreateAttribute(pxr::TfToken("motion:channelName"),
+                                 pxr::SdfValueTypeNames->String, /* custom */ true,
+                                 pxr::SdfVariabilityUniform)
+                .Set(channel);
+            valueByChannel.emplace(channel,
+                                   prim.CreateAttribute(pxr::TfToken("motion:channelValue"),
+                                                        pxr::SdfValueTypeNames->Float,
+                                                        /* custom */ true));
+        }
+        for (std::size_t sample = 0; sample < clip.samples.size(); ++sample)
+        {
+            for (const MotionChannel& channel : clip.samples[sample].channels.entries)
+            {
+                valueByChannel.at(channel.name).Set(channel.value, timeCodes[sample]);
+            }
+        }
+    }
+
     if (report)
     {
         report->jointCount = joints.size();
         report->sampleCount = clip.samples.size();
-        report->unauthoredChannels.assign(channels.begin(), channels.end());
+        report->channels.assign(channels.begin(), channels.end());
         report->unauthoredLookAtTargets = lookAtTargets;
     }
     return true;
