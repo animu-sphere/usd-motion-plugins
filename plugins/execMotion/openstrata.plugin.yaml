@@ -4,7 +4,7 @@ manifest:
 plugin:
   name: execMotion
   # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
-  version: 0.1.0
+  version: 0.5.0
   kind: usd-exec
 license: Apache-2.0
 runtime:
@@ -33,7 +33,7 @@ requires:
     # evaluated frame, so the node interpolates nothing and has no sampling
     # call to wrap.
     - id: motionCore
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
     # The sampling half, from `motion.filterPose` onward: the node is one step
     # of `PoseFilter` and the algorithm stays in the library. The state that
     # filter normally keeps does not come with it -- an OpenExec callback is
@@ -48,13 +48,13 @@ requires:
     # `motion.blendPoses` needs it for a call and nothing else: the node is the
     # N-way `BlendPoses` over the clips a relationship targets.
     - id: motionSampling
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
     # The recording half, for one node: `motion.extractRootMotion` is
     # `ConditionRootMotion`, the intake rule a capture session applies to every
     # frame it accepts, with `LiveCaptureConfig`'s own default for a clip that
     # states nothing. Nothing else here reaches into a session.
     - id: motionRecording
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
     # The stage bridge, for one thing and a decisive one:
     # `PoseFromStageSample`, the rule that turns a `UsdSkelAnimation`'s
     # already-resolved arrays into a pose. `motion.sampleAnimation` is that
@@ -66,7 +66,7 @@ requires:
     # it does not make this bundle a stage reader: the values still arrive
     # through exec inputs, and the call takes values.
     - id: motionUsd
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
 usd:
   plug_info: plugin/resources/execMotion/plugInfo.json
 tests:

@@ -20,9 +20,9 @@ here.
 | [guides/](guides/) | How to build and test the tree. | [building.md](guides/building.md) |
 | [contributing/](contributing/) | How to maintain these documents. | [documentation.md](contributing/documentation.md) |
 
-`releases/` and `reports/` are created with their first real content: the
-first release record with the first tag, the first report with the first dated
-run.
+[releases/](releases/) holds one record per release, added with its tag; the
+first is [v0.5.0](releases/v0.5.0.md). `reports/` is still created with its
+first real content, a dated run.
 
 ## Canonical documents
 

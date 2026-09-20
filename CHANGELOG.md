@@ -7,7 +7,14 @@ motion contract, joint vocabulary and USD mapping carry their own versions,
 separate from the package version
 ([docs/architecture/WORKSPACE.md §4](docs/architecture/WORKSPACE.md#4-versioning-and-build)).
 
-## [Unreleased]
+## [0.5.0] - 2026-09-20
+
+The first release. It carries the whole scope the roadmap numbered v0.1.0
+through v0.5.0, because every identity those five releases were to deliver
+arrived between 2026-09-19 and 2026-09-20 — faster than the releases could be
+cut — and `usd-vrm-plugins` cannot delete its second copy of any of them until
+all of them are installable. One tag rather than five, and the roadmap's
+scope table records which row carried what.
 
 ### Added
 

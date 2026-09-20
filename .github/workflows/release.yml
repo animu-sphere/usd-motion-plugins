@@ -436,7 +436,7 @@ jobs:
           cat staged/*/library-digests.tsv | sort -u | while IFS=$'\t' read -r lib ver target digest; do
             tag="${lib}-${ver}-${target}"
             out=".ost-ci/push-${tag}.json"
-            ost artifact push "$digest" "oci://${OCI_REPOSITORY}:${tag}" --json > "$out"
+            ost artifact push "$digest" "oci://${OCI_REPOSITORY}:${tag}" --json > "$out" < /dev/null
             oci="$(jq -er '.data.oci_digest' "$out")"
             art="$(jq -er '.data.artifact_digest' "$out")"
             if [ "$art" != "$digest" ]; then
@@ -460,9 +460,19 @@ jobs:
             rows=.ost-ci/dry.tsv
             cat staged/*/library-digests.tsv | sort -u | awk -F'\t' '{print $0 "\t"}' > "$rows"
           fi
-          python3 - "$rows" "$version" "$released" "${OCI_REPOSITORY}" <<'PY'
+          # What the table MUST contain, counted from the tree and from the
+          # build jobs that ran -- not from a number written here. A target
+          # whose archive silently never arrived would otherwise ship a pin
+          # table that is correct about everything it mentions and missing a
+          # platform, which is the kind of half-right artifact a consumer only
+          # discovers on the platform it cannot build.
+          want_libs="$(ls -d libs/*/ | wc -l | tr -d ' ')"
+          want_targets="$(ls -d staged/release-* | wc -l | tr -d ' ')"
+          echo "expecting $want_libs library(ies) on $want_targets target(s)"
+          python3 - "$rows" "$version" "$released" "${OCI_REPOSITORY}" "$want_libs" "$want_targets" <<'PY'
           import json, pathlib, sys
           rows_path, version, released, repository = sys.argv[1:5]
+          want_libs, want_targets = int(sys.argv[5]), int(sys.argv[6])
           libs: dict[str, dict] = {}
           for line in pathlib.Path(rows_path).read_text().splitlines():
               if not line.strip():
@@ -474,6 +484,16 @@ jobs:
               if oci:
                   entry["source"] = f"oci://{repository}@{oci}"
               libs.setdefault(lib, {})[target] = entry
+          if len(libs) != want_libs:
+              raise SystemExit(
+                  f"::error title=publish::the pin table has {len(libs)} "
+                  f"library(ies), but the tree declares {want_libs}: "
+                  f"{sorted(libs)}")
+          for lib, targets in sorted(libs.items()):
+              if len(targets) != want_targets:
+                  raise SystemExit(
+                      f"::error title=publish::{lib} has {len(targets)} "
+                      f"target(s), expected {want_targets}: {sorted(targets)}")
           out = pathlib.Path("out")
           out.mkdir(exist_ok=True)
           (out / "external-library-pins.json").write_text(
