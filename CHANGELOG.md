@@ -192,7 +192,9 @@ separate from the package version
   ([USD_MAPPING.md §4.3](docs/design/USD_MAPPING.md#43-channels)): a channel is
   one prim under `/Animation/Channels`, carrying `motion:channelName` — the
   namespaced semantic verbatim, and the key, because a sanitized prim path can
-  differ from the name — and a time-sampled `float motion:channelValue`.
+  differ from the name — and a time-sampled `float motion:channelValue`. The
+  prim is typeless, a writer must make the prim names unique rather than let
+  one channel overwrite another, and a reader keys on the attribute.
   `vrm:expressionType` does not come across: a format's classification of its
   own channel belongs in that format's namespace. Nothing authors the prim
   yet; `motionUsd` still reports the channels it did not author, and authoring

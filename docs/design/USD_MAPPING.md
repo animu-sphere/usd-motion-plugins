@@ -134,13 +134,22 @@ def Scope "Channels"
 }
 ```
 
+The prim is **typeless**, as `Bindings` is proposed to be (USD-O5): a channel
+is a name and a number, which namespaced properties on a typeless prim express
+without a schema (design policy §4.3).
+
 The name attribute, **not the prim path**, is the key. That is
 `usd-vrm-plugins`' measured rule for the same data — it authors VRMA
 expressions as `/Animation/Expressions/<name>` with `vrm:expressionName`,
 `vrm:expressionType` and a time-sampled `vrm:expressionWeight` — and the
-reason is that a sanitized path can differ from the name, and two semantics
-differing only where the sanitizer folds them would land on one prim. A reader
-that trusted the path would answer a channel nobody authored.
+reason is that a sanitized path can differ from the name: `vrm:happy` and
+`vrm.happy` are two semantics that sanitize to one prim name. So the rule is
+two-sided, and both halves are required:
+
+- **A writer makes the prim names unique**, and a channel set it cannot author
+  under distinct names is an error rather than a stage with one channel
+  silently overwriting another.
+- **A reader keys on `motion:channelName`** and never on the prim's path.
 
 What does **not** come across is `vrm:expressionType`: it classifies a VRM
 expression, and a format's classification of its own channel belongs in that
@@ -148,10 +157,10 @@ format's namespace, not in the generic mapping.
 
 `motionUsd` does not author the prim yet; it still reports the channel names
 it did not author (`MotionStageReport::unauthoredChannels`). Authoring them,
-and reading them back, arrive with the reading half in v0.2.0, and that is
-what bumps `contractVersion`: a consumer that read a stage without a
-`Channels` prim is unaffected by one gaining it, so adding it is the §8 case
-that does **not** bump.
+and reading them back, arrive with the reading half in v0.2.0. That does not
+bump `contractVersion`: a consumer that read a stage without a `Channels` prim
+is unaffected by one gaining it, which is the §8 case that adds an optional
+prim.
 
 ## 5. Metadata
 
