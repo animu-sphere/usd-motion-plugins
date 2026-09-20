@@ -83,6 +83,15 @@ if(NOT TARGET motionRecording::motionRecording)
     find_package(motionRecording CONFIG REQUIRED)
 endif()
 
+# The stage bridge, for one call: `PoseFromStageSample`, the rule that turns a
+# UsdSkelAnimation's already-resolved arrays into a pose. It lived in
+# usd-vrm-plugins' retarget CLI, which a computation cannot call, so this
+# bundle carried a copy until the reading half arrived here (USD_MAPPING.md
+# §7). The call takes values, so this is not a stage edge.
+if(NOT TARGET motionUsd::motionUsd)
+    find_package(motionUsd CONFIG REQUIRED)
+endif()
+
 set(PLUGIN_NAME ExecMotion)
 add_library(${PLUGIN_NAME} SHARED
     src/ExecMotionPose.cpp
@@ -95,7 +104,8 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
 target_link_libraries(${PLUGIN_NAME} PRIVATE
     motionCore::motionCore
     motionSampling::motionSampling
-    motionRecording::motionRecording)
+    motionRecording::motionRecording
+    motionUsd::motionUsd)
 
 if(MSVC)
     target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX _USE_MATH_DEFINES)

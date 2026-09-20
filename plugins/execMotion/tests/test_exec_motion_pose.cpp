@@ -37,24 +37,27 @@ Has(const openstrata::motion::MotionPose& pose, openstrata::motion::HumanJoint j
 void
 TestLeafSegmentIsTheBone()
 {
-    // A joint path is UsdSkelAnimation's own spelling and the joint is its leaf:
-    // "hips/spine/chest" is the chest, not something named after the whole path.
-    assert(execmotion::JointForPath("hips") == openstrata::motion::HumanJoint::Hips);
-    assert(execmotion::JointForPath("hips/spine") == openstrata::motion::HumanJoint::Spine);
-    assert(execmotion::JointForPath("hips/spine/chest/neck/head") ==
+    // The rule is motionCore's `FindHumanJointByPath` since 2026-09-20 -- this
+    // bundle, motionUsd and usd-vrm-plugins had a copy each, and the
+    // vocabulary owns the spelling of its own paths. Checked here because this
+    // bundle depends on it: a joint path is UsdSkelAnimation's own spelling
+    // and the joint is its leaf, so "hips/spine/chest" is the chest and not
+    // something named after the whole path.
+    using openstrata::motion::FindHumanJointByPath;
+    assert(FindHumanJointByPath("hips") == openstrata::motion::HumanJoint::Hips);
+    assert(FindHumanJointByPath("hips/spine") == openstrata::motion::HumanJoint::Spine);
+    assert(FindHumanJointByPath("hips/spine/chest/neck/head") ==
            openstrata::motion::HumanJoint::Head);
 
     // A path whose leaf is not a canonical joint maps to nothing, and so does a
     // trailing separator -- which names no leaf at all.
-    assert(!execmotion::JointForPath("prop").has_value());
-    assert(!execmotion::JointForPath("hips/").has_value());
-    assert(!execmotion::JointForPath("").has_value());
+    assert(!FindHumanJointByPath("prop").has_value());
+    assert(!FindHumanJointByPath("hips/").has_value());
+    assert(!FindHumanJointByPath("").has_value());
 
     // The names are the canonical ones, so a differently-cased spelling is a
-    // different name rather than the same joint. Nothing normalizes here: the
-    // one table lives in motionCore and a second, laxer one in this bundle is
-    // exactly the duplicate the workspace forbids.
-    assert(!execmotion::JointForPath("Hips").has_value());
+    // different name rather than the same joint. Nothing normalizes.
+    assert(!FindHumanJointByPath("Hips").has_value());
 }
 
 void
@@ -113,11 +116,11 @@ TestARepeatedJointIsNotCountedTwice()
 
 // The fixture clip, as plain values: four canonical joints, one joint that names
 // none, and a rotation on the head so a pose that dropped the frame is visible.
-execmotion::ClipSample
+execmotion::MotionStageSample
 FourBonesAndAProp()
 {
-    execmotion::ClipSample sample;
-    sample.jointPaths = {"hips", "hips/spine", "hips/spine/chest", "hips/spine/chest/neck/head",
+    execmotion::MotionStageSample sample;
+    sample.jointTokens = {"hips", "hips/spine", "hips/spine/chest", "hips/spine/chest/neck/head",
                          "prop"};
     sample.rotations = {pxr::GfQuatf(1.0f, pxr::GfVec3f(0.0f)),
                         pxr::GfQuatf(1.0f, pxr::GfVec3f(0.0f)),
@@ -137,7 +140,7 @@ void
 TestTheFrameBecomesASecond()
 {
     const std::optional<openstrata::motion::MotionPose> pose =
-        execmotion::PoseFromClipSample(FourBonesAndAProp());
+        execmotion::PoseFromStageSample(FourBonesAndAProp());
     assert(pose.has_value());
 
     // 100 frames at 50 time codes per second is two seconds. This is the one
@@ -159,31 +162,31 @@ TestTheFrameBecomesASecond()
 void
 TestNoRateIsARefusalAndNotAZero()
 {
-    execmotion::ClipSample sample = FourBonesAndAProp();
+    execmotion::MotionStageSample sample = FourBonesAndAProp();
     sample.timeCodesPerSecond = 0.0;
-    assert(!execmotion::PoseFromClipSample(sample).has_value());
+    assert(!execmotion::PoseFromStageSample(sample).has_value());
 
     // A negative rate is the same refusal rather than a negative second: a clip
     // that states one has not said anything this layer can use.
     sample.timeCodesPerSecond = -50.0;
-    assert(!execmotion::PoseFromClipSample(sample).has_value());
+    assert(!execmotion::PoseFromStageSample(sample).has_value());
 
     // The refusal is about the rate alone, so a rate with no frame beside it is
     // still a pose -- see below for what the frame's absence means.
     sample.timeCodesPerSecond = 50.0;
     sample.hasTimeCode = false;
-    assert(execmotion::PoseFromClipSample(sample).has_value());
+    assert(execmotion::PoseFromStageSample(sample).has_value());
 }
 
 void
 TestTheDefaultTimeCodeCarriesNoSecond()
 {
-    execmotion::ClipSample sample = FourBonesAndAProp();
+    execmotion::MotionStageSample sample = FourBonesAndAProp();
     sample.hasTimeCode = false;
     sample.timeCode = 100.0; // ignored: there is no numeric frame
 
     const std::optional<openstrata::motion::MotionPose> pose =
-        execmotion::PoseFromClipSample(sample);
+        execmotion::PoseFromStageSample(sample);
     assert(pose.has_value());
     assert(pose->timestamp == 0.0 && "a frame was read from a sample that says it has none");
 
@@ -195,11 +198,11 @@ TestTheDefaultTimeCodeCarriesNoSecond()
 void
 TestAnArrayThatDoesNotFitTheJointsIsNotGuessedAt()
 {
-    execmotion::ClipSample sample = FourBonesAndAProp();
+    execmotion::MotionStageSample sample = FourBonesAndAProp();
     sample.rotations.pop_back();
 
     const std::optional<openstrata::motion::MotionPose> pose =
-        execmotion::PoseFromClipSample(sample);
+        execmotion::PoseFromStageSample(sample);
     assert(pose.has_value());
 
     // Not four joints with one dropped: none at all. A clip whose rotation array
@@ -213,10 +216,10 @@ TestAnArrayThatDoesNotFitTheJointsIsNotGuessedAt()
     // usable at all.
     assert(pose->root.hasPosition);
 
-    execmotion::ClipSample noTranslations = FourBonesAndAProp();
+    execmotion::MotionStageSample noTranslations = FourBonesAndAProp();
     noTranslations.translations.clear();
     const std::optional<openstrata::motion::MotionPose> rotationsOnly =
-        execmotion::PoseFromClipSample(noTranslations);
+        execmotion::PoseFromStageSample(noTranslations);
     assert(rotationsOnly.has_value());
     assert(CountValid(*rotationsOnly) == 4);
     assert(!rotationsOnly->root.hasPosition &&
@@ -226,14 +229,14 @@ TestAnArrayThatDoesNotFitTheJointsIsNotGuessedAt()
 void
 TestARotationIsNormalizedOnTheWayIn()
 {
-    execmotion::ClipSample sample = FourBonesAndAProp();
+    execmotion::MotionStageSample sample = FourBonesAndAProp();
     // Twice the length, same direction: a clip may author a quaternion that has
     // drifted, and every consumer of a canonical pose is entitled to a rotation
     // rather than to a scaled one.
     sample.rotations[3] = pxr::GfQuatf(1.4142136f, pxr::GfVec3f(0.0f, 1.4142136f, 0.0f));
 
     const std::optional<openstrata::motion::MotionPose> pose =
-        execmotion::PoseFromClipSample(sample);
+        execmotion::PoseFromStageSample(sample);
     assert(pose.has_value());
     const pxr::GfQuatf& head =
         pose->localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Head)];
@@ -263,6 +266,25 @@ PoseWithHeadAndHips(double timestamp, float headAngleDeg, const pxr::GfVec3f& hi
     pose.root.worldPosition = hips;
     pose.root.hasPosition = true;
     return pose;
+}
+
+// A rotation about X, and the angle of any rotation. Both mirror
+// `HeadAngleDegrees` below rather than reaching for GfRotation: the clamp is
+// the point, because acos at zero is where a quaternion test loses its
+// precision.
+pxr::GfQuatf
+RotationX(float degrees)
+{
+    const float radians = degrees * float(M_PI) / 180.0f;
+    return pxr::GfQuatf(std::cos(radians * 0.5f),
+                        pxr::GfVec3f(std::sin(radians * 0.5f), 0.0f, 0.0f));
+}
+
+float
+AngleDegrees(const pxr::GfQuatf& rotation)
+{
+    const double w = std::min(1.0, std::max(-1.0, double(rotation.GetNormalized().GetReal())));
+    return float(2.0 * std::acos(w) * 180.0 / M_PI);
 }
 
 float
@@ -354,6 +376,70 @@ TestEachPolicyFieldReachesTheOptionItNames()
     assert(held.root.worldPosition == pose.root.worldPosition);
     assert(std::abs(HeadAngleDegrees(held) -
                     HeadAngleDegrees(execmotion::FilteredPose(prior, pose, {}))) < 1e-4f);
+}
+
+// `motion:filter:rootOrientation` used to be authored and do nothing, because
+// the copy of the sampling rule this bundle carried never set
+// `root.hasOrientation`. `PoseFromStageSample` does (MOTION_CONTRACT.md §5.3),
+// so the flag names a field a clip-sourced pose carries and turning it on
+// changes the answer. That change is the point of the switch, and this is
+// where it is pinned: `execMotion_filter`'s fixture leaves its hips unturned.
+void
+TestTheRootOrientationFlagIsNoLongerInert()
+{
+    // Both ends must report an orientation for `PoseFilter` to smooth one, so
+    // both of these are built through the seam rather than by hand.
+    execmotion::MotionStageSample priorSample;
+    priorSample.jointTokens = {"hips", "hips/spine/chest/neck/head"};
+    priorSample.rotations = {pxr::GfQuatf(1.0f), pxr::GfQuatf(1.0f)};
+    priorSample.timeCode = 49.0;
+    priorSample.hasTimeCode = true;
+    priorSample.timeCodesPerSecond = 50.0;
+
+    execmotion::MotionStageSample sample = priorSample;
+    sample.rotations = {RotationX(60.0f), RotationX(45.0f)};
+    sample.timeCode = 50.0;
+
+    const std::optional<openstrata::motion::MotionPose> prior =
+        execmotion::PoseFromStageSample(priorSample);
+    const std::optional<openstrata::motion::MotionPose> pose =
+        execmotion::PoseFromStageSample(sample);
+    assert(prior && pose);
+    assert(prior->root.hasOrientation && pose->root.hasOrientation &&
+           "a clip-sourced pose carries no root orientation, so the switch to "
+           "PoseFromStageSample did not take");
+
+    constexpr double kTwoPi = 6.2831853071795862;
+    const double weight = 1.0 - std::exp(-kTwoPi * 6.0 * 0.02);
+
+    // A clip that authors **nothing** is the case that changed, and it is the
+    // common one: `PoseFilter::Options::filterRootOrientation` defaults to
+    // true, so the root orientation is smoothed now where before there was no
+    // orientation to smooth. It takes the same slerp step as every other
+    // rotation, and lands with the hips' own local rotation because the two
+    // are the same value going in (MOTION_CONTRACT.md §5.3).
+    const openstrata::motion::MotionPose smoothed =
+        execmotion::FilteredPose(*prior, *pose, {});
+    assert(std::abs(AngleDegrees(smoothed.root.worldOrientation) - float(60.0 * weight)) < 1e-2f &&
+           "a clip that authors no filter policy did not smooth its root "
+           "orientation, so the field is still not reaching PoseFilter");
+    assert(std::abs(AngleDegrees(smoothed.localRotations[static_cast<std::size_t>(
+                        openstrata::motion::HumanJoint::Hips)]) -
+                    float(60.0 * weight)) < 1e-2f);
+
+    // Off: the orientation is carried through unsmoothed while the hips' own
+    // local rotation still takes its step. The two disagreeing is what says
+    // the flag reaches exactly the field it names, and nothing else.
+    execmotion::FilterPolicy heldOrientation;
+    heldOrientation.filterRootOrientation = false;
+    const openstrata::motion::MotionPose unsmoothed =
+        execmotion::FilteredPose(*prior, *pose, heldOrientation);
+    assert(std::abs(AngleDegrees(unsmoothed.root.worldOrientation) - 60.0f) < 1e-2f &&
+           "the root orientation was smoothed although the clip said not to");
+    assert(std::abs(AngleDegrees(unsmoothed.localRotations[static_cast<std::size_t>(
+                        openstrata::motion::HumanJoint::Hips)]) -
+                    float(60.0 * weight)) < 1e-2f &&
+           "turning off root filtering stopped the hips' local rotation too");
 }
 
 // ---------------------------------------------------------------------------
@@ -1140,6 +1226,7 @@ main()
     TestFilteringAgainstYourselfChangesNothing();
     TestAnAbsentPolicyIsTheLibrarysOwn();
     TestEachPolicyFieldReachesTheOptionItNames();
+    TestTheRootOrientationFlagIsNoLongerInert();
     TestADropoutDoesNotSurviveTheRoundTrip();
     TestTheIntakeTokenTableIsTheLibrarysEnum();
     TestAnAbsentIntakeIsTheLibrarysOwn();

@@ -468,7 +468,15 @@ def purity_import_errors(library: pathlib.Path) -> list[str]:
 # `usdmotion_require_openexec()` probes for, plus the base and stage-value
 # libraries under them. A new OpenUSD library is one line here, on purpose:
 # imaging, for one, is the presentation layer's and not a computation's.
+#
+# `usdGeom` is here for a reason worth stating, because nothing in this bundle
+# uses it: `motionUsd` links it PUBLIC for the writer's `UsdGeomScope` and
+# stage metrics, and this bundle links `motionUsd` for `PoseFromStageSample`.
+# It is transitive and unused rather than reached for. Closing it would mean
+# splitting `motionUsd`'s reading half out of its writer's link line, which is
+# a bigger change than the edge is worth today.
 OPENUSD_ALLOWED = {"arch", "tf", "gf", "vt", "plug", "sdf", "usd", "usdSkel",
+                   "usdGeom",
                    "vdf", "ef", "esf", "esfUsd", "exec", "execUsd"}
 
 
@@ -568,7 +576,7 @@ def main() -> int:
     errors += link_errors(
         "execMotion", sys.argv[3],
         {"motionCore::motionCore", "motionSampling::motionSampling",
-         "motionRecording::motionRecording"})
+         "motionRecording::motionRecording", "motionUsd::motionUsd"})
     errors += schema_errors("execMotion", source)[1]
 
     # Vendor-neutral by specification, and downstream of nothing: the

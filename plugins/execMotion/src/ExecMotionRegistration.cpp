@@ -221,13 +221,13 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
         .Callback<openstrata::motion::MotionPose>(
             +[](const VdfContext& ctx)
             {
-                execmotion::ClipSample sample;
+                execmotion::MotionStageSample sample;
 
                 VdfReadIterator<TfToken> joint(ctx, _tokens->joints);
-                sample.jointPaths.reserve(joint.ComputeSize());
+                sample.jointTokens.reserve(joint.ComputeSize());
                 for (; !joint.IsAtEnd(); ++joint)
                 {
-                    sample.jointPaths.push_back(joint->GetString());
+                    sample.jointTokens.push_back(joint->GetString());
                 }
 
                 // Neither of the next two is `.Required()`, so an unconnected input
@@ -268,7 +268,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(UsdSkelAnimation)
                 }
 
                 if (std::optional<openstrata::motion::MotionPose> pose =
-                        execmotion::PoseFromClipSample(sample))
+                        execmotion::PoseFromStageSample(sample))
                 {
                     ctx.SetOutput(*pose);
                     return;

@@ -83,13 +83,21 @@ motionRetarget ──→ motionCore
 motionUsd ───────→ motionCore, motionSampling, OpenUSD (usd, sdf, usdSkel)
 motionSource ────→ motionCore
 motionBvh ───────→ motionSource
-execMotion ──────→ motionCore, motionSampling, motionRecording, OpenExec
+execMotion ──────→ motionCore, motionSampling, motionRecording, motionUsd,
+                   OpenExec
 tools/* ─────────→ the libraries they name (motion_convert: motionBvh,
                    motionSource, motionUsd; motion_record: motionRecording,
                    motionSampling, motionUsd), OpenUSD stage authoring
 ```
 
 This is the design policy's §24 with the recorded-source pair added.
+`execMotion` reaches `motionUsd` for one call, `PoseFromStageSample`
+([USD_MAPPING.md §7](../design/USD_MAPPING.md#7-reading-usd-back)): the rule
+that turns a `UsdSkelAnimation`'s already-resolved arrays into a pose. It does
+not make the bundle a stage reader — the values arrive through exec inputs and
+the call takes values — but it is the one edge here into a library that holds
+stage API, and it carries OpenUSD's `usdGeom` in transitively, which nothing
+in the bundle uses.
 `motionRetarget` depends on `motionCore` alone (WS-O2, decided 2026-09-19).
 `usd-vrm-plugins`' `vrmRetarget` also depended on its runtime library, for one
 resample option; the option was removed on arrival, and a caller that wants a

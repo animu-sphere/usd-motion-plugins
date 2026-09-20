@@ -127,6 +127,21 @@ NearestPresentAncestor(HumanJoint joint, const std::bitset<HumanJointCount>& pre
 MOTIONCORE_API std::string HumanJointPath(HumanJoint joint,
                                               const std::bitset<HumanJointCount>& present);
 
+// `HumanJointPath`'s inverse: the joint a semantic joint path names, by its
+// last segment. Nullopt for a path whose leaf is no joint of the vocabulary,
+// and for an empty leaf.
+//
+// It is the documented inverse and not a name heuristic: a path is built here
+// and read back here. Which segment carries the name is the vocabulary's
+// business, so the rule lives beside the vocabulary rather than in each
+// reader -- `motionUsd` reading a stage and `execMotion` reading an exec
+// input had a copy each, and `usd-vrm-plugins` had two more.
+//
+// The leaf alone is compared, whatever precedes it: a path a rig spells with
+// extra joints between two vocabulary ones still names its leaf, and the
+// caller that cares about the chain reads the path itself.
+MOTIONCORE_API std::optional<HumanJoint> FindHumanJointByPath(std::string_view path) noexcept;
+
 enum class MotionSourceKind : std::uint8_t
 {
     Clip,

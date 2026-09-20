@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <set>
-#include <string_view>
 
 namespace openstrata::motion
 {
@@ -34,23 +33,6 @@ const pxr::TfToken kChannelValue("motion:channelValue");
 const pxr::TfToken kRate("motion:timeCodesPerSecond");
 const pxr::TfToken kMotion("motion");
 const pxr::TfToken kSource("source");
-
-// The semantic joint tokens the motion contract defines are paths whose leaf
-// is the joint name (`hips`, `hips/spine`, `hips/spine/chest`). Reading the
-// leaf back is the documented inverse, not a name heuristic.
-std::optional<HumanJoint>
-JointForToken(const std::string& jointToken)
-{
-    const std::size_t separator = jointToken.rfind('/');
-    const std::string_view leaf = separator == std::string::npos
-                                      ? std::string_view(jointToken)
-                                      : std::string_view(jointToken).substr(separator + 1);
-    if (leaf.empty())
-    {
-        return std::nullopt;
-    }
-    return FindHumanJoint(leaf);
-}
 
 // Finds the skeleton to read against: the named one, otherwise the first
 // `UsdSkelSkeleton` in stage order. Reporting which one is what makes a
@@ -280,7 +262,7 @@ PoseFromStageSample(const MotionStageSample& sample)
 
     for (std::size_t i = 0; i < jointCount; ++i)
     {
-        const std::optional<HumanJoint> joint = JointForToken(sample.jointTokens[i]);
+        const std::optional<HumanJoint> joint = FindHumanJointByPath(sample.jointTokens[i]);
         if (!joint)
         {
             continue;
@@ -394,7 +376,7 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     for (const pxr::TfToken& joint : animationJoints)
     {
         jointTokens.push_back(joint.GetString());
-        if (JointForToken(jointTokens.back()))
+        if (FindHumanJointByPath(jointTokens.back()))
         {
             ++recognized;
         }

@@ -12,22 +12,6 @@
 namespace execmotion
 {
 
-std::optional<openstrata::motion::HumanJoint>
-JointForPath(const std::string& jointPath)
-{
-    // A joint path is `parent/child/leaf`; the joint is the leaf. A path with no
-    // separator is already a leaf, which is what a flat rig authors.
-    const std::size_t slash = jointPath.rfind('/');
-    const std::string_view leaf = slash == std::string::npos
-                                      ? std::string_view(jointPath)
-                                      : std::string_view(jointPath).substr(slash + 1);
-    if (leaf.empty())
-    {
-        return std::nullopt;
-    }
-    return openstrata::motion::FindHumanJoint(leaf);
-}
-
 openstrata::motion::MotionPose
 IdentityPoseForJoints(const std::vector<std::string>& jointPaths)
 {
@@ -37,70 +21,12 @@ IdentityPoseForJoints(const std::vector<std::string>& jointPaths)
     // which joints the clip named -- it authors no rotation at all.
     for (const std::string& jointPath : jointPaths)
     {
-        if (const std::optional<openstrata::motion::HumanJoint> joint = JointForPath(jointPath))
+        if (const std::optional<openstrata::motion::HumanJoint> joint =
+                openstrata::motion::FindHumanJointByPath(jointPath))
         {
             pose.validRotations.set(static_cast<std::size_t>(*joint));
         }
     }
-    return pose;
-}
-
-std::optional<openstrata::motion::MotionPose>
-PoseFromClipSample(const ClipSample& sample)
-{
-    if (!(sample.timeCodesPerSecond > 0.0))
-    {
-        return std::nullopt;
-    }
-
-    openstrata::motion::MotionPose pose;
-
-    // The default time code is not frame zero, and this is the one place the
-    // difference does not produce a wrong number: a pose resolved outside a
-    // timeline carries no second, `timestamp` has no absent state, and frame
-    // zero converts to 0.0 at every rate -- so "no time" and "the first frame"
-    // are the same value here whatever the clip's rate is. What differs between
-    // the two is which values USD resolved, and that happened before this call.
-    if (sample.hasTimeCode)
-    {
-        pose.timestamp = sample.timeCode / sample.timeCodesPerSecond;
-    }
-
-    const std::size_t jointCount = sample.jointPaths.size();
-    const bool rotationsUsable = sample.rotations.size() == jointCount;
-    const bool translationsUsable = sample.translations.size() == jointCount;
-
-    for (std::size_t i = 0; i < jointCount; ++i)
-    {
-        const std::optional<openstrata::motion::HumanJoint> joint =
-            JointForPath(sample.jointPaths[i]);
-        if (!joint)
-        {
-            continue;
-        }
-        const auto slot = static_cast<std::size_t>(*joint);
-
-        if (rotationsUsable)
-        {
-            // Normalized on the way in, like the offline reader: a clip may
-            // author a quaternion that has drifted off the unit sphere, and
-            // every consumer of a canonical pose is entitled to a rotation.
-            pose.localRotations[slot] = sample.rotations[i].GetNormalized();
-            pose.validRotations.set(slot);
-        }
-
-        // Only the hips carry body translation. A `translations` array states
-        // one per joint, but the rest of it is the rest pose the source rig was
-        // authored with, which a retargeter re-derives for the rig it is aiming
-        // at (motion contract; usd-vrm-plugins' motion_retarget reads a
-        // clip the same way).
-        if (translationsUsable && *joint == openstrata::motion::HumanJoint::Hips)
-        {
-            pose.root.worldPosition = sample.translations[i];
-            pose.root.hasPosition = true;
-        }
-    }
-
     return pose;
 }
 

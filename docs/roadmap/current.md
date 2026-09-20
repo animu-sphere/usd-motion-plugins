@@ -135,10 +135,14 @@ was removed in the adapting commit rather than carried
 - ✅ The `Channels` prim is authored as well as read, which is the other half
   of USD-O4 and what makes the round trip checkable. A channel is read back
   only where the stage keyed it, because USD holds the last key forward.
-- ⬜ `execMotion` still carries `PoseFromClipSample`, the copy this ends.
-  Switching it over adds a `motionUsd` edge
-  ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository))
-  and is a change of its own.
+- ✅ `execMotion` calls it and holds no copy (2026-09-20, in a change of its
+  own). The `motionUsd` edge is drawn in
+  [WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository),
+  and the switch changed what two nodes answer
+  ([USD_MAPPING.md §7.1](../design/USD_MAPPING.md#71-what-the-shared-rule-changed-for-execmotion)):
+  `motion.filterPose` smooths the root orientation, by default, and
+  `motion.extractRootMotion` carries one. The goldens did not move, because no
+  fixture turns its hips.
 - ⬜ `usd-vrm-plugins` deletes `StageIo`'s reading half in its consuming
   change, which waits on `ost` (its report 41). The bake stays there.
 
