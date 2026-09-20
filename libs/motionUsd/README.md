@@ -52,8 +52,9 @@ and `customData.motion`.
 - **Times are the samples'.** A sample at `t` seconds is written at `t × 30`,
   snapped to a whole frame when within 1e-6 of one. Samples whose time codes do
   not increase are refused.
-- **What the mapping cannot hold yet is reported.** Channels wait for USD-O4's
-  attribute names and look-at targets have no place yet, so both are counted in
+- **What this writer does not author yet is reported.** The `Channels` prim's
+  names are decided (USD §4.3) but nothing authors it until the reading half
+  arrives, and look-at targets have no place at all yet, so both are counted in
   `MotionStageReport` rather than dropped in silence.
 
 ## Building

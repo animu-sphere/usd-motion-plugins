@@ -64,7 +64,7 @@ import, and WS-O2 and RT-O1 with the retarget's.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| USD-O4 | Channel attribute names | [USD §9](../design/USD_MAPPING.md#9-open-questions) | v0.2.0 |
+| USD-O4 | ✅ decided 2026-09-20: one prim per channel, `motion:channelName` (the semantic verbatim, and the key) and a time-sampled `motion:channelValue` | [USD §4.3](../design/USD_MAPPING.md#43-channels) | — |
 | MC-O5 | `MotionStream`'s public shape | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.3.0 |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |

@@ -1,7 +1,8 @@
 # USD mapping
 
 > Status: **proposed**, 2026-09-17. **§2–§5 are authored** by `motionUsd`
-> since 2026-09-19, except the `Channels` prim (USD-O4). §6–§7 are not
+> since 2026-09-19, except the `Channels` prim, whose names §4.3 decided on
+> 2026-09-20 and which nothing authors yet. §6–§7 are not
 > implemented here. `usd-vrm-plugins` authors two stages of this family: the
 > `.vrma` importer's and the capture recorder's semantic clip. It also bakes
 > retargeted animation onto avatars. `motionUsd`'s writer arrived from that
@@ -110,13 +111,56 @@ velocities explicitly is USD-O3.
 
 `MotionChannelSet` entries become one prim per channel under `Channels`,
 carrying the namespaced semantic verbatim and a time-sampled value.
-`usd-vrm-plugins` authors VRMA expressions as
-`/Animation/Expressions/<name>` with `vrm:expressionName`,
-`vrm:expressionType` and a time-sampled `vrm:expressionWeight`, and keeps the
-name attribute — not the prim path — as the key, because a sanitized path can
-differ from the name. The generic attribute names are USD-O4. Until it is
-decided, `motionUsd` authors no `Channels` prim and reports the channel names
-it did not author (`MotionStageReport::unauthoredChannels`).
+
+**USD-O4 is decided (2026-09-20).** One prim per channel, named from the
+channel's semantic sanitized into a valid prim name, and two attributes on it:
+
+| Attribute | Type | Content |
+| --- | --- | --- |
+| `motion:channelName` | `uniform string` | the namespaced semantic, **verbatim** — `vrm:happy`, not `vrm_happy` |
+| `motion:channelValue` | `float`, time-sampled | the channel's value (MC-O4: scalar only) |
+
+```usda
+def Scope "Channels"
+{
+    def "vrm_happy"
+    {
+        uniform string motion:channelName = "vrm:happy"
+        float motion:channelValue.timeSamples = {
+            0: 0.0,
+            30: 1.0,
+        }
+    }
+}
+```
+
+The prim is **typeless**, as `Bindings` is proposed to be (USD-O5): a channel
+is a name and a number, which namespaced properties on a typeless prim express
+without a schema (design policy §4.3).
+
+The name attribute, **not the prim path**, is the key. That is
+`usd-vrm-plugins`' measured rule for the same data — it authors VRMA
+expressions as `/Animation/Expressions/<name>` with `vrm:expressionName`,
+`vrm:expressionType` and a time-sampled `vrm:expressionWeight` — and the
+reason is that a sanitized path can differ from the name: `vrm:happy` and
+`vrm.happy` are two semantics that sanitize to one prim name. So the rule is
+two-sided, and both halves are required:
+
+- **A writer makes the prim names unique**, and a channel set it cannot author
+  under distinct names is an error rather than a stage with one channel
+  silently overwriting another.
+- **A reader keys on `motion:channelName`** and never on the prim's path.
+
+What does **not** come across is `vrm:expressionType`: it classifies a VRM
+expression, and a format's classification of its own channel belongs in that
+format's namespace, not in the generic mapping.
+
+`motionUsd` does not author the prim yet; it still reports the channel names
+it did not author (`MotionStageReport::unauthoredChannels`). Authoring them,
+and reading them back, arrive with the reading half in v0.2.0. That does not
+bump `contractVersion`: a consumer that read a stage without a `Channels` prim
+is unaffected by one gaining it, which is the §8 case that adds an optional
+prim.
 
 ## 5. Metadata
 
@@ -179,11 +223,10 @@ a stage bumps it; adding an optional prim or key does not.
 ## 9. Open questions
 
 USD-O1 (prim names, §2) and USD-O2 (time codes, §4.1) were decided on
-2026-09-19.
+2026-09-19, and USD-O4 (channel attribute names, §4.3) on 2026-09-20.
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
 | USD-O3 | Whether root orientation and velocities are authored explicitly, or only the hips translation | a consumer that reads them back |
-| USD-O4 | Generic channel attribute names under `/Animation/Channels` | the first channel `motionUsd` authors |
 | USD-O5 | The `Bindings` prim: typeless with namespaced properties, or a schema that passes design policy §4.3 | `usd-avatar-runtime`'s first composed scene |
 | USD-O6 | Whether `MOT-O2` in `usd-mmd-plugins` — a directly opened `.vmd` — can use this stage at all, since a VMD without a model has control-rig tracks, not body motion | that repository, with this mapping |
