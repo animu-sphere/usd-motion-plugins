@@ -1,6 +1,6 @@
 # Current — after v0.5.0
 
-Status: **v0.5.0 is prepared** (2026-09-20,
+Status: **v0.5.0 is published** (2026-09-20,
 [its record](../releases/v0.5.0.md)). Every identity the scope table numbered
 v0.1.0 through v0.5.0 has arrived and is published as a digest-pinned artifact.
 What remains is not more imports: it is the other side of the move, in the
@@ -39,15 +39,6 @@ release:
   VRM's with the names changed.
 - ⬜ **`motion-connectors` consumes `motionCore` and `motionRecording`**, which
   its remaining imports (`motionTracking` and the three adapters) all link.
-
-### The first publication has two unproven steps ⬜
-
-Both are in [the release record](../releases/v0.5.0.md) and are settled by
-running it, not by deciding anything:
-
-- ⬜ whether `GITHUB_TOKEN` may create this repository's first GHCR package,
-  or a PAT with `write:packages` is needed;
-- ⬜ the package's visibility flip, which is manual and one-time.
 
 ### Beyond the imports ⬜
 
