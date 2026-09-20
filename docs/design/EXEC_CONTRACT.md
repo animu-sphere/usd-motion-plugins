@@ -159,6 +159,17 @@ It is a **shim**: it duplicates stage metadata and can disagree with it. The
 rule that keeps it honest is on the writer: both values come from one number,
 and a writer that cannot state the rate writes neither.
 
+**EX-O2 is decided (2026-09-20, with the import of `execMotion`): it stays a
+namespaced convention and no schema registers it.** A schema is introduced
+only where a concept cannot be expressed with existing schemas, namespaced
+metadata or composition (design policy §4.3), and this is expressible: the
+writer authors a plain namespaced attribute and the node reads it by name,
+which `execMotion`'s suites measure end to end. Registering it would also be
+the wrong shape for what it is — a shim with a stated retirement condition, so
+a schema for it would outlive its reason and cost a migration to remove — and
+schema declaration is partitioned one declarer per session, which is a budget
+not to spend on a duplicate of stage metadata.
+
 ### 5.2 Policies: `motion:filter:*` and `motion:root:intake`
 
 | Attribute | Read by | Absent means |
@@ -265,7 +276,6 @@ Two cases have been measured.
 | Id | Question | Resolve by |
 | --- | --- | --- |
 | EX-O1 | Where the driver lives once a second caller needs it: a library here beside `execMotion`, or in `usd-avatar-runtime`, which owns scheduling | the second caller |
-| EX-O2 | Whether §5.1's rate becomes a registered attribute of a schema, or stays a namespaced convention until upstream retires it | the import of `execMotion` |
 | EX-O3 | Whether §5.2–§5.4's scene-side attributes wait for USD-O5's `Bindings` prim, or get names of their own first | USD-O5 |
 
 ## 8. Evidence

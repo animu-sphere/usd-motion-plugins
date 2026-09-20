@@ -9,7 +9,8 @@ bridge every avatar format and every motion source share.
 > proposed, and six libraries are imported: `motionCore` — the value types
 > every other library builds on — `motionSampling`, `motionRecording`,
 > `motionUsd`, `motionSource` and `motionBvh`, with `motion_convert`,
-> `motion_bvh_inspect`, `motion_record` and the producer profiles. The rest of the implementation arrives from
+> `motion_bvh_inspect`, `motion_record`, the producer profiles and the
+> `execMotion` bundle. The rest of the implementation arrives from
 > [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), where
 > it is built and measured today, one identity at a time
 > ([roadmap](docs/roadmap/current.md)); how to build the tree is in
@@ -48,7 +49,7 @@ Every one of them depends on this repository, and it depends on none of them.
 | `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` | v0.1.0, v0.2.0 |
 | `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy (imported 2026-09-19) | v0.2.0 |
 | `motionSource`, `motionBvh` | recorded sources through declarative producer profiles | v0.4.0 |
-| `execMotion` | optional OpenExec nodes over the same libraries | v0.5.0 |
+| `execMotion` | optional OpenExec nodes over the same libraries (imported 2026-09-20) | v0.5.0 |
 
 Identities and dependency directions are fixed in
 [docs/architecture/WORKSPACE.md](docs/architecture/WORKSPACE.md); which release

@@ -2,7 +2,9 @@
 
 Status: 🚧 documentation baseline done (2026-09-17); scaffold done
 (2026-09-19), its CI rendered with the first import; v0.1.0 🚧 — `motionCore`,
-`motionSampling` and `motionRecording` imported (2026-09-19).
+`motionSampling` and `motionRecording` imported (2026-09-19). Every later
+release's identities have arrived ahead of it as well, the last on 2026-09-20:
+what remains to publish is the releases themselves.
 
 Migration Phase A is *define the public contracts*
 ([DESIGN_POLICY.md §37](../design/DESIGN_POLICY.md#37-migration-from-usd-vrm-plugins)).
@@ -89,8 +91,10 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   — 2026-09-19. `SampleClip`, `PoseFilter::Step`, an N-way blend that answers
   nullopt when there is nothing to blend, and `ConditionRootMotion`. The
   streaming classes call these functions, so each rule has one
-  implementation. `usd-vrm-plugins`' `execMotion` can drop its wrapper code
-  when it switches to these packages.
+  implementation. `execMotion` arrived on 2026-09-20 and calls them, so the
+  wrapper code the findings were about is gone rather than moved; the copy in
+  `usd-vrm-plugins` drops it when that repository switches to these
+  packages.
 - ⬜ Reproduce the parity evidence named by `usd-vrm-plugins`' MIG-0 against
   this repository's packages, so that repository can delete its copies.
 - ⬜ `usd-mmd-plugins`' `mmdMotionAdapter` configures against the installed
@@ -150,6 +154,46 @@ second copy. It still ships as v0.3.0's scope, with the published
   resolved through a `UsdSkelSkeletonQuery`, the claim the leg rested on.
 - ⬜ `usd-vrm-plugins` deletes `tools/motionCapture` in its consuming change,
   which waits on `ost` (its report 41).
+
+### Arrived ahead of its release: v0.5.0's `execMotion` ✅ (2026-09-20)
+
+`usd-vrm-plugins`' `execMotion` was imported with its history (that
+repository's MIG-2, its last item). 13 commits arrived through
+`git filter-repo` into `plugins/execMotion/`, the directory
+[WORKSPACE.md §1.2](../architecture/WORKSPACE.md#12-bundles-tools-and-data)
+reserved, and the rename and the workspace join followed. It is the first
+bundle here. It depends only on `motionCore`, `motionSampling` and
+`motionRecording`, all of which have arrived, and importing it now shortens
+the time `usd-vrm-plugins` holds a second copy. It still ships as v0.5.0's
+scope.
+
+- ✅ Each node is one library call, because the four sampling findings this
+  bundle raised were fixed before it arrived: `PoseFilter::Step`,
+  `ConditionRootMotion`, `SampleClip` and an N-way `BlendPoses` that answers
+  `std::optional`. What the library answers where a node refuses is pinned in
+  `execMotion_pose`, and it changed with them — nothing weighted is nullopt
+  now, and a NaN weight counts as no weight.
+- ✅ The one thing the graph still cannot carry is the filter's state.
+  `StepResult::state` is richer than the pose it returns, an exec
+  computation's value is a pose, and no node publishes the state as a value of
+  its own — so a driver hands the result back as the next prior pose and a
+  joint returning after a dropout is passed through rather than slerped. The
+  difference is measured, not assumed.
+- ✅ It is **optional**, and it is the only member that needs OpenExec.
+  `usdmotion_require_openexec()` moved into `cmake/UsdMotionOpenUsd.cmake` and
+  this bundle alone calls it, so a runtime without the exec libraries still
+  builds every library and tool; `USDMOTION_BUILD_EXEC_MOTION=OFF` leaves the
+  bundle out.
+- ✅ EX-O2 is decided with it
+  ([EXEC_CONTRACT.md §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)):
+  `motion:timeCodesPerSecond` stays a namespaced convention and no schema
+  registers it.
+- ✅ CI gained one cell, `execmotion-pr-linux`, for what a workspace cell
+  cannot reach: the standalone `ost plugin build` and the L0–L5 pyramid, whose
+  golden roundtrip over eight fixtures no CTest suite runs.
+- ⬜ `usd-vrm-plugins` deletes `plugins/execMotion` in its consuming change,
+  which waits on `ost` (its report 41). Its `execVrm` stays there and reaches
+  these nodes by name, as it does today.
 
 ## Completion criteria
 

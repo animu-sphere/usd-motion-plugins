@@ -33,7 +33,7 @@ and `usd-mmd-plugins` as its Phase 9.
 | v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half — **imported 2026-09-19** —, the reading half of `StageIo` (vrm MIG-2) | C | 🚧 |
 | v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) — **imported 2026-09-19** as `motion_record` | E | 🚧 |
 | v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | 🚧 |
-| v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item | — | ⬜ |
+| v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item — **imported 2026-09-20** | — | 🚧 |
 | later | generic NPZ payload contract, IK-assisted retarget, contacts, blending beyond the imported one, generator interfaces, Python | — | F follows the imports | ⬜ |
 
 **Where this departs from the design policy's §35, and why.** The code
@@ -70,7 +70,7 @@ import, and WS-O2 and RT-O1 with the retarget's.
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |
 | MC-O6 | Tracking state | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a live producer |
 | MC-O4 | A non-scalar channel's value type | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | the first non-scalar channel |
-| EX-O2 | The rate attribute: schema or namespaced convention | [EXEC §7](../design/EXEC_CONTRACT.md#7-open-questions) | the import of `execMotion` |
+| EX-O2 | ✅ decided 2026-09-20 with the import: a namespaced convention | [EXEC §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond) | — |
 | EX-O3 | Scene-side evaluation attributes before or with `Bindings` | [EXEC §7](../design/EXEC_CONTRACT.md#7-open-questions) | USD-O5 |
 | EX-O1 | Where the exec driver lives | [EXEC §7](../design/EXEC_CONTRACT.md#7-open-questions) | a second caller |
 | RT-O4 | Bind transforms in the descriptor | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | a consumer |

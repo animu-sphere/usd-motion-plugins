@@ -34,7 +34,7 @@ beside each component, and two build modes, `ost` and plain CMake.
 
 | Identity | Kind | Directory | Role | Arrives from | Status |
 | --- | --- | --- | --- | --- | --- |
-| `execMotion` | optional plugin bundle (`usd-exec`) | `plugins/execMotion/` | vendor-neutral OpenExec nodes, each a thin wrapper over a library call (design policy §21) | `usd-vrm-plugins` `execMotion` | reserved |
+| `execMotion` | optional plugin bundle (`usd-exec`) | `plugins/execMotion/` | vendor-neutral OpenExec nodes, each a thin wrapper over a library call (design policy §21) | `usd-vrm-plugins` `execMotion` | **imported** 2026-09-20, with history (release v0.5.0); the only member that needs OpenExec, and `USDMOTION_BUILD_EXEC_MOTION=OFF` builds the workspace without it |
 | `motion_inspect` | CLI | `tools/motionInspect/` | reports on a motion stage or clip | new | reserved |
 | `motion_convert` | CLI | `tools/motionConvert/` | a recorded source + a named profile → a motion stage | `usd-vrm-plugins` `motion_bvh_convert` | **imported** 2026-09-19, with history (release v0.4.0); it authors through `motionUsd` |
 | `motion_bvh_inspect` | CLI | `tools/motionBvhInspect/` | what a BVH file holds, and which profiles fit it | `usd-vrm-plugins` `motion_bvh_inspect` | **imported** 2026-09-19, with history (release v0.4.0) |
@@ -83,7 +83,7 @@ motionRetarget ──→ motionCore
 motionUsd ───────→ motionCore, motionSampling, OpenUSD (usd, sdf, usdSkel)
 motionSource ────→ motionCore
 motionBvh ───────→ motionSource
-execMotion ──────→ motionCore, motionSampling, motionRetarget, OpenExec
+execMotion ──────→ motionCore, motionSampling, motionRecording, OpenExec
 tools/* ─────────→ the libraries they name (motion_convert: motionBvh,
                    motionSource, motionUsd; motion_record: motionRecording,
                    motionSampling, motionUsd), OpenUSD stage authoring

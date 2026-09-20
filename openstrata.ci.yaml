@@ -38,7 +38,7 @@
 # and so macOS's bash 3.2 never meets an empty "${openusd_args[@]}" under
 # `set -u` (usd-mmd-plugins' first CI run failed on exactly that).
 #
-# Cell inventory -- four:
+# Cell inventory -- five:
 #   * workspace-graph-pr: the WORKSPACE.md §2 dependency gate
 #     (`ost plugin test --workspace --graph-only`), before anything builds.
 #   * workspace-pr-{windows,macos-arm64,linux}: the root CMake tree and its
@@ -46,10 +46,21 @@
 #     motionSampling, motionRecording, with the trace corpus and its
 #     generator check, motionRetarget, motionUsd, motionSource, motionBvh
 #     with its corpus),
-#     the two BVH tools' suites, motion_record's replay, the
+#     the two BVH tools' suites, motion_record's replay, execMotion's seam,
+#     mechanism and node suites, the
 #     producer-profile check, the docs check and its self-test, and the installed-consumer lane
 #     (workspace_installed_consumer), which installs the tree and configures a
 #     consumer outside the repository.
+#   * execmotion-pr-linux: the workspace's one bundle, built STANDALONE --
+#     `ost plugin build plugins/execMotion` against a pulled runtime with no
+#     root CMake tree in scope -- and its L0-L5 pyramid, whose golden
+#     roundtrip over eight fixtures no CTest suite runs. Neither is reachable
+#     from a workspace cell. One platform rather than three: the workspace
+#     cells already build the bundle on all three, so what this adds is the
+#     standalone configure path (including the OpenExec probe reached through
+#     a bundle's own CMakeLists) and the goldens, and neither differs by
+#     platform. This workspace publishes no package yet, so no cell runs
+#     `ost plugin package`.
 schema: 1
 
 bootstrap:
@@ -75,6 +86,26 @@ runners:
       acknowledgement: required
 
 cells:
+  - name: execmotion-pr-linux
+    lane: pull_request
+    runner: linux-hosted
+    runtime_artifact: sha256:3bf31789daa60ef650df35ab276bd67d0c0ee44a960311f78835cc0962efe261
+    runtime_remote:
+      uri: oci://ghcr.io/animu-sphere/openstrata-runtime-cy2026-usd@sha256:8d2d599489ee623044f4360ad3a2b979e2966e6ad2f949e5aa9083570e59cc4f
+      expected_oci_digest: sha256:8d2d599489ee623044f4360ad3a2b979e2966e6ad2f949e5aa9083570e59cc4f
+    bundle: plugins/execMotion
+    platform: cy2026
+    profile: usd
+    require_openusd: cy2026/linux/x86_64/gl
+    require_openusd_version: "26.08"
+    # L4 opens a fixture through Usd.Stage.Open, so the pyramid needs an
+    # interpreter.
+    host_python: "3.13"
+    # MaterialX 1.39.5 (OpenUSD 26.08) hard-requires X11 on Linux; see header.
+    host_packages:
+      apt: [libx11-dev, libxt-dev]
+    up_to: 5
+
   - name: workspace-graph-pr
     kind: workspace
     lane: pull_request
