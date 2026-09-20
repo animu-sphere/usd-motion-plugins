@@ -1,0 +1,79 @@
+# OpenStrata plugin bundle manifest.
+manifest:
+  schema: openstrata.plugin/v1alpha1
+plugin:
+  name: execMotion
+  version: 0.9.0
+  kind: usd-exec
+license: Apache-2.0
+runtime:
+  # The one OpenUSD version this plugin supports; see usdVrmFileFormat's
+  # manifest for why the tolerated range was retired in v0.6.0. This bundle is
+  # the first that would not build at all without the OpenExec half of it.
+  openusd: "==26.08"
+  cxx_abi: inherit
+provides:
+  # One schema, and exactly one plugin in a session may declare it. 26.08 keys
+  # its Exec.Schemas metadata by schema type and refuses a second declarer with
+  # a coding error, dropping that plugin's computations for the schema -- so
+  # `UsdSkelAnimation` belongs to this bundle and `execVrm` reaches an animation
+  # through an input rather than by registering on it (WORKSPACE.md §2).
+  - usd-exec:UsdSkelAnimation
+requires:
+  capabilities: [usd-stage-read]
+  libraries:
+    # The vendor-neutral half of the motion layer, and the one every node needs:
+    # a computation is a thin wrapper, so the value that crosses the boundary is
+    # motionCore's own (WORKSPACE.md §2, motion policy §11).
+    #
+    # `motion.sampleAnimation` does not change that, which was a surprise rather
+    # than a plan. An exec input arrives already resolved at the evaluated frame,
+    # so the node interpolates nothing and has no `motionRuntime` call to wrap
+    # (docs/reports/openusd/26.08-openexec-sampling.md §5).
+    - id: motionCore
+      version: ">=0.9,<0.10"
+    # And the runtime half, from `motion.filterPose` onward: the node is one
+    # step of `motion::PoseFilter` and the algorithm stays in the library. The
+    # state that filter normally keeps does not come with it -- an OpenExec
+    # callback is pure, so the prior pose is an input the driver supplies
+    # (README, "A filter is a recurrence").
+    #
+    # `motion.extractRootMotion` needs it for the vocabulary rather than for a
+    # call: `motion::RootMotionIntake` and `LiveCaptureConfig`'s default are the
+    # library's, and the rule they select sits in a private method of a capture
+    # session with no entry point a pure computation can reach -- the third
+    # finding this bundle has produced for boundary consolidation.
+    #
+    # `motion.interpolatePose` needs it for both a call and a type: the node is
+    # `motion::ClipSource::Sample` over a driver's history, and it answers the
+    # library's own `motion::PoseSampleResult` whole, because the status in it
+    # is part of the answer. That type's `operator==`, which the registry
+    # requires, was added after the v0.8.0 tag, which is why v0.9.0 is a minor
+    # release: this range excludes the 0.8.0 package that lacks it
+    # (PACKAGE_CONTRACT.md §3.1).
+    #
+    # `motion.blendPoses` needs it for a call and nothing else: the node is the
+    # N-way `motion::BlendPoses` over the clips a relationship targets.
+    - id: motionRuntime
+      version: ">=0.9,<0.10"
+usd:
+  plug_info: plugin/resources/execMotion/plugInfo.json
+tests:
+  smoke:
+    - tests/fixtures/identity_clip.usda
+    - tests/fixtures/sampled_clip.usda
+    - tests/fixtures/static_clip.usda
+    - tests/fixtures/unrated_clip.usda
+    - tests/fixtures/filtered_clip.usda
+    - tests/fixtures/rooted_clip.usda
+    - tests/fixtures/blended_clips.usda
+    - tests/fixtures/displayed_clip.usda
+  roundtrip:
+    - tests/fixtures/identity_clip.usda
+    - tests/fixtures/sampled_clip.usda
+    - tests/fixtures/static_clip.usda
+    - tests/fixtures/unrated_clip.usda
+    - tests/fixtures/filtered_clip.usda
+    - tests/fixtures/rooted_clip.usda
+    - tests/fixtures/blended_clips.usda
+    - tests/fixtures/displayed_clip.usda
