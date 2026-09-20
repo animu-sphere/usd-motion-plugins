@@ -16,7 +16,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
          _motion_record_version LIMIT_COUNT 1)
     string(STRIP "${_motion_record_version}" _motion_record_version)
 else()
-    set(_motion_record_version "0.1.0")
+    set(_motion_record_version "0.5.0")
 endif()
 
 project(motionRecord

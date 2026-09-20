@@ -10,15 +10,15 @@ schema: openstrata.tool/v1alpha1
 tool:
   id: motion_convert
   # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
-  version: 0.1.0
+  version: 0.5.0
   license: Apache-2.0
 executables: [motion_convert]
 directories: [bin]
 requires:
   libraries:
     - id: motionBvh
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
     - id: motionSource
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"
     - id: motionUsd
-      version: ">=0.1,<0.2"
+      version: ">=0.5,<0.6"

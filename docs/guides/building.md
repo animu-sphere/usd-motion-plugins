@@ -1,9 +1,11 @@
 # Building
 
-How to build and test `usd-motion-plugins` from a checkout. The tree holds no
-component yet (the [roadmap](../roadmap/current.md) says what arrives first),
-so a build today configures the root project, pins OpenUSD, and runs the
-workspace tests. The commands do not change when the first library arrives.
+How to build and test `usd-motion-plugins` from a checkout. A build configures
+the root project, pins OpenUSD, builds seven libraries, three CLIs and the
+optional `execMotion` bundle, and runs the workspace tests. What is left to do
+in the repository is in the [roadmap](../roadmap/current.md); what each
+component is, in the
+[capability matrix](../reference/CAPABILITY_MATRIX.md).
 
 ## Requirements
 

@@ -9,7 +9,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 | Document | Contents |
 | --- | --- |
-| [current.md](current.md) | The current milestone, the first import, and what is left of the scaffold. |
+| [current.md](current.md) | What is left after v0.5.0: the consumers' deletions, the parity evidence, and the first publication's two unproven steps. |
 
 ## Two sequences
 
@@ -27,13 +27,21 @@ and `usd-mmd-plugins` as its Phase 9.
 
 **This table is the single source of truth for which release carries what.**
 
+**All five rows shipped in one tag, `v0.5.0`, on 2026-09-20**
+([the release record](../releases/v0.5.0.md)). Every group of identities
+arrived between 2026-09-19 and 2026-09-20 — faster than releases could be cut,
+because each import shortens the time `usd-vrm-plugins` holds a second copy —
+and five tags in one day would have published four artifact sets nothing would
+pull. The rows stay as the record of which one carried what; the version is the
+last row's, so a consumer pins `>=0.5,<0.6`.
+
 | Release | Scope | Imports | Migration Phase | Status |
 | --- | --- | --- | --- | --- |
-| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ⬜ |
-| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half — **imported 2026-09-19** — and the reading half of `StageIo` — **imported 2026-09-20** — (vrm MIG-2) | C | 🚧 |
-| v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) — **imported 2026-09-19** as `motion_record` | E | 🚧 |
-| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | 🚧 |
-| v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item — **imported 2026-09-20** | — | 🚧 |
+| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ✅ v0.5.0 |
+| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half — **imported 2026-09-19** — and the reading half of `StageIo` — **imported 2026-09-20** — (vrm MIG-2) | C | ✅ v0.5.0 |
+| v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) — **imported 2026-09-19** as `motion_record` | E | ✅ v0.5.0 |
+| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | ✅ v0.5.0 |
+| v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item — **imported 2026-09-20** | — | ✅ v0.5.0 |
 | later | generic NPZ payload contract, IK-assisted retarget, contacts, blending beyond the imported one, generator interfaces, Python | — | F follows the imports | ⬜ |
 
 **Where this departs from the design policy's §35, and why.** The code

@@ -8,19 +8,19 @@ Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
 of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
 bridge every avatar format and every motion source share.
 
-> **Status: the core, the runtime, both halves of the stage bridge and the
-> recorded-source layer have arrived.** The design policy is accepted, the contracts are
-> proposed, and six libraries are imported: `motionCore` — the value types
-> every other library builds on — `motionSampling`, `motionRecording`,
+> **Status: v0.5.0, the first release — every library is installable.** Seven
+> libraries are published as digest-pinned artifacts another repository names
+> in its own `requires.libraries`: `motionCore` — the value types every other
+> library builds on — `motionSampling`, `motionRecording`, `motionRetarget`,
 > `motionUsd`, `motionSource` and `motionBvh`, with `motion_convert`,
 > `motion_bvh_inspect`, `motion_record`, the producer profiles and the
-> `execMotion` bundle. The rest of the implementation arrives from
-> [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), where
-> it is built and measured today, one identity at a time
-> ([roadmap](docs/roadmap/current.md)); how to build the tree is in
-> [docs/guides/building.md](docs/guides/building.md). The
+> optional `execMotion` bundle. What that release is and what it does not
+> settle is in [its record](docs/releases/v0.5.0.md); how to build the tree is
+> in [docs/guides/building.md](docs/guides/building.md); the
 > [capability matrix](docs/reference/CAPABILITY_MATRIX.md) is the only page
-> that says what is implemented here.
+> that says what is implemented here. The consuming half is
+> [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins)', which
+> deletes its second copy of each of these against this release.
 
 ## The central rule
 
@@ -43,9 +43,12 @@ collection of device adapters. VRM and VRMA stay in `usd-vrm-plugins`, PMX and
 VMD in `usd-mmd-plugins`, devices and protocols in `motion-connectors`.
 Every one of them depends on this repository, and it depends on none of them.
 
-## Planned components
+## Components
 
-| Component | Role | Release |
+All of these shipped in v0.5.0; the release column is the roadmap row each one
+was planned in, kept because the scope table still reads that way.
+
+| Component | Role | Planned in |
 | --- | --- | --- |
 | `motionCore` | `HumanJoint`, `MotionPose`, `RootMotion`, channels, provenance, `MotionClip` | v0.1.0 |
 | `motionSampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
