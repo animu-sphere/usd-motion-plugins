@@ -164,6 +164,30 @@ separate from the package version
     baked the result onto a VRM avatar stays in `usd-vrm-plugins`; here the
     stage is resolved through a `UsdSkelSkeletonQuery` instead.
 
+- **`execMotion`, imported from `usd-vrm-plugins` with its history** (vrm
+  MIG-2, its last item), ahead of the v0.5.0 release that carries it. 13
+  commits came through `git filter-repo`, into the directory this workspace
+  reserved, and the rename and the workspace join followed. It is the first
+  bundle here, and the only member that cannot build without OpenExec:
+  - Eight computations over `UsdSkelAnimation` and one attribute expression:
+    `motion.identityPose`, `motion.sampleAnimation`, `motion.filterPose` with
+    the `motion.priorPose` seam a driver overrides, `motion.extractRootMotion`,
+    `motion.interpolatePose` over `motion.poseHistory`, `motion.blendPoses`
+    over a relationship, and `motion:root:transform`, which places an
+    Xformable through `usdExecImaging`.
+  - Each node is a library call, because the four findings it raised were
+    fixed before it arrived: `PoseFilter::Step`, `ConditionRootMotion`,
+    `SampleClip` and the N-way `BlendPoses`' `std::optional`. What the library
+    answers where a node refuses is pinned in `execMotion_pose`.
+  - `USDMOTION_BUILD_EXEC_MOTION` (ON) turns it off, and the OpenExec probe is
+    `usdmotion_require_openexec()` in `cmake/UsdMotionOpenUsd.cmake`, called by
+    this bundle alone — so every library and tool still builds against a
+    runtime with no OpenExec.
+  - EX-O2 is decided with it: the rate stays a namespaced convention.
+  - CI gained one cell, `execmotion-pr-linux`: the standalone
+    `ost plugin build` path and the L0–L5 pyramid, whose golden roundtrip over
+    eight fixtures no CTest suite runs.
+
 ### Changed
 
 - **The four sampling findings from `usd-vrm-plugins`' OpenExec layer are
