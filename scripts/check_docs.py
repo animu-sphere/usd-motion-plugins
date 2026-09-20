@@ -206,6 +206,14 @@ def check_mirrors(root: pathlib.Path) -> list[str]:
     release = pin.group(1)
     expect(root / "docs" / "architecture" / "DEPENDENCIES.md",
            r"OpenUSD \*\*([0-9.]+)\*\*", release, "OpenUSD pin")
+    # The README's badge states the pin to every visitor before they open a
+    # single document, so it is a mirror like the others and drifts like one.
+    # Both halves: shields.io renders the label, and the alt text is what a
+    # reader without images sees.
+    expect(root / "README.md", r"badge/OpenUSD-([0-9.]+)-", release,
+           "OpenUSD badge")
+    expect(root / "README.md", r"!\[OpenUSD ([0-9.]+)\]", release,
+           "OpenUSD badge alt text")
     ci = root / "openstrata.ci.yaml"
     for found in re.findall(r'require_openusd_version:\s*"([^"]+)"',
                             ci.read_text(encoding="utf-8")):
