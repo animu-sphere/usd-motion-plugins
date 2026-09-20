@@ -11,6 +11,34 @@ separate from the package version
 
 ### Added
 
+- **A release lane, and with it the thing this repository exists for: published
+  library artifacts.** `.github/workflows/release.yml` is hand-authored — the
+  CI contract cannot express packaging every member or pushing to a registry —
+  and a tag `vX.Y.Z` now builds the workspace on the same three OS cells and
+  digest-pinned runtimes as the PR lane, runs the whole CTest suite and the
+  bundle's pyramid, packages every member, and publishes **each library** as a
+  digest-pinned OpenStrata artifact.
+  - One OCI repository, `ghcr.io/animu-sphere/usd-motion-plugins`, tagged
+    `<library>-<version>-<target>`. One repository rather than seven because a
+    new GHCR package is private and is made public by hand, once per package.
+  - The release's real output is a **pin table**, generated from what was
+    actually pushed: per library, per target, the archive digest a consumer
+    pins and the `oci://…@sha256:…` source it pulls from. It ships as
+    `external-library-pins.{json,md}` and inside the release notes, ready to
+    paste into a consumer's `requires.libraries`.
+  - `execMotion` and the three CLIs are packaged and attached to the release
+    but not pushed: nothing pins them by digest yet.
+  - `workflow_dispatch` is a dry run — same lanes, same table with local
+    digests and no `source`, no registry write, no release object.
+  - `scripts/make_release_notes.py` and
+    `docs/contributing/RELEASE_NOTES_TEMPLATE.md` render the notes from the
+    changelog, and refuse a section still headed *unreleased* unless the run is
+    a dry one.
+  - `scripts/check_docs.py` gained the check that makes the hand-authored lane
+    safe: its three `ost` pin sites must agree with `openstrata.ci.yaml`.
+    usd-vrm-plugins let exactly that drift across three releases (its ost
+    report 39) before adding the same check. Mutation-checked here.
+
 - **The documentation baseline.** The design policy, accepted on 2026-09-17
   with §42 recording the decisions taken while `usd-mmd-plugins` and
   `usd-vrm-plugins` aligned with it; three proposed contracts written from
