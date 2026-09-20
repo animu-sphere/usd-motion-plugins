@@ -4,8 +4,8 @@ Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
 of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
 bridge every avatar format and every motion source share.
 
-> **Status: the core, the runtime, the stage writer and the recorded-source
-> layer have arrived.** The design policy is accepted, the contracts are
+> **Status: the core, the runtime, both halves of the stage bridge and the
+> recorded-source layer have arrived.** The design policy is accepted, the contracts are
 > proposed, and six libraries are imported: `motionCore` — the value types
 > every other library builds on — `motionSampling`, `motionRecording`,
 > `motionUsd`, `motionSource` and `motionBvh`, with `motion_convert`,
@@ -46,7 +46,7 @@ Every one of them depends on this repository, and it depends on none of them.
 | `motionCore` | `HumanJoint`, `MotionPose`, `RootMotion`, channels, provenance, `MotionClip` | v0.1.0 |
 | `motionSampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
 | `motionRecording` | stream intake, recorder, the capture trace format | v0.1.0 |
-| `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` | v0.1.0, v0.2.0 |
+| `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` (both halves, 2026-09-20) | v0.1.0, v0.2.0 |
 | `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy (imported 2026-09-19) | v0.2.0 |
 | `motionSource`, `motionBvh` | recorded sources through declarative producer profiles | v0.4.0 |
 | `execMotion` | optional OpenExec nodes over the same libraries (imported 2026-09-20) | v0.5.0 |

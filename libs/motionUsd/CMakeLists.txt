@@ -48,6 +48,7 @@ if(NOT TARGET motionCore::motionCore)
 endif()
 
 add_library(motionUsd STATIC
+    src/ClipReader.cpp
     src/ClipWriter.cpp)
 add_library(motionUsd::motionUsd ALIAS motionUsd)
 set_target_properties(motionUsd PROPERTIES

@@ -81,12 +81,9 @@ VRM-vocabulary name the moving headers still spell (its WORKSPACE.md §9.3 and
   ([EXEC_CONTRACT.md §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond)),
   and open it through OpenUSD in a test — 2026-09-19. The writer arrived with
   its history from `usd-vrm-plugins`' `motion_capture`, which is the writer
-  there that authors an avatar-independent clip. `StageIo` reads a clip and
-  bakes onto a VRM, so it is the reading half and arrives with v0.2.0. The
-  writer was adapted to the mapping after the move. The `Channels` prim's
-  names were decided on 2026-09-20 (USD-O4) and nothing authors it until the
-  reading half arrives, so the channels a clip carries are reported rather
-  than authored.
+  there that authors an avatar-independent clip, and was adapted to the
+  mapping after the move. The `Channels` prim's names were decided on
+  2026-09-20 (USD-O4) and it is authored with the reading half, below.
 - ✅ Fix the sampling findings in their own change
   ([MOTION_CONTRACT.md §8](../design/MOTION_CONTRACT.md#8-motionclip-and-sampling))
   — 2026-09-19. `SampleClip`, `PoseFilter::Step`, an N-way blend that answers
@@ -111,6 +108,39 @@ before v0.2.0 and v0.3.0, by the user's call. They depend only on
 ([README](README.md#status-at-a-glance)). DIAG-O1 was decided with them
 (design policy §42.8). `motion_convert` authors through `motionUsd`, which is
 why `motionUsd` takes a producer's rest.
+
+### Arrived ahead of its release: v0.2.0's reading half ✅ (2026-09-20)
+
+`motionUsd`'s reading half was imported with its history from
+`usd-vrm-plugins`' `motion_retarget` (that repository's MIG-2, its last open
+item). 13 commits came through `git filter-repo` over `StageIo.{h,cpp}`; a
+move-only commit and the adaptation followed. That file is the stage half of a
+VRM retarget CLI, and a file cannot be filtered in two, so both halves arrived
+and the VRM half — the avatar reading, the expressions, the look-at, the bake —
+was removed in the adapting commit rather than carried
+([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in), rule 5).
+
+- ✅ `ReadMotionStage` and `OpenMotionStage`
+  ([USD_MAPPING.md §7](../design/USD_MAPPING.md#7-reading-usd-back)): a
+  `MotionClip`, the skeleton's tokens and rest transforms, §5's metadata and
+  warnings. A skeleton whose tokens are not the vocabulary's is refused,
+  because it reads only through a retarget. The exit codes stayed behind:
+  they classify an input for a CLI.
+- ✅ The three findings §7 named, fixed with the move. One library home
+  (`PoseFromStageSample`, taking values so an exec node can call it);
+  `RootMotion::worldOrientation` carried, which both of the copies it arrived
+  from dropped; and the skeleton answered as the two arrays
+  `BuildSkeletonDescriptor` takes, whose descriptor `BuildSourceRestPose`
+  takes after it, so reading a stage links no retargeter.
+- ✅ The `Channels` prim is authored as well as read, which is the other half
+  of USD-O4 and what makes the round trip checkable. A channel is read back
+  only where the stage keyed it, because USD holds the last key forward.
+- ⬜ `execMotion` still carries `PoseFromClipSample`, the copy this ends.
+  Switching it over adds a `motionUsd` edge
+  ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository))
+  and is a change of its own.
+- ⬜ `usd-vrm-plugins` deletes `StageIo`'s reading half in its consuming
+  change, which waits on `ost` (its report 41). The bake stays there.
 
 ### Arrived ahead of its release: v0.2.0's retarget ✅ (2026-09-19)
 

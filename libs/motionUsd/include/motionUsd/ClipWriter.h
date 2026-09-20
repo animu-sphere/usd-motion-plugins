@@ -10,6 +10,7 @@
 // stage it is filling.
 #pragma once
 
+#include "motionUsd/MotionStage.h"
 #include "motionUsd/api.h"
 
 #include "motionCore/MotionPose.h"
@@ -29,15 +30,6 @@
 
 namespace openstrata::motion
 {
-
-// `customData.motion.contractVersion` on every stage this library authors
-// (USD_MAPPING.md §8).
-inline constexpr int MotionStageContractVersion = 1;
-
-// Always 30, whatever rate the samples were taken at (USD_MAPPING.md §4.1,
-// USD-O2). The samples keep their own times; this is only where they are
-// written.
-inline constexpr double MotionStageTimeCodesPerSecond = 30.0;
 
 // A producer's rest pose, joint by joint, for a clip whose rest is not
 // identity (USD_MAPPING.md §3): a recorded file states one, and a profile says
@@ -88,11 +80,9 @@ struct MotionStageReport
     std::size_t jointCount = 0;
     std::size_t sampleCount = 0;
 
-    // Channel names the clip carried, sorted, each once. The prim's shape is
-    // decided (USD_MAPPING.md §4.3) but nothing authors it until the reading
-    // half arrives, so a caller that needs them has to be told they were
-    // dropped.
-    std::vector<std::string> unauthoredChannels;
+    // Channel names the clip carried, sorted, each once, and each authored
+    // under `/Animation/Channels` (USD_MAPPING.md §4.3).
+    std::vector<std::string> channels;
 
     // Samples whose look-at target was not authored. A target is a point in
     // the root's space, and the mapping gives it no place yet.
@@ -104,6 +94,7 @@ struct MotionStageReport
 //     /Animation            Scope, the default prim; customData.motion
 //       /Skeleton           UsdSkelSkeleton over semantic joint paths
 //       /Body               UsdSkelAnimation, bound to /Animation/Skeleton
+//       /Channels           one typeless prim per channel, when the clip has any
 //
 // with `upAxis = Y`, `metersPerUnit = 1` and 30 time codes per second, which
 // `Body` also states as `motion:timeCodesPerSecond` (EXEC_CONTRACT.md §5.1).
@@ -127,13 +118,22 @@ struct MotionStageReport
 // - A sample at `t` seconds is authored at `t * 30`, snapped to the nearest
 //   whole frame when within 1e-6 of it, so a clip taken at a divisor of 30 Hz
 //   lands on whole frames rather than on `62.00000000000001`.
+// - `Channels` holds one typeless prim per channel any sample carried
+//   (USD_MAPPING.md §4.3): a `uniform string motion:channelName` with the
+//   namespaced semantic verbatim, and a time-sampled `float
+//   motion:channelValue`. A sample that reported no value for a channel
+//   authors none at that time code, because an unreported name is not a zero.
 //
 // Refused, with nothing authored, when:
 // - the stage already holds `/Animation`;
 // - the clip has no sample, or observes no joint and no root;
 // - a timestamp is not finite or does not increase;
 // - a producer rest carries no hips, or a sample observes a joint the rest does
-//   not carry.
+//   not carry;
+// - two channel names sanitize to one prim name. The name attribute is the key
+//   and the prim path is not, but a stage with one channel silently overwriting
+//   another is worse than a refusal, so the writer owes distinct paths
+//   (USD_MAPPING.md §4.3).
 //
 // `report` may be null.
 MOTIONUSD_API bool AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,

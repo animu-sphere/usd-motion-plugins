@@ -2,6 +2,7 @@
 //
 // The standalone motion stage, opened back through OpenUSD: what a consumer of
 // the stage sees, not what the writer meant (USD_MAPPING.md §2-§5).
+#include "motionUsd/ClipReader.h"
 #include "motionUsd/ClipWriter.h"
 
 #include "pxr/base/gf/matrix4d.h"
@@ -18,6 +19,7 @@
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/metrics.h"
+#include "pxr/usd/usdGeom/scope.h"
 #include "pxr/usd/usdSkel/animation.h"
 #include "pxr/usd/usdSkel/bindingAPI.h"
 #include "pxr/usd/usdSkel/cache.h"
@@ -25,10 +27,12 @@
 #include "pxr/usd/usdSkel/skeletonQuery.h"
 
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,7 +43,9 @@ using openstrata::motion::HumanJoint;
 using openstrata::motion::MotionClip;
 using openstrata::motion::MotionPose;
 using openstrata::motion::MotionStageOptions;
+using openstrata::motion::MotionStageRead;
 using openstrata::motion::MotionStageReport;
+using openstrata::motion::MotionStageSample;
 
 constexpr auto kHips = static_cast<std::size_t>(HumanJoint::Hips);
 constexpr auto kSpine = static_cast<std::size_t>(HumanJoint::Spine);
@@ -194,8 +200,10 @@ TestTheStageHasTheMappingsShape()
 
     assert(report.jointCount == 2);
     assert(report.sampleCount == 3);
-    assert(report.unauthoredChannels.empty());
+    assert(report.channels.empty());
     assert(report.unauthoredLookAtTargets == 0);
+    // A clip with no channel authors no Channels prim at all.
+    assert(!stage->GetPrimAtPath(pxr::SdfPath("/Animation/Channels")));
 }
 
 // What UsdSkel resolves, not what was authored: the check that catches a
@@ -282,20 +290,292 @@ TestAbsenceIsAuthoredAsAbsence()
     assert(translations[0] == pxr::GfVec3f(2.0f, 0.9f, 0.0f));
 }
 
-// What the mapping cannot hold yet is reported, not dropped in silence.
+// A channel is a prim under /Animation/Channels, keyed by its name attribute
+// and not by its path (USD_MAPPING.md §4.3). What the mapping still cannot
+// hold -- a look-at target -- is reported rather than dropped in silence.
 void
-TestUnauthoredValuesAreReported()
+TestChannelsAreAuthoredUnderTheirSemantics()
 {
     MotionClip clip = MakeClip();
-    clip.samples[0].channels.Set("smile", 0.5f);
-    clip.samples[1].channels.Set("blink", 1.0f);
-    clip.samples[2].channels.Set("smile", 0.25f);
+    clip.samples[0].channels.Set("vrm:smile", 0.5f);
+    clip.samples[1].channels.Set("vrm:blink", 1.0f);
+    clip.samples[2].channels.Set("vrm:smile", 0.25f);
     clip.samples[2].lookAtTarget = pxr::GfVec3f(0.0f, 1.5f, 1.0f);
     MotionStageReport report;
-    const pxr::UsdStageRefPtr stage = WriteAndOpen(clip, {}, "motionUsd_report.usda", &report);
-    assert(report.unauthoredChannels == std::vector<std::string>({"blink", "smile"}));
+    const pxr::UsdStageRefPtr stage = WriteAndOpen(clip, {}, "motionUsd_channels.usda", &report);
+    assert(report.channels == std::vector<std::string>({"vrm:blink", "vrm:smile"}));
     assert(report.unauthoredLookAtTargets == 1);
-    assert(!stage->GetPrimAtPath(pxr::SdfPath("/Animation/Channels")));
+
+    // The prim name is sanitized; the semantic on the attribute is verbatim.
+    const pxr::UsdPrim smile = stage->GetPrimAtPath(pxr::SdfPath("/Animation/Channels/vrm_smile"));
+    assert(smile && !smile.IsA<pxr::UsdGeomScope>());
+    std::string name;
+    const pxr::UsdAttribute nameAttr = smile.GetAttribute(pxr::TfToken("motion:channelName"));
+    assert(nameAttr && nameAttr.GetVariability() == pxr::SdfVariabilityUniform);
+    assert(nameAttr.Get(&name) && name == "vrm:smile");
+
+    // Only the samples that reported the channel key it: an unreported name is
+    // the producer saying nothing, and a zero would say the channel is off.
+    const pxr::UsdAttribute valueAttr = smile.GetAttribute(pxr::TfToken("motion:channelValue"));
+    std::vector<double> times;
+    assert(valueAttr && valueAttr.GetTimeSamples(&times));
+    assert(times == std::vector<double>({0.0, 2.0}));
+    float value = 0.0f;
+    assert(valueAttr.Get(&value, 2.0) && NearlyEqual(value, 0.25));
+}
+
+// Two semantics that sanitize to one prim name are a refusal, not a stage
+// where one silently overwrote the other (USD_MAPPING.md §4.3).
+void
+TestCollidingChannelPrimNamesAreRefused()
+{
+    MotionClip clip = MakeClip();
+    clip.samples[0].channels.Set("vrm:happy", 1.0f);
+    clip.samples[0].channels.Set("vrm.happy", 1.0f);
+    const pxr::UsdStageRefPtr stage = pxr::UsdStage::CreateInMemory();
+    std::string error;
+    assert(!openstrata::motion::AuthorMotionStage(stage, clip, {}, nullptr, &error));
+    assert(error.find("vrm_happy") != std::string::npos);
+    assert(!stage->GetPrimAtPath(pxr::SdfPath("/Animation")));
+}
+
+// The round trip the mapping is for: what the writer authored is what the
+// reader answers, value for value (USD_MAPPING.md §7).
+void
+TestAStageReadsBackAsTheClipItWasWrittenFrom()
+{
+    MotionClip clip = MakeClip();
+    clip.samples[1].channels.Set("vrm:blink", 1.0f);
+    MotionStageOptions options;
+    options.sourceFormat = "capture";
+    options.rootMotionSource = "root.worldPosition";
+    options.provenance["profileId"] = "test-profile";
+    const std::string path = TempPath("motionUsd_roundtrip.usda");
+    std::string error;
+    assert(openstrata::motion::WriteMotionStage(path, clip, options, nullptr, &error));
+
+    // Reload from disk first: WriteMotionStage leaves the saved layer in the
+    // registry, so an Open() without this reads the layer the writer still
+    // holds and the round trip never goes through the file's text at all.
+    pxr::SdfLayerRefPtr saved = pxr::SdfLayer::FindOrOpen(path);
+    assert(saved);
+    saved->Reload(/* force */ true);
+    saved.Reset();
+
+    MotionStageRead read;
+    const bool ok = openstrata::motion::OpenMotionStage(path, "", &read, &error);
+    if (!ok)
+    {
+        std::fprintf(stderr, "OpenMotionStage failed: %s\n", error.c_str());
+    }
+    assert(ok);
+    assert(read.warnings.empty());
+    assert(read.skeleton.path == "/Animation/Skeleton");
+    assert(read.animationPath == "/Animation/Body");
+    assert(read.timeCodesPerSecond == 30.0);
+    assert(read.skeleton.restTransformsAuthored);
+    assert(read.skeleton.jointTokens == std::vector<std::string>({"hips", "hips/spine"}));
+    assert(read.skeleton.restTransforms.size() == 2);
+
+    // The metadata of §5, including the provenance nothing reads to decide.
+    assert(read.metadata.contractVersion &&
+           *read.metadata.contractVersion == openstrata::motion::MotionStageContractVersion);
+    assert(read.metadata.jointVocabularyVersion &&
+           *read.metadata.jointVocabularyVersion == openstrata::motion::HumanJointVocabularyVersion);
+    assert(read.metadata.sourceFormat == "capture");
+    assert(read.metadata.sourceProvider == "test-producer");
+    assert(read.metadata.rootMotionSource == "root.worldPosition");
+    assert(read.metadata.provenance.at("profileId") == "test-profile");
+    assert(read.clip.source.provider == "test-producer");
+
+    assert(read.clip.samples.size() == clip.samples.size());
+    for (std::size_t i = 0; i < read.clip.samples.size(); ++i)
+    {
+        const MotionPose& authored = clip.samples[i];
+        const MotionPose& got = read.clip.samples[i];
+        assert(NearlyEqual(got.timestamp, authored.timestamp));
+        assert(got.validRotations.test(kHips) && got.validRotations.test(kSpine));
+        assert(SameOrientation(got.localRotations[kHips], authored.localRotations[kHips]));
+        assert(SameOrientation(got.localRotations[kSpine], authored.localRotations[kSpine]));
+        assert(got.root.hasPosition && got.root.worldPosition == authored.root.worldPosition);
+    }
+    // MOTION_CONTRACT.md §5.3, and the finding USD_MAPPING.md §7 named: the
+    // hips rotation is the body's orientation as well as the local rotation,
+    // and both of usd-vrm-plugins' readers dropped it.
+    const MotionPose& last = read.clip.samples.back();
+    assert(last.root.hasOrientation);
+    assert(SameOrientation(last.root.worldOrientation, last.localRotations[kHips]));
+
+    // A channel comes back under its verbatim semantic, on the sample that
+    // reported it and no other.
+    assert(read.clip.samples[1].channels.Find("vrm:blink") != nullptr);
+    assert(NearlyEqual(*read.clip.samples[1].channels.Find("vrm:blink"), 1.0));
+    assert(read.clip.samples[0].channels.entries.empty());
+}
+
+// The rate the samples were taken at is not the rate they were written at
+// (USD_MAPPING.md §4.1): a 60 Hz capture is authored at 30 time codes per
+// second and says 60 in `customData.motion`. A reader that answered the
+// encoding would report a measurement nobody made.
+void
+TestTheProducersRateSurvivesTheStagesRate()
+{
+    MotionClip clip = MakeClip();
+    // Six samples at 60 Hz, so the stage's 30 and the producer's 60 differ.
+    clip.samples.clear();
+    for (int frame = 0; frame < 6; ++frame)
+    {
+        clip.samples.push_back(MakePose(frame / 60.0, 10.0f * static_cast<float>(frame),
+                                        pxr::GfVec3f(0.0f, 0.9f, 0.0f)));
+    }
+    clip.startTime = 0.0;
+    clip.endTime = 5.0 / 60.0;
+    clip.nominalFrameRate = 60.0;
+
+    const std::string path = TempPath("motionUsd_rate.usda");
+    std::string error;
+    assert(openstrata::motion::WriteMotionStage(path, clip, {}, nullptr, &error));
+
+    MotionStageRead read;
+    assert(openstrata::motion::OpenMotionStage(path, "", &read, &error));
+    assert(read.timeCodesPerSecond == 30.0);
+    assert(read.metadata.nominalFrameRate && *read.metadata.nominalFrameRate == 60.0);
+    assert(read.clip.nominalFrameRate == 60.0);
+    // The samples keep their own seconds either way.
+    assert(NearlyEqual(read.clip.samples.back().timestamp, 5.0 / 60.0));
+
+    // A stage that states no rate falls back to the stage's, which is the
+    // only number left.
+    const pxr::UsdStageRefPtr bare = pxr::UsdStage::CreateInMemory();
+    bare->SetTimeCodesPerSecond(24.0);
+    const pxr::VtTokenArray joints({pxr::TfToken("hips")});
+    const pxr::UsdSkelSkeleton skeleton =
+        pxr::UsdSkelSkeleton::Define(bare, pxr::SdfPath("/Rig"));
+    skeleton.CreateJointsAttr(pxr::VtValue(joints));
+    const pxr::UsdSkelAnimation animation =
+        pxr::UsdSkelAnimation::Define(bare, pxr::SdfPath("/Rig/Anim"));
+    animation.CreateJointsAttr(pxr::VtValue(joints));
+    animation.CreateRotationsAttr().Set(pxr::VtQuatfArray({RotationX(10.0f)}), 12.0);
+    assert(openstrata::motion::ReadMotionStage(bare, "", &read, &error));
+    assert(!read.metadata.nominalFrameRate);
+    assert(read.clip.nominalFrameRate == 24.0);
+}
+
+// A skeleton whose tokens are not the vocabulary's is a retarget, not a read
+// (USD_MAPPING.md §7), and a stage with no skeleton at all is neither.
+void
+TestWhatTheReaderRefuses()
+{
+    std::string error;
+    MotionStageRead read;
+
+    const pxr::UsdStageRefPtr empty = pxr::UsdStage::CreateInMemory();
+    assert(!openstrata::motion::ReadMotionStage(empty, "", &read, &error));
+    assert(error.find("no UsdSkelSkeleton") != std::string::npos);
+
+    const pxr::UsdStageRefPtr foreign = pxr::UsdStage::CreateInMemory();
+    const pxr::UsdSkelSkeleton skeleton =
+        pxr::UsdSkelSkeleton::Define(foreign, pxr::SdfPath("/Rig"));
+    skeleton.CreateJointsAttr(
+        pxr::VtValue(pxr::VtTokenArray({pxr::TfToken("Root"), pxr::TfToken("Root/J_Bip_C_Hips")})));
+    const pxr::UsdSkelAnimation animation =
+        pxr::UsdSkelAnimation::Define(foreign, pxr::SdfPath("/Rig/Anim"));
+    animation.CreateJointsAttr(
+        pxr::VtValue(pxr::VtTokenArray({pxr::TfToken("Root"), pxr::TfToken("Root/J_Bip_C_Hips")})));
+    assert(!openstrata::motion::ReadMotionStage(foreign, "", &read, &error));
+    assert(error.find("retarget") != std::string::npos);
+
+    // A path that is not a skeleton, and one that is nothing at all.
+    assert(!openstrata::motion::ReadMotionStage(foreign, "/Rig/Anim", &read, &error));
+    assert(error.find("not a UsdSkelSkeleton") != std::string::npos);
+    assert(!openstrata::motion::ReadMotionStage(foreign, "/Nowhere", &read, &error));
+    assert(error.find("no prim at") != std::string::npos);
+
+    // A path that did not open says which kind of wrong it is.
+    assert(!openstrata::motion::OpenMotionStage(TempPath("motionUsd_absent.usda"), "", &read,
+                                                &error));
+    assert(error.find("no file at") != std::string::npos);
+    assert(!openstrata::motion::OpenMotionStage(
+        std::filesystem::temp_directory_path().generic_string(), "", &read, &error));
+    assert(error.find("is a directory") != std::string::npos);
+}
+
+// The rule an OpenExec node applies to values it was handed, without a stage.
+void
+TestPoseFromStageSampleIsTheSameRuleWithoutAStage()
+{
+    MotionStageSample sample;
+    sample.jointTokens = {"hips", "hips/spine"};
+    sample.rotations = {RotationX(60.0f), RotationX(30.0f)};
+    sample.translations = {pxr::GfVec3f(0.0f, 0.9f, 0.2f), pxr::GfVec3f(0.0f)};
+    sample.timeCode = 60.0;
+    sample.hasTimeCode = true;
+    sample.timeCodesPerSecond = 30.0;
+
+    const std::optional<MotionPose> pose = openstrata::motion::PoseFromStageSample(sample);
+    assert(pose);
+    assert(NearlyEqual(pose->timestamp, 2.0));
+    assert(pose->root.hasPosition && pose->root.worldPosition == pxr::GfVec3f(0.0f, 0.9f, 0.2f));
+    assert(pose->root.hasOrientation && SameOrientation(pose->root.worldOrientation,
+                                                        RotationX(60.0f)));
+
+    // No rate is a refusal: `timestamp` has no value that spells "unknown".
+    MotionStageSample unstamped = sample;
+    unstamped.timeCodesPerSecond = 0.0;
+    assert(!openstrata::motion::PoseFromStageSample(unstamped));
+
+    // The default time code is not frame zero, and carries no second.
+    MotionStageSample atDefault = sample;
+    atDefault.hasTimeCode = false;
+    assert(openstrata::motion::PoseFromStageSample(atDefault)->timestamp == 0.0);
+
+    // An array that cannot say which joint a value belongs to has not said it.
+    MotionStageSample short_ = sample;
+    short_.translations.pop_back();
+    const std::optional<MotionPose> partial = openstrata::motion::PoseFromStageSample(short_);
+    assert(partial && partial->validRotations.test(kHips) && !partial->root.hasPosition);
+
+    // A token naming no joint of the vocabulary contributes nothing.
+    MotionStageSample foreign = sample;
+    foreign.jointTokens = {"Root/J_Bip_C_Hips", "hips/spine"};
+    const std::optional<MotionPose> ignored = openstrata::motion::PoseFromStageSample(foreign);
+    assert(ignored && !ignored->validRotations.test(kHips) && !ignored->root.hasPosition);
+    assert(ignored->validRotations.test(kSpine));
+}
+
+// A stage no writer of this library authored still reads, because the reader
+// asks the stage rather than the metadata: usd-vrm-plugins' `.vrma` stage is
+// standard UsdSkel over the same tokens and claims none of the mapping.
+void
+TestAStageThatClaimsNothingStillReads()
+{
+    const pxr::UsdStageRefPtr stage = pxr::UsdStage::CreateInMemory();
+    stage->SetTimeCodesPerSecond(60.0);
+    const pxr::UsdSkelSkeleton skeleton =
+        pxr::UsdSkelSkeleton::Define(stage, pxr::SdfPath("/Animation/HumanoidSkeleton"));
+    const pxr::VtTokenArray joints({pxr::TfToken("hips")});
+    skeleton.CreateJointsAttr(pxr::VtValue(joints));
+    const pxr::UsdSkelAnimation animation =
+        pxr::UsdSkelAnimation::Define(stage, pxr::SdfPath("/Animation/BodyAnimation"));
+    animation.CreateJointsAttr(pxr::VtValue(joints));
+    animation.CreateRotationsAttr().Set(pxr::VtQuatfArray({RotationX(45.0f)}), 30.0);
+    pxr::UsdSkelBindingAPI::Apply(skeleton.GetPrim())
+        .CreateAnimationSourceRel()
+        .SetTargets({animation.GetPath()});
+
+    MotionStageRead read;
+    std::string error;
+    assert(openstrata::motion::ReadMotionStage(stage, "", &read, &error));
+    assert(!read.metadata.contractVersion);
+    assert(read.timeCodesPerSecond == 60.0);
+    assert(read.clip.samples.size() == 1);
+    assert(NearlyEqual(read.clip.samples[0].timestamp, 0.5));
+    // The skeleton authored no restTransforms, which is stated rather than
+    // substituted from bindTransforms.
+    assert(!read.skeleton.restTransformsAuthored);
+    assert(std::any_of(read.warnings.begin(), read.warnings.end(),
+                       [](const std::string& warning)
+                       { return warning.find("restTransforms") != std::string::npos; }));
 }
 
 void
@@ -456,11 +736,17 @@ main()
     TestUsdSkelResolvesTheMotion();
     TestTimeCodesAreAlwaysThirtyPerSecond();
     TestAbsenceIsAuthoredAsAbsence();
-    TestUnauthoredValuesAreReported();
+    TestChannelsAreAuthoredUnderTheirSemantics();
+    TestCollidingChannelPrimNamesAreRefused();
     TestRefusalsAuthorNothing();
     TestARefusedWriteTouchesNothing();
     TestAProducerRestIsTheSkeleton();
     TestRewritingReplacesThePreviousStage();
+    TestAStageReadsBackAsTheClipItWasWrittenFrom();
+    TestTheProducersRateSurvivesTheStagesRate();
+    TestWhatTheReaderRefuses();
+    TestPoseFromStageSampleIsTheSameRuleWithoutAStage();
+    TestAStageThatClaimsNothingStillReads();
     std::puts("motionUsd tests passed");
     return 0;
 }
