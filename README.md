@@ -1,6 +1,6 @@
 # OpenUSD Motion Plugins
 
-[![CI](https://github.com/animu-sphere/usd-motion-plugins/actions/workflows/ost-source-ci.yml/badge.svg)](https://github.com/animu-sphere/usd-motion-plugins/actions/workflows/ost-source-ci.yml)
+[![CI](https://github.com/animu-sphere/usd-motion-plugins/actions/workflows/ost-source-ci.yml/badge.svg?event=pull_request)](https://github.com/animu-sphere/usd-motion-plugins/actions/workflows/ost-source-ci.yml)
 [![OpenUSD 26.08](https://img.shields.io/badge/OpenUSD-26.08-2f6f9f)](docs/architecture/DEPENDENCIES.md#1-openusd)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-4b8bbe.svg)](LICENSE)
 
