@@ -7,6 +7,17 @@ motion contract, joint vocabulary and USD mapping carry their own versions,
 separate from the package version
 ([docs/architecture/WORKSPACE.md §4](docs/architecture/WORKSPACE.md#4-versioning-and-build)).
 
+## [Unreleased]
+
+### Changed
+
+- **The `ost` pin is 0.23.2.** Taken for the consumers rather than for this
+  repository: 0.23.2 makes the root `ost build` compose the external library
+  artifacts a workspace's members declare, which is how every consumer of the
+  packages v0.5.0 published builds against them
+  (`usd-vrm-plugins`' ost report 43). Nothing here changes — this workspace
+  consumes no external library — and the pin moves with the ecosystem.
+
 ## [0.5.0] - 2026-09-20
 
 The first release. It carries the whole scope the roadmap numbered v0.1.0

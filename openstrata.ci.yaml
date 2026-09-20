@@ -22,7 +22,7 @@
 # openstrata.ci.yaml records their provenance). The ecosystem pins one OpenUSD
 # release because usd-avatar-runtime composes every package into one process
 # (docs/architecture/DEPENDENCIES.md §1), so these are re-pinned together. The
-# `ost` pin is 0.23.1 (2026-09-20), re-pinned across the ecosystem together
+# `ost` pin is 0.23.2 (2026-09-21), re-pinned across the ecosystem together
 # with usd-vrm-plugins and motion-connectors. It is taken for what it adds,
 # not because it is current: `requires.libraries` can name a digest-pinned
 # library artifact from another repository, and every rendered job pulls it
@@ -82,7 +82,7 @@ schema: 1
 
 bootstrap:
   ost:
-    version: "0.23.1"
+    version: "0.23.2"
     repository: animu-sphere/open-strata
 
 runners:
