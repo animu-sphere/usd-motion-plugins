@@ -13,10 +13,6 @@ stage, `Sdf`, `Plug` or file-format dependency, only OpenUSD's `Gf` value types
 [WORKSPACE.md §2](../../docs/architecture/WORKSPACE.md#2-dependency-directions)
 for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.py).
 
-It arrived from `usd-vrm-plugins` on 2026-09-19 with its history, as the
-capture half of that repository's `motionRuntime`, and was renamed on arrival
-([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-are-this-policys-applied-on-arrival)).
-
 ## What it provides
 
 | Header | Contents |

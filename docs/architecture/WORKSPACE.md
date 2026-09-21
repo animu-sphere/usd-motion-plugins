@@ -7,8 +7,8 @@ them and to the rest of the ecosystem, and the invariants every change keeps.
 first, in its own pull request** — never through a README, a roadmap entry or
 code.
 
-Status (2026-09-19): **contract adopted; seven libraries and two tools
-imported.** Each row below says when its identity arrived from
+Status (2026-09-21): **contract adopted; seven libraries, three tools and one
+optional bundle imported.** Each row below says when its identity arrived from
 `usd-vrm-plugins`, with its history. Every other
 identity below is *reserved* until the change that creates it lands, and its
 row then says so. The shape follows the design
@@ -68,7 +68,9 @@ workspace discipline (WS-O1, decided 2026-09-19;
 | VMC, mocopi, VRChat OSC, `osc`, `liveTransport`, tracker assignment and solve | `motion-connectors` | device and protocol connectivity (design policy §3.1) |
 | VRMA reading, the VRM humanoid binding, expressions, look-at, `execVrm` | `usd-vrm-plugins` | VRM semantics (design policy §3.2, §26) |
 | VMD reading, MMD IK and append evaluation, the MMD role table | `usd-mmd-plugins` | MMD semantics (design policy §3.2, §42.4) |
-| scheduling, physics, OpenExec driving policy | `usd-avatar-runtime` | runtime orchestration (design policy §3.3) |
+| physical simulation | `usd-physics-plugins` | simulation (design policy §3.3) |
+| scheduling, application execution and OpenExec driving policy | `usd-stage-runner` | execution (design policy §3.3) |
+| runtime composition | `usd-avatar-runtime` | composition (design policy §3.3) |
 | a generator's model, training or inference | never in this ecosystem's core | design policy §3, §24 |
 
 ## 2. Dependency directions

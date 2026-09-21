@@ -14,12 +14,6 @@ a motion stage calls it. It links OpenUSD's `usd`, `sdf`, `usdGeom` and
 [WORKSPACE.md §2](../../docs/architecture/WORKSPACE.md#2-dependency-directions)
 for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.py).
 
-Both halves arrived from `usd-vrm-plugins` with their history. The writer came
-on 2026-09-19 from `motion_capture`'s semantic clip writer, the one writer
-there that authors an avatar-independent clip; the reader on 2026-09-20 from
-`motion_retarget`'s `StageIo`, whose bake onto a VRM avatar stayed behind.
-Each was adapted to the mapping after its move.
-
 ## What it provides
 
 | Header | Contents |

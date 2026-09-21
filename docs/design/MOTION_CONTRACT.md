@@ -1,12 +1,11 @@
 # Motion contract
 
-> Status: **proposed**, 2026-09-17. Nothing here is implemented in this
-> repository yet. Almost all of it *is* implemented, tested and measured in
-> `usd-vrm-plugins` (its `libs/motionCore`, `libs/motionRuntime` and its own
-> `MOTION_CONTRACT.md`), and arrives here with that code
+> Status: **binding for the implemented surface**, 2026-09-20. The value,
+> sampling and recording sections are implemented and tested by
+> `motionCore`, `motionSampling` and `motionRecording`. Remaining additions
+> are identified as open questions below.
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
-> A section becomes **binding** when the code it describes lands here with its
-> tests; the capability matrix says when.
+> The capability matrix is the source for the current implementation boundary.
 >
 > This document owns the in-memory motion values: joint vocabulary, units,
 > basis, time, the pose, root motion, channels, provenance, clips and streams.

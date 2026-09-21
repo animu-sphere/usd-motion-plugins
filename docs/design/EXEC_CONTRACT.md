@@ -1,7 +1,8 @@
 # OpenExec evaluation contract
 
-> Status: **proposed**, 2026-09-19. Nothing here is implemented in this
-> repository. `execMotion` arrives from `usd-vrm-plugins` in Migration Phase C
+> Status: **binding for the imported `execMotion` surface**, implemented since
+> 2026-09-20. Scene-side proposals remain explicitly marked in §5. `execMotion`
+> arrived from `usd-vrm-plugins` in Migration Phase C
 > (its MIG-2; [WORKSPACE.md §1.2](../architecture/WORKSPACE.md#12-bundles-tools-and-data)),
 > and everything below is what that repository measured while it built
 > `execMotion` and `execVrm` on OpenUSD 26.08. The rules are carried as cited

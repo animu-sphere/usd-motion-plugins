@@ -7,9 +7,6 @@ motion stage ([USD_MAPPING.md](../../docs/design/USD_MAPPING.md) §2–§5). Tha
 is the stage `motion_convert` authors from a recorded file, so a retargeter
 reads a replayed session without knowing it was live.
 
-It arrived from usd-vrm-plugins as `motion_capture`, with its history, and
-takes this repository's command name
-([WORKSPACE.md §1.2](../../docs/architecture/WORKSPACE.md#12-bundles-tools-and-data)).
 It is an executable, not a bundle: it registers nothing with OpenUSD.
 
 ## The loop
@@ -78,10 +75,9 @@ per second. `customData.motion.sourceFormat` is `capture`. The rules are
   joint that is present and unmoving means something different downstream
   from one that was never captured.
 
-Channels (a face's expression weights) and look-at targets are not authored
-yet: the `Channels` prim's names are decided (USD §4.3) but nothing authors it
-until the reading half arrives, and a look-at target has no place at all. The
-tool says so on stderr when a session carried either, rather than dropping
+Channels (including face expression weights) are authored through `motionUsd`
+under the `Channels` prim described by USD §4.3. Look-at targets still have no
+place in the mapping, so the tool reports them on stderr rather than dropping
 them without a word.
 
 ## Tests

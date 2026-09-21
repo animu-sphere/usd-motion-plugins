@@ -1,7 +1,7 @@
 # Retargeting policy
 
-> Status: **proposed**, 2026-09-17; **implemented** by `motionRetarget` since
-> 2026-09-19. The generic half of `usd-vrm-plugins`' `vrmRetarget` — the pose
+> Status: **binding**, implemented by `motionRetarget` since 2026-09-19. The
+> generic half of `usd-vrm-plugins`' `vrmRetarget` — the pose
 > retargeter, rest correction and root-motion policy — arrived with its
 > history and its tests
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).

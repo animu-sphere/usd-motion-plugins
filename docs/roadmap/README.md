@@ -11,74 +11,25 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 | --- | --- |
 | [current.md](current.md) | What is left after v0.5.0: the consumers' deletions, the parity evidence, and the first publication's two unproven steps. |
 
-## Two sequences
-
-| Sequence | What it tracks | Source of truth |
-| --- | --- | --- |
-| **Releases v0.1.0–v0.5.0** | what this repository delivers | [DESIGN_POLICY.md §35](../design/DESIGN_POLICY.md#35-release-strategy), as mapped below |
-| **Migration Phase A–F** | how generic motion leaves `usd-vrm-plugins` and `usd-mmd-plugins` joins | [DESIGN_POLICY.md §37](../design/DESIGN_POLICY.md#37-migration-from-usd-vrm-plugins) |
-
-Migration phases are always written with the qualifier
-([DESIGN_POLICY.md §42.3](../design/DESIGN_POLICY.md#423-migration-phases-are-always-qualified)).
-`usd-vrm-plugins` tracks its side as MIG-0 to MIG-5 in its migration track,
-and `usd-mmd-plugins` as its Phase 9.
-
 ## Status at a glance
 
-**This table is the single source of truth for which release carries what.**
-
-**All five rows shipped in one tag, `v0.5.0`, on 2026-09-20**
-([the release record](../releases/v0.5.0.md)). Every group of identities
-arrived between 2026-09-19 and 2026-09-20 — faster than releases could be cut,
-because each import shortens the time `usd-vrm-plugins` holds a second copy —
-and five tags in one day would have published four artifact sets nothing would
-pull. The rows stay as the record of which one carried what; the version is the
-last row's, so a consumer pins `>=0.5,<0.6`.
-
-| Release | Scope | Imports | Migration Phase | Status |
-| --- | --- | --- | --- | --- |
-| v0.1.0 — core contract | `motionCore`, `motionSampling`, `motionRecording`; `motionUsd` authoring a motion stage; deterministic tests | `motionCore`, `motionRuntime`, `motion_capture`'s clip writer (vrm MIG-1, part of MIG-2) | A, B | ✅ v0.5.0 |
-| v0.2.0 — retargeting | `motionRetarget`; `motionUsd` reading; mapping validation; the VRM and MMD integration hooks | `vrmRetarget`'s generic half — **imported 2026-09-19** — and the reading half of `StageIo` — **imported 2026-09-20** — (vrm MIG-2) | C | ✅ v0.5.0 |
-| v0.3.0 — recording and stream utilities | the published `MotionStream` shape (MC-O5); `motion_record`; the processor interface | `motion_capture` (vrm MIG-4, its first item) — **imported 2026-09-19** as `motion_record` | E | ✅ v0.5.0 |
-| v0.4.0 — generic format integration | `motionSource`, `motionBvh`, `motion_convert`, `motion_bvh_inspect`, producer profiles | vrm MIG-3 — **imported 2026-09-19**, ahead of v0.2.0 and v0.3.0 | C | ✅ v0.5.0 |
-| v0.5.0 — runtime integration | `execMotion` | vrm MIG-2, its last item — **imported 2026-09-20** | — | ✅ v0.5.0 |
-| later | generic NPZ payload contract, IK-assisted retarget, contacts, blending beyond the imported one, generator interfaces, Python | — | F follows the imports | ⬜ |
-
-**Where this departs from the design policy's §35, and why.** The code
-arrives by moving whole identities, and moving half of one would leave
-`usd-vrm-plugins` with two copies of a library across releases, which its
-moving rules forbid. Two consequences:
-
-- `motionRuntime` holds sampling and capture together, so **recording arrives
-  in v0.1.0**, not v0.3.0; v0.3.0 keeps what is new — the published stream
-  shape and the recording tool.
-- `SkeletonDescriptor` and the basic `RetargetMap` are part of the retargeter,
-  so they **arrive in v0.2.0** with it, not in v0.1.0. v0.2.0 then delivers
-  §35's v0.1.0 retarget items and its own v0.2.0 list at once, because the
-  imported retargeter is already rest-pose-aware.
-
-**Migration Phase D** — `usd-mmd-plugins` consuming the core — is that
-repository's Phase 9. Its adapter needs v0.1.0 and uses v0.2.0's map
-validation; its evaluator needs nothing from here.
+`v0.5.0` is published. Its release scope is recorded in the
+[release record](../releases/v0.5.0.md), and current implementation facts are
+in the [capability matrix](../reference/CAPABILITY_MATRIX.md). This directory
+contains no completed release inventory.
 
 ## Open decisions
 
 Every open question the design documents carry, in the order they block work.
-The owning document holds the question; this list only schedules it. MC-O1,
-USD-O1 and USD-O2 were decided on 2026-09-19, and MC-O4 narrowed to its
-non-scalar case, before the first import. RT-O2 and RT-O3 were carried the same
-day from `usd-vrm-plugins`' v0.9.0 decisions. DIAG-O1 was decided with the BVH
-import, and WS-O2 and RT-O1 with the retarget's.
+The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| USD-O4 | ✅ decided 2026-09-20: one prim per channel, `motion:channelName` (the semantic verbatim, and the key) and a time-sampled `motion:channelValue` | [USD §4.3](../design/USD_MAPPING.md#43-channels) | — |
 | MC-O5 | `MotionStream`'s public shape | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.3.0 |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |
 | MC-O6 | Tracking state | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a live producer |
 | MC-O4 | A non-scalar channel's value type | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | the first non-scalar channel |
-| EX-O2 | ✅ decided 2026-09-20 with the import: a namespaced convention | [EXEC §5.1](../design/EXEC_CONTRACT.md#51-the-rate-motiontimecodespersecond) | — |
 | EX-O3 | Scene-side evaluation attributes before or with `Bindings` | [EXEC §7](../design/EXEC_CONTRACT.md#7-open-questions) | USD-O5 |
 | EX-O1 | Where the exec driver lives | [EXEC §7](../design/EXEC_CONTRACT.md#7-open-questions) | a second caller |
 | RT-O4 | Bind transforms in the descriptor | [RETARGET §9](../design/RETARGETING_POLICY.md#9-open-questions) | a consumer |
