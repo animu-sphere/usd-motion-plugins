@@ -12,12 +12,6 @@ file-format dependency, and no OpenExec: only OpenUSD's `Gf` value types. See
 [WORKSPACE.md §2](../../docs/architecture/WORKSPACE.md#2-dependency-directions)
 for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.py).
 
-It arrived from `usd-vrm-plugins` on 2026-09-19 with its history, as the
-generic half of that repository's `vrmRetarget`, cut by header along the line
-its WORKSPACE.md §9.5 draws. The VRM half stayed there: expression resolution,
-a VRM rig's look-at, and VRM 1.0's required-bone set. The types were renamed
-on arrival ([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-are-this-policys-applied-on-arrival)).
-
 ## It never opens a stage
 
 The target rig arrives as plain values: a `SkeletonDescriptor`, a

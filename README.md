@@ -4,70 +4,49 @@
 [![OpenUSD 26.08](https://img.shields.io/badge/OpenUSD-26.08-2f6f9f)](docs/architecture/DEPENDENCIES.md#1-openusd)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-4b8bbe.svg)](LICENSE)
 
-Vendor-neutral, avatar-format-neutral motion for OpenUSD: one representation
-of body motion, and the sampling, retargeting, recording and `UsdSkelAnimation`
-bridge every avatar format and every motion source share.
+`usd-motion-plugins` is an OpenUSD-oriented motion interoperability and
+processing layer for representing, transforming, retargeting, recording, and
+bridging motion data.
 
-> **Status: v0.5.0 is published — every library is installable.** Seven
-> libraries are published as digest-pinned artifacts another repository names
-> in its own `requires.libraries`: `motionCore` — the value types every other
-> library builds on — `motionSampling`, `motionRecording`, `motionRetarget`,
-> `motionUsd`, `motionSource` and `motionBvh`, with `motion_convert`,
-> `motion_bvh_inspect`, `motion_record`, the producer profiles and the
-> optional `execMotion` bundle. What that release is and what it does not
-> settle is in [its record](docs/releases/v0.5.0.md); how to build the tree is
-> in [docs/guides/building.md](docs/guides/building.md); the
-> [capability matrix](docs/reference/CAPABILITY_MATRIX.md) is the only page
-> that says what is implemented here. The consuming half is
-> [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins)', which
-> deletes its second copy of each of these against this release.
+> **Status: v0.5.0 is published.** The [capability matrix](docs/reference/CAPABILITY_MATRIX.md)
+> is the only source for what is implemented here. The [release record](docs/releases/v0.5.0.md)
+> covers publication; [the build guide](docs/guides/building.md) covers local use.
 
-## The central rule
+## Scope
 
-> **Motion is represented independently of its transport, source product,
-> avatar format, and runtime host.**
+This repository provides generic motion representation, canonicalization,
+transformation, retargeting, recording, evaluation primitives, and OpenUSD
+interoperability.
+
+It does not own motion acquisition, avatar-format semantics, physics
+simulation, or application execution and orchestration.
+
+| Responsibility | Owner |
+| --- | --- |
+| Device and protocol acquisition | `motion-connectors` |
+| Generic motion representation and processing | `usd-motion-plugins` |
+| VRM or MMD avatar semantics | the corresponding avatar plugin |
+| Physical simulation | `usd-physics-plugins` |
+| Execution and update loops | `usd-stage-runner` |
+| Runtime composition | `usd-avatar-runtime` |
+
+## Data flow
 
 ```text
-files (BVH, …) ─┐        devices and protocols ─→ motion-connectors ─┐
-                 │                                                   │
-VRMA ─→ usd-vrm-plugins ─┐                                           │
-VMD ─→ usd-mmd-plugins ──┼─→ MotionClip / MotionPose ←────────────────┘
-                         │          │
-                         │   sampling · retarget · recording · UsdSkelAnimation
-                         │          │                  (this repository)
-                         └──────────┴─→ usd-avatar-runtime
+external or canonical motion
+    |
+    v
+representation -> canonicalization -> transformation -> retargeting
+    |                                      |
+    +---------- recording / evaluation ---+
+    |
+    v
+OpenUSD interoperability -> reusable motion data
 ```
 
-This repository is not a second VRM repository, a second MMD repository, or a
-collection of device adapters. VRM and VRMA stay in `usd-vrm-plugins`, PMX and
-VMD in `usd-mmd-plugins`, devices and protocols in `motion-connectors`.
-Every one of them depends on this repository, and it depends on none of them.
-
-## Components
-
-All of these shipped in v0.5.0; the release column is the roadmap row each one
-was planned in, kept because the scope table still reads that way.
-
-| Component | Role | Planned in |
-| --- | --- | --- |
-| `motionCore` | `HumanJoint`, `MotionPose`, `RootMotion`, channels, provenance, `MotionClip` | v0.1.0 |
-| `motionSampling` | sampling with status, interpolation, filtering, blending | v0.1.0 |
-| `motionRecording` | stream intake, recorder, the capture trace format | v0.1.0 |
-| `motionUsd` | motion ↔ `UsdSkelAnimation` and `UsdSkelSkeleton` (both halves, 2026-09-20) | v0.1.0, v0.2.0 |
-| `motionRetarget` | skeleton descriptors, maps, rest-pose correction, root-motion policy (imported 2026-09-19) | v0.2.0 |
-| `motionSource`, `motionBvh` | recorded sources through declarative producer profiles | v0.4.0 |
-| `execMotion` | optional OpenExec nodes over the same libraries (imported 2026-09-20) | v0.5.0 |
-
-Identities and dependency directions are fixed in
-[docs/architecture/WORKSPACE.md](docs/architecture/WORKSPACE.md); which release
-carries what, in the [roadmap](docs/roadmap/README.md#status-at-a-glance).
-
-## Canonical conventions
-
-Right-handed, +Y up, +Z forward, metres, seconds; local joint rotations
-relative to the semantic parent; root motion separate from the hips; a missing
-joint is valid state, never an identity rotation
-([MOTION_CONTRACT.md](docs/design/MOTION_CONTRACT.md)).
+Inputs arrive already acquired or decoded. Format-specific adapters remain in
+their owning repositories; generic motion containers are converted to the
+canonical model before downstream processing.
 
 ## Documentation
 

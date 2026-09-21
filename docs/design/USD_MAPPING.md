@@ -1,8 +1,8 @@
 # USD mapping
 
-> Status: **proposed**, 2026-09-17. **§2–§5 are authored and read** by
-> `motionUsd` since 2026-09-20, the `Channels` prim of §4.3 included. §6 is
-> not implemented here. `usd-vrm-plugins` authors two stages of this family:
+> Status: **binding for §2–§5 and §7**, implemented by `motionUsd` since
+> 2026-09-20. §6 remains proposed here. `usd-vrm-plugins` authors two stages
+> of this family:
 > the `.vrma` importer's and the capture recorder's semantic clip. It also
 > bakes retargeted animation onto avatars. `motionUsd`'s writer arrived from
 > that capture recorder and its reader from `motion_retarget`'s `StageIo`

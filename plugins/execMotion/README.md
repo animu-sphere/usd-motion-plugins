@@ -1,9 +1,7 @@
 # execMotion
 
-Vendor-neutral OpenExec computations over canonical motion. It arrived from
-usd-vrm-plugins with its history, where it was that repository's OpenExec
-foundation (its `docs/roadmap/openexec-foundation.md` §6, P0-4), and the
-contract it evaluates under here is
+Vendor-neutral OpenExec computations over canonical motion. The contract it
+evaluates under here is
 [EXEC_CONTRACT.md](../../docs/design/EXEC_CONTRACT.md).
 
 **This is the foundation, not the layer.** It registers four value types, eight

@@ -4,10 +4,10 @@ What `usd-motion-plugins` builds against and what it refuses. Edges between
 this repository's own components are
 [WORKSPACE.md §2](WORKSPACE.md#2-dependency-directions)'s.
 
-Status (2026-09-19): **adopted by the scaffold.** The OpenUSD pin and the
-toolchain below are what the root project enforces. The per-library rows apply
-as each library arrives. Every value is taken from the sibling repositories so
-that `usd-avatar-runtime` can compose all of them into one process.
+Status (2026-09-21): **adopted by the workspace.** The OpenUSD pin and the
+toolchain below are what the root project enforces. The rows describe the
+current components. Every value is taken from the sibling repositories so that
+`usd-avatar-runtime` can compose all of them into one process.
 
 ## 1. OpenUSD
 
@@ -26,7 +26,7 @@ that `usd-avatar-runtime` can compose all of them into one process.
 | Language | C++20 |
 | Build | CMake 3.22 or later; `CMakePresets.json` for plain CMake |
 | Compilers | MSVC on Windows, Clang on macOS arm64, GCC on Linux — the siblings' three lanes |
-| OpenStrata | `ost` 0.22.10, pinned in `openstrata.ci.yaml`: `usd-mmd-plugins`' pin, the newest a sibling runs (`usd-vrm-plugins` pins 0.22.8) |
+| OpenStrata | `ost` 0.23.2, pinned in `openstrata.ci.yaml` and kept in sync with the consuming ecosystem |
 | Tests | as in the siblings: plain executables registered with CTest, checking with `assert()` compiled into Release builds, unless the scaffold records a reason to differ |
 | Python | the interpreter OpenUSD was built against, for stage tests and tooling; Python bindings are later (design policy §25) |
 

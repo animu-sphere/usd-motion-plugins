@@ -1,17 +1,15 @@
 # Current — after v0.5.0
 
 Status: **v0.5.0 is published** (2026-09-20,
-[its record](../releases/v0.5.0.md)). Every identity the scope table numbered
-v0.1.0 through v0.5.0 has arrived and is published as a digest-pinned artifact.
-What remains is not more imports: it is the other side of the move, in the
-repositories that consume these packages, and the evidence that the move
-preserved what it moved.
+[its record](../releases/v0.5.0.md)). Every identity planned for that release
+is published as a digest-pinned artifact. What remains is not more imports: it
+is the other side of the move, in the repositories that consume these packages,
+and the evidence that the move preserved what it moved.
 
-The scaffold, the imports and each release's scope have left this file: they
-are in the [changelog](../../CHANGELOG.md), the
-[release record](../releases/v0.5.0.md) and the
-[scope table](README.md#status-at-a-glance). This directory holds only
-incomplete work.
+The scaffold and release history are in the
+[changelog](../../CHANGELOG.md) and [release record](../releases/v0.5.0.md).
+Implementation facts are in the [capability matrix](../reference/CAPABILITY_MATRIX.md).
+This directory holds only incomplete work.
 
 ## What remains
 
@@ -42,11 +40,11 @@ release:
 
 ### Beyond the imports ⬜
 
-The scope table's `later` row, unchanged: the generic NPZ payload contract
-(design policy §28) and the recorded-source identity decision that travels with
-it, IK-assisted retarget, contacts, blending beyond the imported one, the
-generator interfaces `motion-connectors`' ARDY adapter needs, and Python
-bindings. None of them is started, and none blocks a consumer.
+Remaining future work includes the generic NPZ payload contract (design policy
+§28) and its recorded-source identity decision, IK-assisted retarget, contacts,
+blending beyond the imported one, generator interfaces for
+`motion-connectors`, and Python bindings. None is started, and none blocks a
+consumer.
 
 ## Open decisions
 

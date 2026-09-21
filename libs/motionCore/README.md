@@ -12,9 +12,6 @@ network protocol or vendor SDK. The sole OpenUSD dependency is the small `Gf`
 value-type library used for vectors and quaternions, and the boundary check
 refuses any other, and any product or avatar-format name in the code.
 
-It arrived from `usd-vrm-plugins` on 2026-09-19 with its history, and was
-renamed on arrival ([DESIGN_POLICY.md §42.2](../../docs/design/DESIGN_POLICY.md#422-names-are-this-policys-applied-on-arrival)).
-
 All coordinates are right-handed, Y-up, metres. `World`, `Character`,
 `Skeleton`, and `JointLocal` identify the reference frame of a constraint;
 the conversion and USD-stage authoring belong to consumers. Root motion is
