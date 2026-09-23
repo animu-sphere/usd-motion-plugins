@@ -18,7 +18,7 @@ is the mistake this guard exists to catch.
 
 Usage (what .github/workflows/release.yml runs):
 
-    python scripts/make_release_notes.py --version 0.5.0 \
+    python scripts/make_release_notes.py --version 0.5.1 \
         --pins dist-release/external-library-pins.md \
         --checksums dist-release/SHA256SUMS --out release-notes.md
 """

@@ -9,7 +9,27 @@ separate from the package version
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-24
+
+A publication release. It changes no library, bundle or tool behaviour. What
+it adds is that the `execMotion` bundle and the three CLIs are in the registry
+as well as the libraries, so another repository can pin them.
+
 ### Added
+
+- **`execMotion` and the three CLIs are published as digest-pinned
+  artifacts.** Through v0.5.0 they were attached to the GitHub release and not
+  pushed, because no consumer could pin a bundle or a tool from another
+  repository. `ost` 0.23.4 can, with `requires.bundles[].artifact` and
+  `requires.tools[]`. `usd-vrm-plugins` needs both: its `execVrm` reads
+  `execMotion`'s nodes by name, and it must re-run its parity rows against the
+  consumed bundle before deleting its own copy. The release workflow now stages,
+  imports and pushes every packaged bundle and tool the way it does a library,
+  to the same OCI repository and under the same tag shape
+  (`<member>-<version>-<target>`). The pin table (`external-library-pins.md` /
+  `.json`) gains a `bundles` and a `tools` section. Each section's member count
+  comes from the tree, as the library count already did, so a member that stops
+  being packaged fails the publish job instead of going missing from the table.
 
 - **`motion_convert_clip` and `motion_bvh_inspect_report` hand their tools
   paths no ANSI code page can spell.** A BVH and a profile named by path under
@@ -48,7 +68,7 @@ separate from the package version
   cache was configured against another runtime (`usd-vrm-plugins`' ost report
   44). Nothing here consumes an external library, so nothing here changes.
 
-- **The `ost` pin is 0.23.2.** Taken for the consumers rather than for this
+- **The `ost` pin was 0.23.2.** Taken for the consumers rather than for this
   repository: 0.23.2 makes the root `ost build` compose the external library
   artifacts a workspace's members declare, which is how every consumer of the
   packages v0.5.0 published builds against them

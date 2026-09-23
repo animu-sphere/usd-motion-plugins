@@ -16,20 +16,23 @@ reaches this repository only through installed packages.
 
 {changelog}
 
-## Consuming a library from another repository
+## Consuming a package from another repository
 
-Every library here is published twice: as a `.tar.zst` asset below, and as a
-digest-pinned OpenStrata artifact in one OCI repository,
-`ghcr.io/animu-sphere/usd-motion-plugins`, tagged
-`<library>-{version}-<target>`. A consumer declares the dependency in its own
-`requires.libraries` and pins the archive digest per target — the table below
-is generated from this release's published artifacts, so it can be pasted as
-it stands:
+Every library, the `execMotion` bundle and every CLI are published twice: as
+a `.tar.zst` asset below, and as a digest-pinned OpenStrata artifact in one OCI
+repository, `ghcr.io/animu-sphere/usd-motion-plugins`, tagged
+`<member>-{version}-<target>`. A consumer declares the dependency in its own
+descriptor and pins the archive digest per target: a library under
+`requires.libraries`, the bundle under `requires.bundles`, and a tool its tests
+run under `requires.tools` (the last two need `ost` 0.23.4). The table below is
+generated from this release's published artifacts, so it can be pasted as it
+stands:
 
 {pins}
 
 `ost library pull --target <platform> --profile <profile>` then materializes
-it, and generated CI runs that pull before it builds. The archive must match
+a library, and generated CI runs that pull before it builds; `ost plugin test`,
+`run` and `package` materialize a bundle or a tool when a session needs it. The archive must match
 the consumer's target **and** the exact OpenUSD runtime identity: everything
 here is built against the one OpenUSD release the ecosystem pins
 ([DEPENDENCIES.md](https://github.com/animu-sphere/usd-motion-plugins/blob/{tag}/docs/architecture/DEPENDENCIES.md)).
@@ -44,7 +47,7 @@ here is built against the one OpenUSD release the ecosystem pins
 | `motion_convert` · `motion_bvh_inspect` · `motion_record` | the CLI tools, in their own packages |
 | `usd-motion-plugins-{version}-src.tar.gz` | source archive at this tag |
 | `SHA256SUMS` | SHA-256 checksums of every file above |
-| `external-library-pins.md` / `.json` | the pin table above, as a file |
+| `external-library-pins.md` / `.json` | the pin table above, as a file: libraries, the bundle and the tools, one section each |
 
 `execMotion` is optional and is the only member that needs OpenExec: every
 library and tool builds against a runtime without the exec libraries.

@@ -24,6 +24,13 @@ release:
   publishes. That change is also where the renames it inherits land —
   `Humanoid.h` is `MotionPose.h` here, a pose's `source` is its `metadata`,
   and each exec node becomes one library call.
+- 🚧 **`execMotion` is the last of them, and v0.5.1 publishes it**
+  ([its record](../releases/v0.5.1.md), prepared 2026-09-24). v0.5.0 attached
+  the bundle and the CLIs without pushing them, so no consumer could pin
+  them. v0.5.1 pushes both, and `ost` 0.23.4 lets a consumer pin them. The
+  deletion also waits on `ost`: its root build materializes external libraries
+  only, so the consumer's root CTest suites that compose the bundle would lose
+  it.
 - ⬜ **The parity evidence its MIG-0 named is reproduced against these
   packages** before those deletions: 414 598 compared values at its v0.9.0,
   every one `==`. Reproducing it is what makes the move provably
