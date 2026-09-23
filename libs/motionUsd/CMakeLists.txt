@@ -7,7 +7,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
          _motion_usd_version LIMIT_COUNT 1)
     string(STRIP "${_motion_usd_version}" _motion_usd_version)
 else()
-    set(_motion_usd_version "0.5.0")
+    set(_motion_usd_version "0.5.1")
 endif()
 
 project(motionUsd

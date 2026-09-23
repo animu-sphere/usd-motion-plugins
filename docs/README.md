@@ -17,7 +17,8 @@ Current implementation facts live in [reference/](reference/).
 | [contributing/](contributing/) | How to maintain these documents. | [documentation.md](contributing/documentation.md) |
 
 [releases/](releases/) holds one record per release, added with its tag; the
-first is [v0.5.0](releases/v0.5.0.md).
+first is [v0.5.0](releases/v0.5.0.md), and the latest is
+[v0.5.1](releases/v0.5.1.md).
 
 ## Source of truth
 

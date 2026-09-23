@@ -22,8 +22,11 @@
 # openstrata.ci.yaml records their provenance). The ecosystem pins one OpenUSD
 # release because usd-avatar-runtime composes every package into one process
 # (docs/architecture/DEPENDENCIES.md §1), so these are re-pinned together. The
-# `ost` pin is 0.23.3 (2026-09-23), re-pinned across the ecosystem together
-# with usd-vrm-plugins, motion-connectors and usd-mmd-plugins. 0.23.3 pulls,
+# `ost` pin is 0.23.4 (2026-09-24), re-pinned across the ecosystem together
+# with usd-vrm-plugins, motion-connectors and usd-mmd-plugins. 0.23.4 lets a
+# consumer pin a published bundle (`requires.bundles[].artifact`) and a published
+# tool for its tests (`requires.tools[]`), which is what `execMotion` and the
+# CLIs are published for from v0.5.1 (usd-vrm-plugins' ost report 45). 0.23.3 pulls,
 # graphs and validates an external library only a tool declares, and discards a
 # build tree configured against another runtime (usd-vrm-plugins' ost report
 # 44). 0.23.2 was taken for what it adds,
@@ -85,7 +88,7 @@ schema: 1
 
 bootstrap:
   ost:
-    version: "0.23.3"
+    version: "0.23.4"
     repository: animu-sphere/open-strata
 
 runners:
