@@ -26,7 +26,7 @@ current components. Every value is taken from the sibling repositories so that
 | Language | C++20 |
 | Build | CMake 3.22 or later; `CMakePresets.json` for plain CMake |
 | Compilers | MSVC on Windows, Clang on macOS arm64, GCC on Linux — the siblings' three lanes |
-| OpenStrata | `ost` 0.23.2, pinned in `openstrata.ci.yaml` and kept in sync with the consuming ecosystem |
+| OpenStrata | `ost` 0.23.3, pinned in `openstrata.ci.yaml` and kept in sync with the consuming ecosystem |
 | Tests | as in the siblings: plain executables registered with CTest, checking with `assert()` compiled into Release builds, unless the scaffold records a reason to differ |
 | Python | the interpreter OpenUSD was built against, for stage tests and tooling; Python bindings are later (design policy §25) |
 

@@ -34,6 +34,13 @@ separate from the package version
 
 ### Changed
 
+- **The `ost` pin is 0.23.3.** Taken with the ecosystem, for the consumers
+  of what v0.5.0 published: 0.23.3 pulls, graphs and validates an external
+  library artifact only a tool declares, which is how `usd-vrm-plugins`'
+  `motion_retarget` consumes `motionUsd`, and it discards a build tree whose
+  cache was configured against another runtime (`usd-vrm-plugins`' ost report
+  44). Nothing here consumes an external library, so nothing here changes.
+
 - **The `ost` pin is 0.23.2.** Taken for the consumers rather than for this
   repository: 0.23.2 makes the root `ost build` compose the external library
   artifacts a workspace's members declare, which is how every consumer of the
