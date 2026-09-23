@@ -16,10 +16,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONSAMPLING_BUILD_TESTS)
 
 # Like motionCore, motionSampling uses only OpenUSD's Gf value types. It has no
 # USD stage, Sdf, plug, or file-format dependency (WORKSPACE.md §2).
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # In the workspace build motionCore is already an in-tree target; a standalone
 # configure resolves its installed package.

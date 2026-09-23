@@ -87,11 +87,7 @@ if(EXISTS "${_motion_bvh_recorded}" AND EXISTS "${_motion_bvh_profiles}")
     # libs/motionSource/tests does. The paragraph above about loading nothing is
     # about the other four executables.
     if(WIN32)
-        if(TARGET gf)
-            set(_motion_bvh_gf gf)
-        else()
-            set(_motion_bvh_gf pxr::gf)
-        endif()
+        set(_motion_bvh_gf usdmotion::pxr::gf)
         set(_motion_bvh_conversion_path
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>"
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>/../bin")

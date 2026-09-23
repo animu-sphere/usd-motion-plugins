@@ -17,10 +17,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONUSD_BUILD_TESTS)
 # motionUsd is the one library here that authors a stage: it links OpenUSD's
 # usd, sdf, usdGeom and usdSkel, and still no plug registration, file format,
 # imaging or OpenExec (WORKSPACE.md §2, DEPENDENCIES.md).
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # In the workspace build motionCore is already an in-tree target; a standalone
 # configure resolves its installed package.
@@ -42,18 +39,14 @@ target_include_directories(motionUsd
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>")
-target_link_libraries(motionUsd PUBLIC motionCore::motionCore)
-# The stage types are in the public header, so the edge is PUBLIC. The runtime
-# names its targets bare or under pxr::, as motionCore's gf lookup says.
-foreach(_motion_usd_pxr IN ITEMS usd sdf usdGeom usdSkel)
-    if(TARGET ${_motion_usd_pxr})
-        target_link_libraries(motionUsd PUBLIC ${_motion_usd_pxr})
-    elseif(TARGET pxr::${_motion_usd_pxr})
-        target_link_libraries(motionUsd PUBLIC pxr::${_motion_usd_pxr})
-    else()
-        message(FATAL_ERROR "motionUsd requires the OpenUSD ${_motion_usd_pxr} CMake target.")
-    endif()
-endforeach()
+# The stage types are in the public header, so the OpenUSD edge is PUBLIC.
+target_link_libraries(motionUsd
+    PUBLIC
+        motionCore::motionCore
+        usdmotion::pxr::usd
+        usdmotion::pxr::sdf
+        usdmotion::pxr::usdGeom
+        usdmotion::pxr::usdSkel)
 
 if(MSVC)
     # PUBLIC, not PRIVATE: the installed headers carry UTF-8 (the §-references

@@ -48,8 +48,7 @@ endif()
 # Resolve OpenUSD once for the whole project, and refuse any release but the
 # one the ecosystem pins. Every library links OpenUSD's foundation types
 # (WORKSPACE.md §2.1), so nothing here is configured before this.
-find_package(pxr REQUIRED CONFIG)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # The interpreter the workspace tests run under. It must be the Python OpenUSD
 # was built against, and pxrConfig.cmake names that one -- it sets

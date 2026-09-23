@@ -53,15 +53,13 @@ if(MSVC)
     target_compile_options(execMotion_mechanism_tests PRIVATE /bigobj /utf-8)
 endif()
 
-set(_exec_motion_test_targets)
-foreach(_t IN ITEMS arch tf gf vt plug sdf usd usdSkel
-                    vdf ef esf esfUsd exec execUsd)
-    if(TARGET ${_t})
-        list(APPEND _exec_motion_test_targets ${_t})
-    elseif(TARGET pxr::${_t})
-        list(APPEND _exec_motion_test_targets pxr::${_t})
-    endif()
-endforeach()
+# The bundle's own OpenUSD half: the suites below drive exec directly.
+set(_exec_motion_test_targets
+    usdmotion::pxr::arch usdmotion::pxr::tf usdmotion::pxr::gf
+    usdmotion::pxr::vt usdmotion::pxr::plug usdmotion::pxr::sdf
+    usdmotion::pxr::usd usdmotion::pxr::usdSkel usdmotion::pxr::vdf
+    usdmotion::pxr::ef usdmotion::pxr::esf usdmotion::pxr::esfUsd
+    usdmotion::pxr::exec usdmotion::pxr::execUsd)
 target_link_libraries(execMotion_mechanism_tests
     PRIVATE ${_exec_motion_test_targets})
 
@@ -275,14 +273,9 @@ if(MSVC)
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
     target_compile_options(execMotion_display_tests PRIVATE /bigobj /utf-8)
 endif()
-set(_exec_motion_display_targets ${_exec_motion_test_targets})
-foreach(_t IN ITEMS usdGeom execGeom hd usdImaging usdExecImaging)
-    if(TARGET ${_t})
-        list(APPEND _exec_motion_display_targets ${_t})
-    elseif(TARGET pxr::${_t})
-        list(APPEND _exec_motion_display_targets pxr::${_t})
-    endif()
-endforeach()
+set(_exec_motion_display_targets ${_exec_motion_test_targets}
+    usdmotion::pxr::usdGeom usdmotion::pxr::execGeom usdmotion::pxr::hd
+    usdmotion::pxr::usdImaging usdmotion::pxr::usdExecImaging)
 target_link_libraries(execMotion_display_tests
     PRIVATE motionCore::motionCore ${_exec_motion_display_targets})
 

@@ -489,7 +489,9 @@ def link_errors(bundle: str, links: str, workspace_allowed: set[str]) -> list[st
         name = entry.strip()
         if name in workspace_allowed:
             continue
-        if name.removeprefix("pxr::") in OPENUSD_ALLOWED:
+        # An OpenUSD library arrives under cmake/UsdMotionOpenUsd.cmake's
+        # `usdmotion::pxr::` alias, or as the install names it.
+        if re.sub(r"^(?:usdmotion::)?pxr::", "", name) in OPENUSD_ALLOWED:
             continue
         errors.append(
             f"{bundle} links '{name}', which WORKSPACE.md section 2 does not allow it "

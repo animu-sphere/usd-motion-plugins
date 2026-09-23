@@ -18,10 +18,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONRETARGET_BUILD_TESTS)
 # Gf value types only, no stage, no plugin registration and no OpenExec
 # (WORKSPACE.md §2; RETARGETING_POLICY.md §1). Reading a rig off a stage is
 # motionUsd's or a format repository's job.
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # In the workspace build motionCore is already an in-tree target; a standalone
 # configure resolves its installed package.

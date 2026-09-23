@@ -65,11 +65,7 @@ if(EXISTS "${_motion_source_profiles}")
 endif()
 
 if(WIN32)
-    if(TARGET gf)
-        set(_motion_source_gf gf)
-    else()
-        set(_motion_source_gf pxr::gf)
-    endif()
+    set(_motion_source_gf usdmotion::pxr::gf)
     # The converter names Gf types and the rest of this library links motionCore,
     # which does -- so the test executables import usd_gf.dll, which pulls
     # usd_tf.dll -> tbb.dll from bin/ plus python3xx.dll from the Python install.

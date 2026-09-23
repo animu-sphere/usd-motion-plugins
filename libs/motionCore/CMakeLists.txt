@@ -16,10 +16,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONCORE_BUILD_TESTS)
 
 # motionCore deliberately uses OpenUSD's small Gf value types in its public
 # contract, but has no USD stage, Sdf, plug, or file-format dependency.
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 add_library(motionCore STATIC
     src/Compare.cpp
@@ -36,13 +33,7 @@ target_include_directories(motionCore
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>")
 
-if(TARGET gf)
-    target_link_libraries(motionCore PUBLIC gf)
-elseif(TARGET pxr::gf)
-    target_link_libraries(motionCore PUBLIC pxr::gf)
-else()
-    message(FATAL_ERROR "motionCore requires the OpenUSD gf CMake target.")
-endif()
+target_link_libraries(motionCore PUBLIC usdmotion::pxr::gf)
 
 if(MSVC)
     target_compile_options(motionCore PRIVATE /utf-8)

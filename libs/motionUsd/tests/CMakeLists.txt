@@ -10,11 +10,7 @@ target_compile_options(motionUsd_tests
 add_test(NAME motionUsd_unit COMMAND motionUsd_tests)
 
 if(WIN32)
-    if(TARGET usdSkel)
-        set(_motion_usd_skel usdSkel)
-    else()
-        set(_motion_usd_skel pxr::usdSkel)
-    endif()
+    set(_motion_usd_skel usdmotion::pxr::usdSkel)
     # The library is static, but it links OpenUSD's stage libraries, so the
     # test executable loads usd_usdSkel.dll and its dependencies at run time.
     # That DLL is in the runtime's lib/ and pulls in usd_tf.dll -> tbb.dll from

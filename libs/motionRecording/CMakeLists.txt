@@ -18,10 +18,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONRECORDING_BUILD_TESTS)
 # USD stage, Sdf, plug, or file-format dependency, and no transport or clock:
 # a stream receives poses already decoded (WORKSPACE.md §2, MOTION_CONTRACT.md
 # §9).
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # In the workspace build motionCore and motionSampling are already in-tree
 # targets; a standalone configure resolves their installed packages.

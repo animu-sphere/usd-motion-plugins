@@ -10,11 +10,7 @@ target_compile_options(motionSampling_tests
 add_test(NAME motionSampling_unit COMMAND motionSampling_tests)
 
 if(WIN32)
-    if(TARGET gf)
-        set(_motion_sampling_gf gf)
-    else()
-        set(_motion_sampling_gf pxr::gf)
-    endif()
+    set(_motion_sampling_gf usdmotion::pxr::gf)
     # The library is static, but it calls exported Gf entry points (GfSlerp,
     # quaternion multiply), so the test executable loads usd_gf.dll at run time.
     # That DLL is in the runtime's lib/ and pulls in usd_tf.dll -> tbb.dll from

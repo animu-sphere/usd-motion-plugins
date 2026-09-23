@@ -30,15 +30,12 @@ project(ExecMotionPlugin
 # platforms and tested it on none.
 usdmotion_component_project(TESTS_OPTION USDMOTION_BUILD_TESTS)
 
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
 # The OpenUSD pin, and then the OpenExec probe -- which this member alone
 # calls, because it is the only one that cannot link without OpenExec, and
 # every library and tool here builds against a runtime that has none
 # (docs/architecture/DEPENDENCIES.md §1). A runtime the probe refuses would
 # otherwise fail here as an unresolved symbol.
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 usdmotion_require_openexec()
 
 if(NOT TARGET motionCore::motionCore)
@@ -96,23 +93,24 @@ endif()
 # The exec half is named explicitly rather than taken from usd_ms: the
 # monolithic target does not carry the exec libraries, and `esf`/`esfUsd`/`ef`
 # are here because the public exec headers include them transitively — the same
-# list `usdmotion_require_openexec()` probes for.
-set(_exec_motion_targets)
-foreach(_t IN ITEMS arch tf gf vt plug sdf usd usdSkel
-                    vdf ef esf esfUsd exec execUsd)
-    if(TARGET ${_t})
-        list(APPEND _exec_motion_targets ${_t})
-    elseif(TARGET pxr::${_t})
-        list(APPEND _exec_motion_targets pxr::${_t})
-    else()
-        message(FATAL_ERROR
-            "execMotion needs the OpenUSD target '${_t}', which this install "
-            "does not define. usdmotion_require_openexec() should have "
-            "refused this runtime already; if it did not, its probe list "
-            "and this one have drifted apart.")
-    endif()
-endforeach()
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${_exec_motion_targets})
+# list `usdmotion_require_openexec()` probes for. A name this runtime lacks
+# fails at generate time; if the probe passed, its list and this one have
+# drifted apart.
+target_link_libraries(${PLUGIN_NAME} PRIVATE
+    usdmotion::pxr::arch
+    usdmotion::pxr::tf
+    usdmotion::pxr::gf
+    usdmotion::pxr::vt
+    usdmotion::pxr::plug
+    usdmotion::pxr::sdf
+    usdmotion::pxr::usd
+    usdmotion::pxr::usdSkel
+    usdmotion::pxr::vdf
+    usdmotion::pxr::ef
+    usdmotion::pxr::esf
+    usdmotion::pxr::esfUsd
+    usdmotion::pxr::exec
+    usdmotion::pxr::execUsd)
 
 set(OPENSTRATA_PLUGIN_LIBRARY_PREFIX "lib")
 set_target_properties(${PLUGIN_NAME} PROPERTIES

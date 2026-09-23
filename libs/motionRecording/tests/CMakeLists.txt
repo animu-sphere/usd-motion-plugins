@@ -28,11 +28,7 @@ if(EXISTS "${_motion_recording_corpus}")
 endif()
 
 if(WIN32)
-    if(TARGET gf)
-        set(_motion_recording_gf gf)
-    else()
-        set(_motion_recording_gf pxr::gf)
-    endif()
+    set(_motion_recording_gf usdmotion::pxr::gf)
     # The libraries are static, but they call exported Gf entry points, so the
     # test executable loads usd_gf.dll at run time; motionSampling's tests say
     # what else that pulls in, and why a plain-CMake `ctest` needs the PATH.

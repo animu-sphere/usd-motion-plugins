@@ -21,10 +21,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONSOURCE_BUILD_TESTS)
 # it in review rather than quietly. Everywhere else a value in a basis this layer
 # does not know is still not a geometric vector (SourceSkeleton.h), and the check
 # is what keeps that true now that one file here does name a Gf type.
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
 # In the composed workspace build motionCore is already an in-tree target; a
 # standalone `ost plugin build`-style configure resolves its installed package.

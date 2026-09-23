@@ -10,11 +10,7 @@ target_compile_options(motionRetarget_tests
 add_test(NAME motionRetarget_unit COMMAND motionRetarget_tests)
 
 if(WIN32)
-    if(TARGET gf)
-        set(_motion_retarget_gf gf)
-    else()
-        set(_motion_retarget_gf pxr::gf)
-    endif()
+    set(_motion_retarget_gf usdmotion::pxr::gf)
     # The library is static, but it calls exported Gf entry points (quaternion
     # multiply, matrix decomposition), so the test executable loads usd_gf.dll
     # at run time.

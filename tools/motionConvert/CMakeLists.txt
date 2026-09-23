@@ -23,10 +23,7 @@ project(motionConvert
 
 usdmotion_component_project(TESTS_OPTION MOTIONCONVERT_BUILD_TESTS)
 
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 if(NOT TARGET motionBvh::motionBvh)
     find_package(motionBvh REQUIRED CONFIG)
 endif()
@@ -49,16 +46,16 @@ target_compile_features(motion_convert PRIVATE cxx_std_17)
 target_link_libraries(motion_convert
     PRIVATE motionBvh::motionBvh motionSource::motionSource motionUsd::motionUsd)
 
-foreach(_usd_lib usd usdGeom usdSkel sdf tf gf vt arch)
-    if(TARGET ${_usd_lib})
-        target_link_libraries(motion_convert PRIVATE ${_usd_lib})
-    elseif(TARGET pxr::${_usd_lib})
-        target_link_libraries(motion_convert PRIVATE pxr::${_usd_lib})
-    else()
-        message(FATAL_ERROR
-                "motion_convert requires the OpenUSD '${_usd_lib}' target.")
-    endif()
-endforeach()
+target_link_libraries(motion_convert
+    PRIVATE
+        usdmotion::pxr::usd
+        usdmotion::pxr::usdGeom
+        usdmotion::pxr::usdSkel
+        usdmotion::pxr::sdf
+        usdmotion::pxr::tf
+        usdmotion::pxr::gf
+        usdmotion::pxr::vt
+        usdmotion::pxr::arch)
 
 if(MSVC)
     target_compile_options(motion_convert PRIVATE /utf-8)

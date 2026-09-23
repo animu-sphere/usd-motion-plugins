@@ -100,3 +100,6 @@ macro(usdmotion_component_project)
     unset(_usdmotion_component_UNPARSED_ARGUMENTS)
     unset(_usdmotion_component_KEYWORDS_MISSING_VALUES)
 endmacro()
+
+# The rest of the shared infrastructure, so a component includes one file.
+include("${CMAKE_CURRENT_LIST_DIR}/UsdMotionOpenUsd.cmake")
