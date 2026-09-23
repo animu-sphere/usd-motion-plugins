@@ -34,7 +34,14 @@ separate from the package version
 
 ### Changed
 
-- **The `ost` pin is 0.23.3.** Taken with the ecosystem, for the consumers
+- **The `ost` pin is 0.23.4.** Taken with the ecosystem. 0.23.4 lets a
+  consumer pin a published bundle (`requires.bundles[].artifact`) and a
+  published tool for its tests (`requires.tools[]`). Those are the two edges
+  `usd-vrm-plugins` needs before it can delete its copy of `execMotion`
+  (its ost report 45). It also discards a member build tree configured
+  against another runtime. The re-render changes nothing but the version.
+
+- **The `ost` pin was 0.23.3.** Taken with the ecosystem, for the consumers
   of what v0.5.0 published: 0.23.3 pulls, graphs and validates an external
   library artifact only a tool declares, which is how `usd-vrm-plugins`'
   `motion_retarget` consumes `motionUsd`, and it discards a build tree whose
