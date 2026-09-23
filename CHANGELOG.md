@@ -9,6 +9,17 @@ separate from the package version
 
 ## [Unreleased]
 
+### Added
+
+- **`motion_record_replay` hands the tool paths no ANSI code page can spell.**
+  A trace under `ユニコード-é/歩き-é.trace` is replayed and held to the same
+  replay from an ASCII directory. Without the UTF-8 code-page manifest the
+  Windows executable reads `é` as `e` and cannot open the trace; measured by
+  building it without the manifest. The claim was a leg of `usd-vrm-plugins`'
+  `workspace_unicode_paths` while the tool was `motion_capture` there, and it
+  comes here first so that repository can delete its copy without leaving it
+  nowhere.
+
 ### Changed
 
 - **The `ost` pin is 0.23.2.** Taken for the consumers rather than for this

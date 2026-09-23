@@ -20,6 +20,7 @@ import argparse
 import json
 import math
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,11 @@ import tempfile
 from pxr import Gf, Sdf, Usd, UsdSkel
 
 TOLERANCE = 1e-5
+
+# Named so that no single ANSI code page can spell it: CP932 has the kana and no
+# `é`, CP1252 the reverse. A name one code page covers would pass on the hosts
+# that use it and prove nothing there.
+UNICODE_DIRECTORY = "ユニコード-é"
 
 
 class Failures:
@@ -515,11 +521,64 @@ def check_stage_resolves_and_moves(clip: pathlib.Path,
         f"recorded session binds but does not animate the skeleton")
 
 
+def animation_values(path: pathlib.Path) -> list:
+    """The stage's SkelAnimation, every attribute and every sample, as values."""
+    # The stage stays in a local: a prim holds no strong reference to it.
+    stage = Usd.Stage.Open(str(path))
+    animation = find_animation(stage).GetPrim()
+    return [(attribute.GetName(), attribute.Get(),
+             [(time, attribute.Get(time))
+              for time in attribute.GetTimeSamples()])
+            for attribute in sorted(animation.GetAttributes(),
+                                    key=lambda a: a.GetName())]
+
+
+def check_non_ascii_paths(tool: str, corpus: pathlib.Path,
+                          directory: pathlib.Path, failures: Failures) -> None:
+    """A trace and an output whose paths no ANSI code page can spell.
+
+    Windows hands `main(int, char**)` its arguments in the process's ANSI code
+    page, and OpenUSD reads a path as UTF-8, so a non-ASCII path reached the
+    stage as bytes it could not decode. The executable's manifest sets its code
+    page to UTF-8 (`cmake/UsdMotionUtf8CodePage.cmake`), and this is the check
+    that it does. It is held to the same replay from an ASCII directory: the
+    path may change the path and nothing else.
+
+    In usd-vrm-plugins, where this tool was `motion_capture`, the claim was a
+    leg of `workspace_unicode_paths`; it moved with the tool. On Linux and
+    macOS a path is bytes and this passes with or without the manifest.
+    """
+    trace = corpus / "walk-clean-30hz.trace"
+    outputs = []
+    for folder, stem in (("ascii", "walk"), (UNICODE_DIRECTORY, "歩き-é")):
+        inputs = directory / folder
+        inputs.mkdir()
+        copied = inputs / f"{stem}.trace"
+        shutil.copyfile(trace, copied)
+        output = inputs / f"{stem}.usda"
+        result = capture(tool, copied, output)
+        if not failures.check(
+                result.returncode == 0 and output.exists(),
+                f"motion_record could not replay {copied.name} from "
+                f"'{folder}': exit {result.returncode}: "
+                f"{result.stderr.strip()}"):
+            return
+        outputs.append(output)
+    failures.check(
+        animation_values(outputs[1]) == animation_values(outputs[0]),
+        "the stage replayed under a non-ASCII path differs from the one "
+        "replayed from an ASCII directory")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tool", required=True)
     parser.add_argument("--corpus", required=True)
     options = parser.parse_args()
+    # A failure can name a non-ASCII path, and a pipe on Windows is otherwise
+    # written in the code page check_non_ascii_paths exists to stay out of.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
     corpus = pathlib.Path(options.corpus).resolve()
     if not corpus.is_dir():
@@ -551,6 +610,7 @@ def main() -> int:
         check_channels_reach_the_stage(options.tool, corpus, directory,
                                        failures)
         check_stage_resolves_and_moves(clip, failures)
+        check_non_ascii_paths(options.tool, corpus, directory, failures)
 
     return failures.report()
 
