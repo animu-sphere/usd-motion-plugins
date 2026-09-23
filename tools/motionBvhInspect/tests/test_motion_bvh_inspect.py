@@ -26,10 +26,17 @@ import argparse
 import json
 import math
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 
 TOLERANCE = 1e-6
+
+# Named so that no single ANSI code page can spell it: CP932 has the kana and no
+# `é`, CP1252 the reverse. A name one code page covers would pass on the hosts
+# that use it and prove nothing there.
+UNICODE_DIRECTORY = "ユニコード-é"
 
 
 class Failures:
@@ -386,11 +393,53 @@ def check_determinism(tool: str, generated: pathlib.Path,
                    "two runs over the same file printed different reports")
 
 
+def check_non_ascii_paths(tool: str, generated: pathlib.Path,
+                          failures: Failures) -> None:
+    """A BVH whose path no ANSI code page can spell reports as an ASCII one.
+
+    Windows hands `main(int, char**)` its arguments in the process's ANSI code
+    page, and a narrow `std::ifstream` opens a string in that same code page;
+    the executable's manifest sets its code page to UTF-8
+    (`cmake/UsdMotionUtf8CodePage.cmake`), and this is the check that it does.
+    The report may name the file, so the path is replaced before the two
+    reports are compared: the path may change the path and nothing else.
+
+    In usd-vrm-plugins the claim was a leg of `workspace_unicode_paths`; it
+    moved with the tool. On Linux and macOS a path is bytes and this passes
+    with or without the manifest.
+    """
+    reports = []
+    with tempfile.TemporaryDirectory() as directory:
+        for folder, stem in (("ascii", "nested"),
+                             (UNICODE_DIRECTORY, "入れ子-é")):
+            inputs = pathlib.Path(directory) / folder
+            inputs.mkdir()
+            copied = inputs / f"{stem}.bvh"
+            shutil.copyfile(generated / "valid-nested-joints.bvh", copied)
+            result = inspect(tool, str(copied), "--all", "--frame", "1")
+            if not failures.check(
+                    result.returncode == 0,
+                    f"motion_bvh_inspect could not read {copied.name} from "
+                    f"'{folder}': exit {result.returncode}: "
+                    f"{result.stderr.strip()}"):
+                return
+            reports.append(result.stdout.replace(str(copied), "<path>")
+                           .replace(copied.name, "<name>"))
+    failures.check(
+        reports[1] == reports[0],
+        "the report over a non-ASCII path differs from the one over an ASCII "
+        "path")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tool", required=True)
     parser.add_argument("--corpus", required=True, type=pathlib.Path)
     arguments = parser.parse_args()
+    # A failure can name a non-ASCII path, and a pipe on Windows is otherwise
+    # written in the code page check_non_ascii_paths exists to stay out of.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
     corpus = arguments.corpus
     generated = corpus / "generated"
@@ -404,6 +453,7 @@ def main() -> int:
     check_limits(arguments.tool, generated, failures)
     check_command_errors(arguments.tool, generated, failures)
     check_determinism(arguments.tool, generated, failures)
+    check_non_ascii_paths(arguments.tool, generated, failures)
 
     if failures.report() != 0:
         return 1

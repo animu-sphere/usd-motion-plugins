@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -45,6 +46,11 @@ TOLERANCE = 1e-6
 # Rotations go through a degrees->radians->quaternion path in both this script
 # and the tool, in float rather than double on the tool's side.
 ANGLE_TOLERANCE = 1e-5
+
+# Named so that no single ANSI code page can spell it: CP932 has the kana and no
+# `é`, CP1252 the reverse. A name one code page covers would pass on the hosts
+# that use it and prove nothing there.
+UNICODE_DIRECTORY = "ユニコード-é"
 
 # USD_MAPPING.md §4.1: every motion stage is 30 time codes per second, and a
 # sample at `t` seconds is written at `t * 30`, snapped to the whole frame
@@ -798,6 +804,69 @@ def check_a_profile_this_repository_did_not_ship(
         f"describe: exit {result.returncode}, {result.stderr}")
 
 
+def animation_values(path: pathlib.Path) -> list:
+    """The clip's SkelAnimation, every attribute and every sample, as values."""
+    # The stage stays in a local: a prim holds no strong reference to it.
+    stage = Usd.Stage.Open(str(path))
+    animation = [prim for prim in stage.Traverse()
+                 if prim.IsA(UsdSkel.Animation)][0]
+    return [(attribute.GetName(), attribute.Get(),
+             [(time, attribute.Get(time))
+              for time in attribute.GetTimeSamples()])
+            for attribute in sorted(animation.GetAttributes(),
+                                    key=lambda a: a.GetName())]
+
+
+def check_non_ascii_paths(failures: Failures, tool: str, bvh: pathlib.Path,
+                          profile_dir: pathlib.Path,
+                          work: pathlib.Path) -> None:
+    """A BVH, a profile and an output whose paths no ANSI code page can spell.
+
+    Windows hands `main(int, char**)` its arguments in the process's ANSI code
+    page, and a narrow `std::ifstream` opens a string in that same code page,
+    so a non-ASCII path read `é` as `e` and the file could not be opened. The
+    executable's manifest sets its code page to UTF-8
+    (`cmake/UsdMotionUtf8CodePage.cmake`), and this is the check that it does.
+    The profile is named by path so that the profile reader meets the name
+    too, and the clip records the BVH's own name as provenance, which has to
+    come back as the name it was given rather than a code page's rendering of
+    it. Each run is held to the same run from an ASCII directory: the path may
+    change the path and nothing else.
+
+    In usd-vrm-plugins, where this tool was `motion_bvh_convert`, the claim was
+    a leg of `workspace_unicode_paths`; it moved with the tool. On Linux and
+    macOS a path is bytes and this passes with or without the manifest.
+    """
+    outputs = []
+    for folder, stem in (("ascii", "recorded"), (UNICODE_DIRECTORY, "収録-é")):
+        inputs = work / folder
+        inputs.mkdir()
+        copied = inputs / f"{stem}.bvh"
+        shutil.copyfile(bvh, copied)
+        profile = inputs / f"{stem}.yaml"
+        shutil.copyfile(profile_dir / f"{PROFILE_ID}.yaml", profile)
+        output = inputs / f"{stem}.usda"
+        result = run_tool(tool, str(copied), "--profile", str(profile),
+                          "--output", str(output), "--quiet")
+        if not failures.check(
+                result.returncode == 0 and output.exists(),
+                f"motion_convert could not convert {copied.name} from "
+                f"'{folder}': exit {result.returncode}: "
+                f"{result.stderr.strip()}"):
+            return
+        stage = Usd.Stage.Open(str(output))
+        source = stage.GetDefaultPrim().GetCustomData().get("source", {})
+        failures.check(
+            source.get("sourceId") == copied.name,
+            f"the clip converted from '{folder}' records its source as "
+            f"{source.get('sourceId')!r}, not {copied.name!r}")
+        outputs.append(output)
+    failures.check(
+        animation_values(outputs[1]) == animation_values(outputs[0]),
+        "the clip converted under a non-ASCII path differs from the one "
+        "converted from an ASCII directory")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tool", required=True)
@@ -806,6 +875,10 @@ def main() -> int:
     parser.add_argument("--profiles", type=pathlib.Path, required=True,
                         help="profiles/motion")
     arguments = parser.parse_args()
+    # A failure can name a non-ASCII path, and a pipe on Windows is otherwise
+    # written in the code page check_non_ascii_paths exists to stay out of.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
     bvh = arguments.corpus / "recorded" / "redistributable" / RECORDED
     if not bvh.exists():
@@ -827,6 +900,8 @@ def main() -> int:
                        arguments.profiles, work)
         check_a_profile_this_repository_did_not_ship(
             failures, arguments.tool, arguments.corpus, bvh, work)
+        check_non_ascii_paths(failures, arguments.tool, bvh,
+                              arguments.profiles, work)
     return failures.report()
 
 

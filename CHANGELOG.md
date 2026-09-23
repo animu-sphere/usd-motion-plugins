@@ -11,6 +11,18 @@ separate from the package version
 
 ### Added
 
+- **`motion_convert_clip` and `motion_bvh_inspect_report` hand their tools
+  paths no ANSI code page can spell.** A BVH and a profile named by path under
+  `ユニコード-é/` are converted, and the clip is held to the same conversion
+  from an ASCII directory, with the BVH's own non-ASCII name as its
+  `sourceId`. The inspector's report over the same kind of path is held to an
+  ASCII one. Built without the UTF-8 code-page manifest, both Windows
+  executables read `é` as `e`. The converter then cannot find the profile and
+  the inspector cannot open the file, which was measured. These claims were
+  the `motion_bvh_convert` and `motion_bvh_inspect` legs of `usd-vrm-plugins`'
+  `workspace_unicode_paths`. They land here first so that repository can
+  delete its BVH tools without leaving the claims nowhere.
+
 - **`motion_record_replay` hands the tool paths no ANSI code page can spell.**
   A trace under `ユニコード-é/歩き-é.trace` is replayed and held to the same
   replay from an ASCII directory. Without the UTF-8 code-page manifest the
