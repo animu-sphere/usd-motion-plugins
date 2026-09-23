@@ -39,14 +39,6 @@ usdmotion_install_library(TARGET motionCore PACKAGE motionCore)
 
 if(MOTIONCORE_BUILD_TESTS)
     enable_testing()
-    # In the workspace the root has already found the interpreter, under a name
-    # pxrConfig.cmake cannot clobber (the root CMakeLists.txt says why).
-    # Standalone, find it here, after find_package(pxr).
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

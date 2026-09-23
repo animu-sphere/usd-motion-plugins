@@ -1,11 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
-# Every suite in this workspace checks with `assert()`, and NDEBUG compiles
-# `assert()` away -- so a suite built Release prints "passed" and returns 0
-# without having checked anything. NDEBUG is undefined for test targets
-# specifically: the bundle under test stays Release, the checks stay live.
-set(_exec_motion_assertions $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
-
 # ---------------------------------------------------------------------------
 # The seam, with no stage and no exec
 # ---------------------------------------------------------------------------
@@ -26,8 +20,7 @@ target_link_libraries(execMotion_pose_tests PRIVATE
     # The seam's sampling rule is motionUsd's since 2026-09-20, so the suite
     # that exercises the seam with no stage links it too.
     motionUsd::motionUsd)
-target_compile_options(execMotion_pose_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_pose_tests)
 usdmotion_target_utf8(execMotion_pose_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_pose_tests
@@ -45,8 +38,7 @@ add_executable(execMotion_mechanism_tests test_exec_motion_mechanism.cpp)
 target_include_directories(execMotion_mechanism_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_mechanism_tests PRIVATE motionCore::motionCore)
-target_compile_options(execMotion_mechanism_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_mechanism_tests)
 usdmotion_target_utf8(execMotion_mechanism_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_mechanism_tests
@@ -80,8 +72,7 @@ add_executable(execMotion_sample_tests test_exec_motion_sample.cpp)
 target_include_directories(execMotion_sample_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_sample_tests PRIVATE motionCore::motionCore)
-target_compile_options(execMotion_sample_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_sample_tests)
 usdmotion_target_utf8(execMotion_sample_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_sample_tests
@@ -120,8 +111,7 @@ add_executable(execMotion_filter_tests test_exec_motion_filter.cpp)
 target_include_directories(execMotion_filter_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_filter_tests PRIVATE motionCore::motionCore)
-target_compile_options(execMotion_filter_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_filter_tests)
 usdmotion_target_utf8(execMotion_filter_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_filter_tests
@@ -157,8 +147,7 @@ add_executable(execMotion_root_tests test_exec_motion_root.cpp)
 target_include_directories(execMotion_root_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_root_tests PRIVATE motionCore::motionCore)
-target_compile_options(execMotion_root_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_root_tests)
 usdmotion_target_utf8(execMotion_root_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_root_tests
@@ -199,8 +188,7 @@ target_include_directories(execMotion_interpolate_tests PRIVATE
 target_link_libraries(execMotion_interpolate_tests PRIVATE
     motionCore::motionCore
     motionSampling::motionSampling)
-target_compile_options(execMotion_interpolate_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_interpolate_tests)
 usdmotion_target_utf8(execMotion_interpolate_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_interpolate_tests
@@ -235,8 +223,7 @@ add_executable(execMotion_blend_tests test_exec_motion_blend.cpp)
 target_include_directories(execMotion_blend_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_link_libraries(execMotion_blend_tests PRIVATE motionCore::motionCore)
-target_compile_options(execMotion_blend_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_blend_tests)
 usdmotion_target_utf8(execMotion_blend_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_blend_tests
@@ -272,8 +259,7 @@ add_test(NAME execMotion_blend
 add_executable(execMotion_display_tests test_exec_motion_display.cpp)
 target_include_directories(execMotion_display_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
-target_compile_options(execMotion_display_tests
-    PRIVATE ${_exec_motion_assertions})
+usdmotion_keep_assertions(execMotion_display_tests)
 usdmotion_target_utf8(execMotion_display_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_display_tests
@@ -306,22 +292,9 @@ add_test(NAME execMotion_display
 # The link libraries are handed in from the target itself, because the
 # workspace libraries a bundle could reach a socket through are static: no
 # dependency list of the built binary would ever name one.
-#
-# The interpreter is the root's USDVRM_TEST_PYTHON where there is one. This
-# directory is configured after `find_package(pxr)`, which re-finds Python3 for
-# Development only and leaves `Python3_Interpreter_FOUND` false here, so a guard
-# on that variable would never register the test and nothing would say so.
-if(USDVRM_TEST_PYTHON)
-    set(_exec_motion_python "${USDVRM_TEST_PYTHON}")
-else()
-    find_package(Python3 COMPONENTS Interpreter QUIET)
-    if(Python3_Interpreter_FOUND)
-        set(_exec_motion_python "${Python3_EXECUTABLE}")
-    endif()
-endif()
-if(_exec_motion_python)
+if(USDMOTION_TEST_PYTHON)
     add_test(NAME execMotion_boundaries
-        COMMAND "${_exec_motion_python}"
+        COMMAND "${USDMOTION_TEST_PYTHON}"
             "${CMAKE_CURRENT_SOURCE_DIR}/check_boundaries.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/.."
             "$<TARGET_FILE:${PLUGIN_NAME}>"
@@ -330,7 +303,7 @@ if(_exec_motion_python)
     # A boundary check that passes proves nothing about whether it can fail,
     # and its first review found two tables that could not.
     add_test(NAME execMotion_boundaries_selftest
-        COMMAND "${_exec_motion_python}"
+        COMMAND "${USDMOTION_TEST_PYTHON}"
             "${CMAKE_CURRENT_SOURCE_DIR}/test_check_boundaries.py")
 else()
     message(WARNING
@@ -344,12 +317,7 @@ endif()
 # The bundle's own resource directory is what PXR_PLUGINPATH_NAME points at, and
 # its plugInfo.json resolves LibraryPath relative to itself -- so the staged
 # tree the bundle already produces is what the test loads, not a copy.
-set(_usd_root "")
-if(pxr_DIR AND EXISTS "${pxr_DIR}/bin")
-    set(_usd_root "${pxr_DIR}")
-elseif(pxr_DIR)
-    get_filename_component(_usd_root "${pxr_DIR}/../../.." ABSOLUTE)
-endif()
+usdmotion_openusd_root(_usd_root)
 
 set(_bundle_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(_plug_resources "${_bundle_dir}/plugin/resources/execMotion")
@@ -364,20 +332,10 @@ set(_exec_motion_env
     "PATH=path_list_prepend:${_bundle_dir}/lib"
     "PXR_PLUGINPATH_NAME=path_list_prepend:${_plug_resources}")
 
-set_tests_properties(execMotion_mechanism PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_sample PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_filter PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_root PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_interpolate PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_blend PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
-set_tests_properties(execMotion_display PROPERTIES
-    ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
+set_tests_properties(execMotion_mechanism execMotion_sample execMotion_filter
+                     execMotion_root execMotion_interpolate execMotion_blend
+                     execMotion_display
+    PROPERTIES ENVIRONMENT_MODIFICATION "${_exec_motion_env}")
 
 # The seam suite needs no plugin and no plugin path, but it does link
 # motionCore, motionSampling and motionRecording and -- through Gf -- loads

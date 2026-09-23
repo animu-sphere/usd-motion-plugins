@@ -49,13 +49,6 @@ usdmotion_install_library(TARGET motionRetarget PACKAGE motionRetarget)
 
 if(MOTIONRETARGET_BUILD_TESTS)
     enable_testing()
-    # In the workspace the root has already found the interpreter (the root
-    # CMakeLists.txt says why under its own name); standalone, find it here.
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

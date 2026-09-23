@@ -50,18 +50,10 @@ endif()
 # (WORKSPACE.md §2.1), so nothing here is configured before this.
 usdmotion_require_openusd()
 
-# The interpreter the workspace tests run under. It must be the Python OpenUSD
-# was built against, and pxrConfig.cmake names that one -- it sets
-# Python3_EXECUTABLE unless it is already defined -- so the interpreter is found
-# here, after it. It is kept under a name of our own because pxrConfig.cmake
-# re-finds Python3 for its Development components in *this* scope, which leaves
-# Python3_Interpreter_FOUND false for anything guarded on it later
-# (usd-vrm-plugins lost a test that way without a red lane).
+# The interpreter every test runs under, found once here, after OpenUSD, for
+# the whole workspace (UsdMotionTesting.cmake says why it has a name of its own).
 if(USDMOTION_BUILD_TESTS)
-    find_package(Python3 COMPONENTS Interpreter QUIET)
-    if(Python3_Interpreter_FOUND)
-        set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-    endif()
+    usdmotion_find_test_python()
 endif()
 
 # Components, in dependency order (WORKSPACE.md §2.1), as each import lands.
