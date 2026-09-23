@@ -16,38 +16,19 @@
 # for the plain-CMake workflow — the same shape as every sibling member.
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION" _exec_motion_version LIMIT_COUNT 1)
-    string(STRIP "${_exec_motion_version}" _exec_motion_version)
-else()
-    set(_exec_motion_version "0.5.1")  # mirrors openstrata.plugin.yaml
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(ExecMotionPlugin
-    VERSION ${_exec_motion_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "OpenExec computations over canonical motion"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2).
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(NOT _isMultiConfig AND NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
-
-# Spelled USDMOTION_BUILD_TESTS, like every member: the root defines it for
-# all of them, and a member-private spelling is how usd-vrm-plugins once
-# shipped a workspace lane that built a bundle on three platforms and tested
-# it on none.
-if(NOT DEFINED USDMOTION_BUILD_TESTS)
-    option(USDMOTION_BUILD_TESTS "Build usd-motion-plugins tests"
-           ${PROJECT_IS_TOP_LEVEL})
-endif()
+# The tests option is USDMOTION_BUILD_TESTS itself rather than a member-private
+# spelling: the root defines it for every member, and a private spelling is how
+# usd-vrm-plugins once shipped a workspace lane that built a bundle on three
+# platforms and tested it on none.
+usdmotion_component_project(TESTS_OPTION USDMOTION_BUILD_TESTS)
 
 if(NOT pxr_FOUND)
     find_package(pxr REQUIRED CONFIG)

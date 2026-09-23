@@ -11,34 +11,15 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_record_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_record_version}" _motion_record_version)
-else()
-    set(_motion_record_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionRecord
-    VERSION ${_motion_record_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "A recorded trace becomes a motion stage"
     LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT DEFINED MOTIONRECORD_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_record_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_record_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONRECORD_BUILD_TESTS "Build motion_record tests"
-           ${_motion_record_tests_default})
-endif()
+usdmotion_component_project(TESTS_OPTION MOTIONRECORD_BUILD_TESTS)
 
 if(NOT pxr_FOUND)
     find_package(pxr REQUIRED CONFIG)

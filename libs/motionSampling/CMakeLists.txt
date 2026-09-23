@@ -2,36 +2,17 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_sampling_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_sampling_version}" _motion_sampling_version)
-else()
-    set(_motion_sampling_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionSampling
-    VERSION ${_motion_sampling_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "Motion sampling with status, interpolation, resampling, filtering and blending"
     LANGUAGES CXX)
 
 # C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
 # public interface asks consumers for no more than C++17.
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT DEFINED MOTIONSAMPLING_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_sampling_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_sampling_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONSAMPLING_BUILD_TESTS "Build motionSampling tests"
-           ${_motion_sampling_tests_default})
-endif()
+usdmotion_component_project(TESTS_OPTION MOTIONSAMPLING_BUILD_TESTS)
 
 # Like motionCore, motionSampling uses only OpenUSD's Gf value types. It has no
 # USD stage, Sdf, plug, or file-format dependency (WORKSPACE.md §2).

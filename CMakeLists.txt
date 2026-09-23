@@ -18,31 +18,18 @@
 # in the dependency order of WORKSPACE.md §2.1.
 cmake_minimum_required(VERSION 3.22)
 
-# The single product version: the repository-root VERSION file. CHANGELOG.md,
-# the git tag and every manifest mirror it; nothing restates the number here.
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" _motion_project_version LIMIT_COUNT 1)
-string(STRIP "${_motion_project_version}" _motion_project_version)
+# The shared build infrastructure is cmake/ (UsdMotionProject.cmake names the
+# rest); this file is the workspace's orchestration only.
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(UsdMotionPlugins
-    VERSION ${_motion_project_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "Vendor-neutral, avatar-format-neutral motion for OpenUSD"
     LANGUAGES CXX)
 
-# C++20, as the siblings build (docs/architecture/DEPENDENCIES.md §2). `ost`'s
-# toolchain sets it too; a plain configure must not quietly get C++17.
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Single-config generators (Ninja) default to an empty build type. The OpenUSD
-# installs this builds against are Release-only, so default to Release rather
-# than pull debug-only imported dependencies.
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(NOT _isMultiConfig AND NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
+# C++20, and Release for a single-config generator with no build type.
+usdmotion_project_policy()
 
 option(USDMOTION_BUILD_TESTS "Build usd-motion-plugins tests" ${PROJECT_IS_TOP_LEVEL})
 
