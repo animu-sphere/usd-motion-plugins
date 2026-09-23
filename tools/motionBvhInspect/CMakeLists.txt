@@ -44,8 +44,7 @@ foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endforeach()
 
-include(GNUInstallDirs)
-install(TARGETS motion_bvh_inspect RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+usdmotion_install_tool(motion_bvh_inspect)
 
 if(MOTIONBVHINSPECT_BUILD_TESTS)
     enable_testing()

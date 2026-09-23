@@ -31,9 +31,7 @@ add_library(motionBvh STATIC
     src/BvhParser.cpp
     src/Diagnostics.cpp)
 add_library(motionBvh::motionBvh ALIAS motionBvh)
-set_target_properties(motionBvh PROPERTIES
-    EXPORT_NAME motionBvh
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionBvh PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionBvh PUBLIC cxx_std_17)
 target_compile_definitions(motionBvh PUBLIC MOTIONBVH_STATIC)
@@ -47,32 +45,7 @@ target_link_libraries(motionBvh PUBLIC motionSource::motionSource)
 # roadmap by its `§` sign -- motionSource's answer, for motionSource's reason.
 usdmotion_target_utf8(motionBvh PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionBvh
-    EXPORT motionBvhTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionBvhConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionBvhConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionBvh")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionBvhConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion)
-install(EXPORT motionBvhTargets
-    FILE motionBvhTargets.cmake
-    NAMESPACE motionBvh::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionBvh")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionBvhConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionBvhConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionBvh")
+usdmotion_install_library(TARGET motionBvh PACKAGE motionBvh)
 
 if(MOTIONBVH_BUILD_TESTS)
     enable_testing()

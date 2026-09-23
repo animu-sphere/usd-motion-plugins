@@ -28,9 +28,7 @@ add_library(motionSampling STATIC
     src/PoseBuffer.cpp
     src/Resample.cpp)
 add_library(motionSampling::motionSampling ALIAS motionSampling)
-set_target_properties(motionSampling PROPERTIES
-    EXPORT_NAME motionSampling
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionSampling PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionSampling PUBLIC cxx_std_17)
 target_compile_definitions(motionSampling PUBLIC MOTIONSAMPLING_STATIC)
@@ -43,33 +41,7 @@ target_link_libraries(motionSampling PUBLIC motionCore::motionCore)
 # PUBLIC: the installed headers cite the contracts by their `§` sign.
 usdmotion_target_utf8(motionSampling PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionSampling
-    EXPORT motionSamplingTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionSamplingConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, as motionCore's does.
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionSamplingTargets
-    FILE motionSamplingTargets.cmake
-    NAMESPACE motionSampling::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
+usdmotion_install_library(TARGET motionSampling PACKAGE motionSampling)
 
 if(MOTIONSAMPLING_BUILD_TESTS)
     enable_testing()

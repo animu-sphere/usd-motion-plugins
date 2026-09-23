@@ -34,9 +34,7 @@ add_library(motionSource STATIC
     src/SourceProvenance.cpp
     src/SourceSkeleton.cpp)
 add_library(motionSource::motionSource ALIAS motionSource)
-set_target_properties(motionSource PROPERTIES
-    EXPORT_NAME motionSource
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionSource PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionSource PUBLIC cxx_std_17)
 target_compile_definitions(motionSource PUBLIC MOTIONSOURCE_STATIC)
@@ -49,32 +47,7 @@ target_link_libraries(motionSource PUBLIC motionCore::motionCore)
 # PUBLIC: the installed headers cite the contracts by their `§` sign.
 usdmotion_target_utf8(motionSource PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionSource
-    EXPORT motionSourceTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionSourceConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSourceConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSource")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSourceConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion)
-install(EXPORT motionSourceTargets
-    FILE motionSourceTargets.cmake
-    NAMESPACE motionSource::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSource")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSourceConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSourceConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSource")
+usdmotion_install_library(TARGET motionSource PACKAGE motionSource)
 
 if(MOTIONSOURCE_BUILD_TESTS)
     enable_testing()

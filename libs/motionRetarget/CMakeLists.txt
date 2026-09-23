@@ -30,9 +30,7 @@ add_library(motionRetarget STATIC
     src/RootMotionPolicy.cpp
     src/SkeletonDescriptor.cpp)
 add_library(motionRetarget::motionRetarget ALIAS motionRetarget)
-set_target_properties(motionRetarget PROPERTIES
-    EXPORT_NAME motionRetarget
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionRetarget PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionRetarget PUBLIC cxx_std_17)
 target_compile_definitions(motionRetarget PUBLIC MOTIONRETARGET_STATIC)
@@ -47,33 +45,7 @@ target_link_libraries(motionRetarget PUBLIC motionCore::motionCore)
 # PUBLIC: the installed headers carry UTF-8.
 usdmotion_target_utf8(motionRetarget PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionRetarget
-    EXPORT motionRetargetTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionRetargetConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRetargetConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRetarget")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRetargetConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, as motionCore's does.
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionRetargetTargets
-    FILE motionRetargetTargets.cmake
-    NAMESPACE motionRetarget::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRetarget")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRetargetConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRetargetConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRetarget")
+usdmotion_install_library(TARGET motionRetarget PACKAGE motionRetarget)
 
 if(MOTIONRETARGET_BUILD_TESTS)
     enable_testing()

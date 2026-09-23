@@ -22,9 +22,7 @@ add_library(motionCore STATIC
     src/Compare.cpp
     src/MotionPose.cpp)
 add_library(motionCore::motionCore ALIAS motionCore)
-set_target_properties(motionCore PROPERTIES
-    EXPORT_NAME motionCore
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionCore PUBLIC cxx_std_17)
 target_compile_definitions(motionCore PUBLIC MOTIONCORE_STATIC)
@@ -37,34 +35,7 @@ target_link_libraries(motionCore PUBLIC usdmotion::pxr::gf)
 
 usdmotion_target_utf8(motionCore PRIVATE)
 
-include(GNUInstallDirs)
-install(TARGETS motionCore
-    EXPORT motionCoreTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionCoreConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionCoreConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionCore")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionCoreConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, so a consumer asking
-    # for 0.1 must not be handed 0.2 (the installed-consumer lane asks this way).
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionCoreTargets
-    FILE motionCoreTargets.cmake
-    NAMESPACE motionCore::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionCore")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionCoreConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionCoreConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionCore")
+usdmotion_install_library(TARGET motionCore PACKAGE motionCore)
 
 if(MOTIONCORE_BUILD_TESTS)
     enable_testing()

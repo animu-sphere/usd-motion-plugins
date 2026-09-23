@@ -25,9 +25,7 @@ add_library(motionUsd STATIC
     src/ClipReader.cpp
     src/ClipWriter.cpp)
 add_library(motionUsd::motionUsd ALIAS motionUsd)
-set_target_properties(motionUsd PROPERTIES
-    EXPORT_NAME motionUsd
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionUsd PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionUsd PUBLIC cxx_std_17)
 target_compile_definitions(motionUsd PUBLIC MOTIONUSD_STATIC)
@@ -47,33 +45,7 @@ target_link_libraries(motionUsd
 # PUBLIC: the installed headers cite the contracts by their `§` sign.
 usdmotion_target_utf8(motionUsd PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionUsd
-    EXPORT motionUsdTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionUsdConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionUsdConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionUsd")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionUsdConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, as motionCore's does.
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionUsdTargets
-    FILE motionUsdTargets.cmake
-    NAMESPACE motionUsd::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionUsd")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionUsdConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionUsdConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionUsd")
+usdmotion_install_library(TARGET motionUsd PACKAGE motionUsd)
 
 if(MOTIONUSD_BUILD_TESTS)
     enable_testing()

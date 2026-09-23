@@ -66,8 +66,7 @@ foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endforeach()
 
-include(GNUInstallDirs)
-install(TARGETS motion_convert RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+usdmotion_install_tool(motion_convert)
 
 # The profiles ship beside the tool, at the location ProfileLocator.cpp derives
 # from the executable's own path: a converter with no profile available refuses

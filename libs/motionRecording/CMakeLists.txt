@@ -29,9 +29,7 @@ add_library(motionRecording STATIC
     src/MotionRecorder.cpp
     src/ReplaySender.cpp)
 add_library(motionRecording::motionRecording ALIAS motionRecording)
-set_target_properties(motionRecording PROPERTIES
-    EXPORT_NAME motionRecording
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionRecording PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionRecording PUBLIC cxx_std_17)
 target_compile_definitions(motionRecording PUBLIC MOTIONRECORDING_STATIC)
@@ -45,33 +43,7 @@ target_link_libraries(motionRecording
 # PUBLIC: the installed headers cite the contracts by their `§` sign.
 usdmotion_target_utf8(motionRecording PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionRecording
-    EXPORT motionRecordingTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionRecordingConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRecordingConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRecording")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRecordingConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, as motionCore's does.
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionRecordingTargets
-    FILE motionRecordingTargets.cmake
-    NAMESPACE motionRecording::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRecording")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRecordingConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionRecordingConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionRecording")
+usdmotion_install_library(TARGET motionRecording PACKAGE motionRecording)
 
 if(MOTIONRECORDING_BUILD_TESTS)
     enable_testing()
