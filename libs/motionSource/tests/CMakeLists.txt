@@ -38,12 +38,7 @@ foreach(_motion_source_test ${_motion_source_tests})
                           motionSource::motionSource)
     target_compile_options(${_motion_source_test}
                            PRIVATE ${_motion_source_assertions})
-    if(MSVC)
-        # The headers cite the contracts by their `§` sign, and MSVC reads
-        # source in the *system* code page unless told otherwise -- so a
-        # Japanese-Windows build warns C4819 on every include without this.
-        target_compile_options(${_motion_source_test} PRIVATE /utf-8)
-    endif()
+    usdmotion_target_utf8(${_motion_source_test} PRIVATE)
 endforeach()
 
 add_test(NAME motionSource_skeleton COMMAND motionSource_skeleton_tests)

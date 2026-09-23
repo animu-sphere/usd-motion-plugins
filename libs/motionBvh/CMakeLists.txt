@@ -23,9 +23,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONBVH_BUILD_TESTS)
 # nowhere, and motionBvh_boundaries checks the source rule that says so. What the
 # edge does cost is the *binary* half of that check, and tests/CMakeLists.txt
 # states what is left of it and why.
-if(NOT TARGET motionSource::motionSource)
-    find_package(motionSource REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionSource)
 
 add_library(motionBvh STATIC
     src/BvhDocument.cpp
@@ -45,13 +43,9 @@ target_include_directories(motionBvh
         "$<INSTALL_INTERFACE:include>")
 target_link_libraries(motionBvh PUBLIC motionSource::motionSource)
 
-if(MSVC)
-    # PUBLIC rather than PRIVATE, unlike before the extractor: BvhExtract.h is
-    # an installed header citing the roadmap by its `§` sign, so every consumer
-    # that includes it needs the flag too or MSVC warns C4819 on a non-UTF-8
-    # code page. This is motionSource's answer, for motionSource's reason.
-    target_compile_options(motionBvh PUBLIC /utf-8)
-endif()
+# PUBLIC since the extractor: BvhExtract.h is an installed header citing the
+# roadmap by its `§` sign -- motionSource's answer, for motionSource's reason.
+usdmotion_target_utf8(motionBvh PUBLIC)
 
 include(GNUInstallDirs)
 install(TARGETS motionBvh

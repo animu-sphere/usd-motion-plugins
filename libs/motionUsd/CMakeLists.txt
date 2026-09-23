@@ -19,11 +19,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONUSD_BUILD_TESTS)
 # imaging or OpenExec (WORKSPACE.md §2, DEPENDENCIES.md).
 usdmotion_require_openusd()
 
-# In the workspace build motionCore is already an in-tree target; a standalone
-# configure resolves its installed package.
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionCore)
 
 add_library(motionUsd STATIC
     src/ClipReader.cpp
@@ -48,12 +44,8 @@ target_link_libraries(motionUsd
         usdmotion::pxr::usdGeom
         usdmotion::pxr::usdSkel)
 
-if(MSVC)
-    # PUBLIC, not PRIVATE: the installed headers carry UTF-8 (the §-references
-    # into the contracts), so every consumer that includes them needs the flag
-    # too or MSVC warns C4819 on a non-UTF-8 code page.
-    target_compile_options(motionUsd PUBLIC /utf-8)
-endif()
+# PUBLIC: the installed headers cite the contracts by their `§` sign.
+usdmotion_target_utf8(motionUsd PUBLIC)
 
 include(GNUInstallDirs)
 install(TARGETS motionUsd

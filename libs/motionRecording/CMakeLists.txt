@@ -20,14 +20,8 @@ usdmotion_component_project(TESTS_OPTION MOTIONRECORDING_BUILD_TESTS)
 # §9).
 usdmotion_require_openusd()
 
-# In the workspace build motionCore and motionSampling are already in-tree
-# targets; a standalone configure resolves their installed packages.
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionCore)
+usdmotion_require_dependency(motionSampling)
 
 add_library(motionRecording STATIC
     src/CaptureTrace.cpp
@@ -48,12 +42,8 @@ target_include_directories(motionRecording
 target_link_libraries(motionRecording
     PUBLIC motionCore::motionCore motionSampling::motionSampling)
 
-if(MSVC)
-    # PUBLIC, not PRIVATE: the installed headers carry UTF-8 (the §-references
-    # into the contracts), so every consumer that includes them needs the flag
-    # too or MSVC warns C4819 on a non-UTF-8 code page.
-    target_compile_options(motionRecording PUBLIC /utf-8)
-endif()
+# PUBLIC: the installed headers cite the contracts by their `§` sign.
+usdmotion_target_utf8(motionRecording PUBLIC)
 
 include(GNUInstallDirs)
 install(TARGETS motionRecording

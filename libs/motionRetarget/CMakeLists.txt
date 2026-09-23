@@ -20,11 +20,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONRETARGET_BUILD_TESTS)
 # motionUsd's or a format repository's job.
 usdmotion_require_openusd()
 
-# In the workspace build motionCore is already an in-tree target; a standalone
-# configure resolves its installed package.
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionCore)
 
 add_library(motionRetarget STATIC
     src/Diagnostics.cpp
@@ -48,12 +44,8 @@ target_include_directories(motionRetarget
 # caller that wants another timeline resamples before it retargets.
 target_link_libraries(motionRetarget PUBLIC motionCore::motionCore)
 
-if(MSVC)
-    # PUBLIC, not PRIVATE: the installed headers carry UTF-8, so every consumer
-    # that includes them needs the flag too or MSVC warns C4819 on a non-UTF-8
-    # code page.
-    target_compile_options(motionRetarget PUBLIC /utf-8)
-endif()
+# PUBLIC: the installed headers carry UTF-8.
+usdmotion_target_utf8(motionRetarget PUBLIC)
 
 include(GNUInstallDirs)
 install(TARGETS motionRetarget

@@ -103,3 +103,5 @@ endmacro()
 
 # The rest of the shared infrastructure, so a component includes one file.
 include("${CMAKE_CURRENT_LIST_DIR}/UsdMotionOpenUsd.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/UsdMotionTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/UsdMotionUtf8CodePage.cmake")

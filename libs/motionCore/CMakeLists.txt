@@ -35,9 +35,7 @@ target_include_directories(motionCore
 
 target_link_libraries(motionCore PUBLIC usdmotion::pxr::gf)
 
-if(MSVC)
-    target_compile_options(motionCore PRIVATE /utf-8)
-endif()
+usdmotion_target_utf8(motionCore PRIVATE)
 
 include(GNUInstallDirs)
 install(TARGETS motionCore

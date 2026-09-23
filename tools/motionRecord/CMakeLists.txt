@@ -22,16 +22,9 @@ project(motionRecord
 usdmotion_component_project(TESTS_OPTION MOTIONRECORD_BUILD_TESTS)
 
 usdmotion_require_openusd()
-if(NOT TARGET motionRecording::motionRecording)
-    find_package(motionRecording REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_dependency(motionRecording)
+usdmotion_require_dependency(motionSampling)
+usdmotion_require_dependency(motionUsd)
 
 add_executable(motion_record
     src/Options.cpp
@@ -56,8 +49,8 @@ target_link_libraries(motion_record
         usdmotion::pxr::vt
         usdmotion::pxr::arch)
 
+usdmotion_target_utf8(motion_record PRIVATE)
 if(MSVC)
-    target_compile_options(motion_record PRIVATE /utf-8)
     # windows.h's min/max macros meet OpenUSD's own numeric_limits<>::max()
     # uses in tf's robin map.
     target_compile_definitions(motion_record PRIVATE NOMINMAX _USE_MATH_DEFINES)

@@ -22,12 +22,7 @@ project(motionBvhInspect
 
 usdmotion_component_project(TESTS_OPTION MOTIONBVHINSPECT_BUILD_TESTS)
 
-# A standalone configure of this directory resolves the library as an installed
-# package; the composed build already has the in-tree target.
-if(NOT TARGET motionBvh::motionBvh)
-    find_package(motionBvh REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_dependency(motionBvh)
 
 add_executable(motion_bvh_inspect
     src/Options.cpp
@@ -38,11 +33,7 @@ usdmotion_use_utf8_code_page(motion_bvh_inspect)
 target_compile_features(motion_bvh_inspect PRIVATE cxx_std_17)
 target_link_libraries(motion_bvh_inspect PRIVATE motionBvh::motionBvh)
 
-if(MSVC)
-    # The headers cite contract sections by their `§` sign, and MSVC reads
-    # source in the *system* code page unless told otherwise.
-    target_compile_options(motion_bvh_inspect PRIVATE /utf-8)
-endif()
+usdmotion_target_utf8(motion_bvh_inspect PRIVATE)
 
 # Staged into the member root's bin/: `ost plugin package` reads the
 # directories openstrata.tool.yaml declares rather than a build tree.

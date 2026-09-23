@@ -24,16 +24,9 @@ project(motionConvert
 usdmotion_component_project(TESTS_OPTION MOTIONCONVERT_BUILD_TESTS)
 
 usdmotion_require_openusd()
-if(NOT TARGET motionBvh::motionBvh)
-    find_package(motionBvh REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSource::motionSource)
-    find_package(motionSource REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_dependency(motionBvh)
+usdmotion_require_dependency(motionSource)
+usdmotion_require_dependency(motionUsd)
 
 add_executable(motion_convert
     src/ClipWriter.cpp
@@ -57,8 +50,8 @@ target_link_libraries(motion_convert
         usdmotion::pxr::vt
         usdmotion::pxr::arch)
 
+usdmotion_target_utf8(motion_convert PRIVATE)
 if(MSVC)
-    target_compile_options(motion_convert PRIVATE /utf-8)
     # This tool includes the canonical half, so windows.h's min/max macros meet
     # OpenUSD's own numeric_limits<>::max() uses in tf's robin map.
     target_compile_definitions(motion_convert PRIVATE NOMINMAX _USE_MATH_DEFINES)

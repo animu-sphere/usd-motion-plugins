@@ -23,6 +23,7 @@
 # Every executable this repository ships calls this. It arrived from
 # usd-vrm-plugins with the BVH tools, whose converter was one of the tools that
 # measurement caught.
+include_guard(GLOBAL)
 
 function(usdmotion_use_utf8_code_page target)
     # The MSVC linker merges a `.manifest` source into the embedded manifest.

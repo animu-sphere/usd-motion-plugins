@@ -18,11 +18,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONSAMPLING_BUILD_TESTS)
 # USD stage, Sdf, plug, or file-format dependency (WORKSPACE.md §2).
 usdmotion_require_openusd()
 
-# In the workspace build motionCore is already an in-tree target; a standalone
-# configure resolves its installed package.
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionCore)
 
 add_library(motionSampling STATIC
     src/Blend.cpp
@@ -44,12 +40,8 @@ target_include_directories(motionSampling
         "$<INSTALL_INTERFACE:include>")
 target_link_libraries(motionSampling PUBLIC motionCore::motionCore)
 
-if(MSVC)
-    # PUBLIC, not PRIVATE: the installed headers carry UTF-8 (the §-references
-    # into the contracts), so every consumer that includes them needs the flag
-    # too or MSVC warns C4819 on a non-UTF-8 code page.
-    target_compile_options(motionSampling PUBLIC /utf-8)
-endif()
+# PUBLIC: the installed headers cite the contracts by their `§` sign.
+usdmotion_target_utf8(motionSampling PUBLIC)
 
 include(GNUInstallDirs)
 install(TARGETS motionSampling

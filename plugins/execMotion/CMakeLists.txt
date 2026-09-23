@@ -38,9 +38,7 @@ usdmotion_component_project(TESTS_OPTION USDMOTION_BUILD_TESTS)
 usdmotion_require_openusd()
 usdmotion_require_openexec()
 
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionCore)
 
 # The sampling half, from `motion.filterPose` onward: the node is one step of
 # `PoseFilter` and the algorithm stays in the library (WORKSPACE.md §2, design
@@ -50,25 +48,19 @@ endif()
 # `motion.identityPose` and `motion.sampleAnimation` need none of it -- an exec
 # input arrives already resolved at the evaluated frame, so the sampler had
 # nothing to wrap.
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionSampling)
 
 # The recording half, for one node and one rule: `motion.extractRootMotion` is
 # `ConditionRootMotion`, the intake rule a capture session applies to every
 # frame it accepts. Nothing else here reaches into a session.
-if(NOT TARGET motionRecording::motionRecording)
-    find_package(motionRecording CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionRecording)
 
 # The stage bridge, for one call: `PoseFromStageSample`, the rule that turns a
 # UsdSkelAnimation's already-resolved arrays into a pose. It lived in
 # usd-vrm-plugins' retarget CLI, which a computation cannot call, so this
 # bundle carried a copy until the reading half arrived here (USD_MAPPING.md
 # §7). The call takes values, so this is not a stage edge.
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionUsd)
 
 set(PLUGIN_NAME ExecMotion)
 add_library(${PLUGIN_NAME} SHARED
@@ -85,9 +77,10 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
     motionRecording::motionRecording
     motionUsd::motionUsd)
 
+usdmotion_target_utf8(${PLUGIN_NAME} PRIVATE)
 if(MSVC)
     target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(${PLUGIN_NAME} PRIVATE /bigobj /utf-8)
+    target_compile_options(${PLUGIN_NAME} PRIVATE /bigobj)
 endif()
 
 # The exec half is named explicitly rather than taken from usd_ms: the

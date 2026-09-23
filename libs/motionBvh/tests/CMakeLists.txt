@@ -27,12 +27,7 @@ foreach(_motion_bvh_test motionBvh_diagnostics_tests motionBvh_document_tests
                          motionBvh_conversion_tests)
     target_link_libraries(${_motion_bvh_test} PRIVATE motionBvh::motionBvh)
     target_compile_options(${_motion_bvh_test} PRIVATE ${_motion_bvh_assertions})
-    if(MSVC)
-        # The headers cite roadmap sections by their `§` sign, and MSVC reads
-        # source in the *system* code page unless told otherwise -- so a
-        # Japanese-Windows build warns C4819 on every include without this.
-        target_compile_options(${_motion_bvh_test} PRIVATE /utf-8)
-    endif()
+    usdmotion_target_utf8(${_motion_bvh_test} PRIVATE)
 endforeach()
 
 add_test(NAME motionBvh_diagnostics COMMAND motionBvh_diagnostics_tests)

@@ -28,10 +28,10 @@ target_link_libraries(execMotion_pose_tests PRIVATE
     motionUsd::motionUsd)
 target_compile_options(execMotion_pose_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_pose_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_pose_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_pose_tests PRIVATE /utf-8)
 endif()
 add_test(NAME execMotion_pose COMMAND execMotion_pose_tests)
 
@@ -47,10 +47,11 @@ target_include_directories(execMotion_mechanism_tests PRIVATE
 target_link_libraries(execMotion_mechanism_tests PRIVATE motionCore::motionCore)
 target_compile_options(execMotion_mechanism_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_mechanism_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_mechanism_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_mechanism_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_mechanism_tests PRIVATE /bigobj)
 endif()
 
 # The bundle's own OpenUSD half: the suites below drive exec directly.
@@ -81,10 +82,11 @@ target_include_directories(execMotion_sample_tests PRIVATE
 target_link_libraries(execMotion_sample_tests PRIVATE motionCore::motionCore)
 target_compile_options(execMotion_sample_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_sample_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_sample_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_sample_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_sample_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(execMotion_sample_tests
     PRIVATE ${_exec_motion_test_targets})
@@ -120,10 +122,11 @@ target_include_directories(execMotion_filter_tests PRIVATE
 target_link_libraries(execMotion_filter_tests PRIVATE motionCore::motionCore)
 target_compile_options(execMotion_filter_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_filter_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_filter_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_filter_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_filter_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(execMotion_filter_tests
     PRIVATE ${_exec_motion_test_targets})
@@ -156,10 +159,11 @@ target_include_directories(execMotion_root_tests PRIVATE
 target_link_libraries(execMotion_root_tests PRIVATE motionCore::motionCore)
 target_compile_options(execMotion_root_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_root_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_root_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_root_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_root_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(execMotion_root_tests
     PRIVATE ${_exec_motion_test_targets})
@@ -197,10 +201,11 @@ target_link_libraries(execMotion_interpolate_tests PRIVATE
     motionSampling::motionSampling)
 target_compile_options(execMotion_interpolate_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_interpolate_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_interpolate_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_interpolate_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_interpolate_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(execMotion_interpolate_tests
     PRIVATE ${_exec_motion_test_targets})
@@ -232,10 +237,11 @@ target_include_directories(execMotion_blend_tests PRIVATE
 target_link_libraries(execMotion_blend_tests PRIVATE motionCore::motionCore)
 target_compile_options(execMotion_blend_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_blend_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_blend_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_blend_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_blend_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(execMotion_blend_tests
     PRIVATE ${_exec_motion_test_targets})
@@ -268,10 +274,11 @@ target_include_directories(execMotion_display_tests PRIVATE
     ${PXR_INCLUDE_DIRS})
 target_compile_options(execMotion_display_tests
     PRIVATE ${_exec_motion_assertions})
+usdmotion_target_utf8(execMotion_display_tests PRIVATE)
 if(MSVC)
     target_compile_definitions(execMotion_display_tests
         PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(execMotion_display_tests PRIVATE /bigobj /utf-8)
+    target_compile_options(execMotion_display_tests PRIVATE /bigobj)
 endif()
 set(_exec_motion_display_targets ${_exec_motion_test_targets}
     usdmotion::pxr::usdGeom usdmotion::pxr::execGeom usdmotion::pxr::hd
