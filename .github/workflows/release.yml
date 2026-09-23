@@ -44,10 +44,14 @@
 # digest, which changes on every republish. The pin table carries both, in the
 # fields that take each.
 #
-# The bundle (`execMotion`) and the three CLIs are packaged and attached to the
-# GitHub release, but NOT pushed to the registry: nothing pins them by digest
-# yet. When `usd-avatar-runtime` needs `execMotion` that decision changes, and
-# this comment is where to change it.
+# THE BUNDLE AND THE CLIs ARE PUBLISHED TOO, since v0.5.1. Through v0.5.0 the
+# bundle (`execMotion`) and the three CLIs were attached to the GitHub release
+# and not pushed, because nothing could pin them. `ost` 0.23.4 added
+# `requires.bundles[].artifact` and `requires.tools[]`, which take the same pin
+# table, and usd-vrm-plugins needs both: its `execVrm` reads `execMotion`'s
+# nodes by name, and its tests run `motion_convert`. So every packaged member
+# goes to the same repository under the same tag shape, and the pin table has
+# one section per kind.
 #
 # `workflow_dispatch` is a dry run: the same build/package lanes, the same pin
 # table (with local digests and no `source`, because nothing was pushed),
@@ -335,7 +339,10 @@ jobs:
             fi
             printf '%s\t%s\t%s\t%s\n' "$lib" "$version" "$target" "$digest" >> release-stage/library-digests.tsv
           done
-          # --- the bundle and the CLI tools: attached, not published -------
+          # --- the bundle and the CLI tools: published like the libraries ---
+          # Staged the same way, as a whole dist directory the publish job can
+          # import, and listed with their kind so the pin table knows which
+          # `requires.*` section each goes in.
           count="$(jq -er '.data.packages | length' .ost-ci/package.json)"
           bundles="$(jq -er '[.data.packages[] | select(.member == "bundle")] | length' .ost-ci/package.json)"
           tools="$(jq -er '[.data.packages[] | select(.member == "tool")] | length' .ost-ci/package.json)"
@@ -354,9 +361,25 @@ jobs:
             cp "$archive" release-stage/
             name="$(jq -er ".data.packages[$i].name" .ost-ci/package.json)"
             target="$(jq -er ".data.packages[$i].target" .ost-ci/package.json)"
+            member="$(jq -er ".data.packages[$i].member" .ost-ci/package.json)"
+            digest="$(jq -er ".data.packages[$i].archive_digest" .ost-ci/package.json)"
+            got_version="$(jq -er ".data.packages[$i].version" .ost-ci/package.json)"
             if [ -f "$dist_dir/manifest.json" ]; then
               cp "$dist_dir/manifest.json" "release-stage/$name-$version-$target.manifest.json"
             fi
+            case "$member" in
+              bundle|tool) ;;
+              *) continue ;;
+            esac
+            if [ "$got_version" != "$version" ]; then
+              echo "::error title=release packaging::$name packaged version $got_version but the release is $version" ; exit 1
+            fi
+            if [ ! -f "$dist_dir/manifest.json" ]; then
+              echo "::error title=release packaging::$name has no manifest.json beside its archive, so it cannot be imported and published" ; exit 1
+            fi
+            mkdir -p "release-stage/packages/$name"
+            cp -R "$dist_dir/." "release-stage/packages/$name/"
+            printf '%s\t%s\t%s\t%s\t%s\n' "$member" "$name" "$version" "$target" "$digest" >> release-stage/member-digests.tsv
           done
           ls -l release-stage
       - name: Upload the staged artifacts
@@ -414,7 +437,7 @@ jobs:
           bin="$(find .ost-ci/bootstrap-bin -type f -name ost | head -n 1)"
           chmod +x "$bin"
           echo "$(cd "$(dirname "$bin")" && pwd)" >> "$GITHUB_PATH"
-      - name: Import every library artifact into the local registry
+      - name: Import every published artifact into the local registry
         shell: bash
         run: |
           set -euo pipefail
@@ -423,18 +446,22 @@ jobs:
             [ -f "$dir/manifest.json" ] || { echo "::error title=publish::$dir has no manifest.json" ; exit 1 ; }
             ost artifact import "$dir" --json > /dev/null
           done
-          echo "imported $(ls -d staged/*/packages/* | wc -l) library package(s)"
-      - name: Push each library to the OCI repository
+          echo "imported $(ls -d staged/*/packages/* | wc -l) package(s)"
+          # One row per (kind, member, target), read from what the build jobs
+          # actually produced rather than from a list written here.
+          {
+            cat staged/*/library-digests.tsv | sort -u | awk -F'\t' -v OFS='\t' '{print "library", $0}'
+            cat staged/*/member-digests.tsv | sort -u
+          } > .ost-ci/artifacts.tsv
+          cat .ost-ci/artifacts.tsv
+      - name: Push each artifact to the OCI repository
         if: ${{ needs.preflight.outputs.is_release == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          version="${{ needs.preflight.outputs.version }}"
           : > .ost-ci/pushed.tsv
-          # One row per (library, target), read from what the build jobs
-          # actually produced rather than from a list written here.
-          cat staged/*/library-digests.tsv | sort -u | while IFS=$'\t' read -r lib ver target digest; do
-            tag="${lib}-${ver}-${target}"
+          while IFS=$'\t' read -r kind name ver target digest; do
+            tag="${name}-${ver}-${target}"
             out=".ost-ci/push-${tag}.json"
             ost artifact push "$digest" "oci://${OCI_REPOSITORY}:${tag}" --json > "$out" < /dev/null
             oci="$(jq -er '.data.oci_digest' "$out")"
@@ -442,9 +469,9 @@ jobs:
             if [ "$art" != "$digest" ]; then
               echo "::error title=publish::pushing $tag reported artifact digest $art, expected $digest" ; exit 1
             fi
-            printf '%s\t%s\t%s\t%s\t%s\n' "$lib" "$ver" "$target" "$digest" "$oci" >> .ost-ci/pushed.tsv
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$kind" "$name" "$ver" "$target" "$digest" "$oci" >> .ost-ci/pushed.tsv
             echo "pushed $tag -> $oci"
-          done
+          done < .ost-ci/artifacts.tsv
       - name: Build the consumer pin table
         shell: bash
         run: |
@@ -458,7 +485,7 @@ jobs:
             # A dry run publishes nothing, so there is no `source` to name and
             # the table says so rather than inventing an unreachable locator.
             rows=.ost-ci/dry.tsv
-            cat staged/*/library-digests.tsv | sort -u | awk -F'\t' '{print $0 "\t"}' > "$rows"
+            awk -F'\t' '{print $0 "\t"}' .ost-ci/artifacts.tsv > "$rows"
           fi
           # What the table MUST contain, counted from the tree and from the
           # build jobs that ran -- not from a number written here. A target
@@ -467,64 +494,78 @@ jobs:
           # platform, which is the kind of half-right artifact a consumer only
           # discovers on the platform it cannot build.
           want_libs="$(ls -d libs/*/ | wc -l | tr -d ' ')"
+          want_bundles="$(find plugins -name openstrata.plugin.yaml -not -path '*/.strata/*' | wc -l | tr -d ' ')"
+          want_tools="$(find tools -name openstrata.tool.yaml -not -path '*/.strata/*' | wc -l | tr -d ' ')"
           want_targets="$(ls -d staged/release-* | wc -l | tr -d ' ')"
-          echo "expecting $want_libs library(ies) on $want_targets target(s)"
-          python3 - "$rows" "$version" "$released" "${OCI_REPOSITORY}" "$want_libs" "$want_targets" <<'PY'
+          echo "expecting $want_libs library(ies), $want_bundles bundle(s) and $want_tools tool(s) on $want_targets target(s)"
+          python3 - "$rows" "$version" "$released" "${OCI_REPOSITORY}" "$want_libs" "$want_bundles" "$want_tools" "$want_targets" <<'PY'
           import json, pathlib, sys
           rows_path, version, released, repository = sys.argv[1:5]
-          want_libs, want_targets = int(sys.argv[5]), int(sys.argv[6])
-          libs: dict[str, dict] = {}
+          want = {"library": int(sys.argv[5]), "bundle": int(sys.argv[6]),
+                  "tool": int(sys.argv[7])}
+          want_targets = int(sys.argv[8])
+          # kind -> (pin-table key, descriptor section a consumer pastes into)
+          sections = {"library": ("libraries", "libraries"),
+                      "bundle": ("bundles", "bundles"),
+                      "tool": ("tools", "tools")}
+          pins: dict[str, dict[str, dict]] = {kind: {} for kind in sections}
           for line in pathlib.Path(rows_path).read_text().splitlines():
               if not line.strip():
                   continue
               parts = line.split("\t")
-              lib, ver, target, digest = parts[0], parts[1], parts[2], parts[3]
-              oci = parts[4] if len(parts) > 4 else ""
+              kind, name, ver, target, digest = parts[:5]
+              oci = parts[5] if len(parts) > 5 else ""
+              if kind not in pins:
+                  raise SystemExit(f"::error title=publish::unknown kind {kind!r} for {name}")
               entry = {"digest": digest}
               if oci:
                   entry["source"] = f"oci://{repository}@{oci}"
-              libs.setdefault(lib, {})[target] = entry
-          if len(libs) != want_libs:
-              raise SystemExit(
-                  f"::error title=publish::the pin table has {len(libs)} "
-                  f"library(ies), but the tree declares {want_libs}: "
-                  f"{sorted(libs)}")
-          for lib, targets in sorted(libs.items()):
-              if len(targets) != want_targets:
+              pins[kind].setdefault(name, {})[target] = entry
+          for kind, members in pins.items():
+              if len(members) != want[kind]:
                   raise SystemExit(
-                      f"::error title=publish::{lib} has {len(targets)} "
-                      f"target(s), expected {want_targets}: {sorted(targets)}")
+                      f"::error title=publish::the pin table has {len(members)} "
+                      f"{kind}(s), but the tree declares {want[kind]}: "
+                      f"{sorted(members)}")
+              for name, targets in sorted(members.items()):
+                  if len(targets) != want_targets:
+                      raise SystemExit(
+                          f"::error title=publish::{name} has {len(targets)} "
+                          f"target(s), expected {want_targets}: {sorted(targets)}")
           out = pathlib.Path("out")
           out.mkdir(exist_ok=True)
+          document = {"version": version, "published": released == "true",
+                      "repository": repository}
+          for kind, (key, _) in sections.items():
+              document[key] = pins[kind]
           (out / "external-library-pins.json").write_text(
-              json.dumps({"version": version, "published": released == "true",
-                          "repository": repository, "libraries": libs},
-                         indent=2, sort_keys=True) + "\n")
+              json.dumps(document, indent=2, sort_keys=True) + "\n")
+          major_minor = ".".join(version.split(".")[:2])
+          nxt = f"{major_minor.split('.')[0]}.{int(major_minor.split('.')[1]) + 1}"
           md = []
           if released != "true":
               md.append("> Dry run: nothing was pushed, so no `source` is named. "
                         "The digests are this build's.\n")
-          for lib in sorted(libs):
-              md.append(f"<details><summary><code>{lib}</code></summary>\n")
-              md.append("```yaml")
-              md.append("requires:")
-              md.append("  libraries:")
-              md.append(f"    - id: {lib}")
-              major_minor = ".".join(version.split(".")[:2])
-              nxt = f"{major_minor.split('.')[0]}.{int(major_minor.split('.')[1]) + 1}"
-              md.append(f'      version: ">={major_minor},<{nxt}"')
-              md.append("      artifact:")
-              md.append("        targets:")
-              for target in sorted(libs[lib]):
-                  entry = libs[lib][target]
-                  md.append(f"          {target}:")
-                  md.append(f"            digest: {entry['digest']}")
-                  if "source" in entry:
-                      md.append(f"            source: {entry['source']}")
-              md.append("```")
-              md.append("\n</details>\n")
+          for kind, (_, section) in sections.items():
+              for name in sorted(pins[kind]):
+                  md.append(f"<details><summary><code>{name}</code> ({kind})</summary>\n")
+                  md.append("```yaml")
+                  md.append("requires:")
+                  md.append(f"  {section}:")
+                  md.append(f"    - id: {name}")
+                  md.append(f'      version: ">={major_minor},<{nxt}"')
+                  md.append("      artifact:")
+                  md.append("        targets:")
+                  for target in sorted(pins[kind][name]):
+                      entry = pins[kind][name][target]
+                      md.append(f"          {target}:")
+                      md.append(f"            digest: {entry['digest']}")
+                      if "source" in entry:
+                          md.append(f"            source: {entry['source']}")
+                  md.append("```")
+                  md.append("\n</details>\n")
           (out / "external-library-pins.md").write_text("\n".join(md) + "\n")
-          print(f"{len(libs)} library(ies) in the pin table")
+          print(", ".join(f"{len(pins[k])} {k}(s)" for k in sections) + " in the pin table")
           PY
           cat out/external-library-pins.md
       - name: Upload the pin table
