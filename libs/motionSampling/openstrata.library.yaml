@@ -6,7 +6,7 @@ schema: openstrata.library/v1alpha1
 library:
   id: motionSampling
   # Mirrors the repository-root VERSION (docs/architecture/WORKSPACE.md §4).
-  version: 0.5.1
+  version: 0.5.2
 requires:
   libraries:
     - id: motionCore

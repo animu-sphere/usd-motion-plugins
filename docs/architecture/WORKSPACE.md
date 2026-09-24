@@ -22,7 +22,7 @@ beside each component, and two build modes, `ost` and plain CMake.
 
 | Identity | Directory | Role | Arrives from | Status |
 | --- | --- | --- | --- | --- |
-| `motionCore` | `libs/motionCore/` | `HumanJoint`, `MotionPose`, `RootMotion`, `MotionChannelSet`, `SourceMetadata`, `MotionClip`, constraints ([MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md)) | `usd-vrm-plugins` `motionCore`, renamed | **imported** 2026-09-19, with history |
+| `motionCore` | `libs/motionCore/` | `HumanJoint`, `MotionPose`, `RootMotion`, `MotionChannelSet`, `SourceMetadata`, `MotionClip`, constraints and signed-permutation basis arithmetic ([MOTION_CONTRACT.md](../design/MOTION_CONTRACT.md)) | `usd-vrm-plugins` `motionCore`, renamed | **imported** 2026-09-19, with history |
 | `motionSampling` | `libs/motionSampling/` | sampling with status, interpolation, resample, filter, blend, the pose buffer | `usd-vrm-plugins` `motionRuntime` (its sampling half) | **imported** 2026-09-19, with history |
 | `motionRecording` | `libs/motionRecording/` | stream intake, `MotionRecorder`, the `motion-capture-trace` format, replay | `usd-vrm-plugins` `motionRuntime` (its capture half) | **imported** 2026-09-19, with history |
 | `motionRetarget` | `libs/motionRetarget/` | `SkeletonDescriptor`, `RetargetMap`, rest correction, root-motion policy, retarget diagnostics ([RETARGETING_POLICY.md](../design/RETARGETING_POLICY.md)) | `usd-vrm-plugins` `vrmRetarget`, its generic half | **imported** 2026-09-19, with history (release v0.2.0) |

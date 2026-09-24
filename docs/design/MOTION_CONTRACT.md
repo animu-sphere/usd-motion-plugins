@@ -99,6 +99,14 @@ Conversions are tested *physically* — a direction rotated and compared with
 where it must end up — because a component-by-component test agrees with a
 mirrored implementation as readily as with a correct one.
 
+`motionCore/BasisConversion.h` owns the reusable signed-permutation arithmetic.
+Its `SignedPermutationBasis` carries the axis reads, signs, determinant and
+metres-per-unit scale; `IsValidBasis` checks that declaration. Source-specific
+code constructs the basis and calls `ApplyBasisToPosition` or
+`ApplyBasisToRotation` at its intake boundary. The core neither chooses a
+source basis nor converts an entire pose after intake. Quaternion normalization
+uses double precision so valid subnormal source components remain usable.
+
 ## 4. Time
 
 - Timestamps are `double` **seconds**, never frame numbers.

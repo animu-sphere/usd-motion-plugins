@@ -2,6 +2,7 @@
 
 #include "motionSource/CanonicalConversion.h"
 
+#include "motionCore/BasisConversion.h"
 #include "motionSource/CanonicalMetadata.h"
 
 #include <algorithm>
@@ -311,72 +312,18 @@ MakeCanonicalBasis(const SourceProfile& profile)
 pxr::GfVec3f
 ConvertPosition(const CanonicalBasis& basis, const SourceVec3& value)
 {
-    const float components[3] = {value.x, value.y, value.z};
-    pxr::GfVec3f out(0.0f);
-    for (std::size_t index = 0; index < 3; ++index)
-    {
-        const int source = basis.component[index];
-        if (source < 0 || source > 2)
-        {
-            continue;
-        }
-        const double read = static_cast<double>(components[source]);
-        out[static_cast<int>(index)] =
-            static_cast<float>((basis.negate[index] ? -read : read) * basis.scale);
-    }
-    return out;
+    const SignedPermutationBasis shared{basis.component, basis.negate, basis.determinant,
+                                        basis.scale};
+    return ApplyBasisToPosition(shared, pxr::GfVec3f(value.x, value.y, value.z));
 }
 
 pxr::GfQuatf
 ConvertRotation(const CanonicalBasis& basis, const SourceQuat& value)
 {
-    const float components[3] = {value.x, value.y, value.z};
-    pxr::GfVec3f imaginary(0.0f);
-    for (std::size_t index = 0; index < 3; ++index)
-    {
-        const int source = basis.component[index];
-        if (source < 0 || source > 2)
-        {
-            continue;
-        }
-        const float read = components[source];
-        imaginary[static_cast<int>(index)] = basis.negate[index] ? -read : read;
-    }
-    // A mirror negates the angle and leaves the axis where the permutation put
-    // it, which for a quaternion is one sign on the imaginary part.
-    if (basis.determinant < 0)
-    {
-        imaginary = -imaginary;
-    }
-    // The length is formed in double and the division is done in it too, then
-    // narrowed. That is load-bearing rather than tidy: `GfQuatf::GetLength()`
-    // squares in float, so a quaternion whose components sit near the denormal
-    // floor -- and the validators only ask that they are not all exactly zero,
-    // so they admit every one of them -- underflows to a length of
-    // exactly zero and comes back un-normalised, collapsing every composition it
-    // then enters. Narrowing after the divide instead of before it keeps that
-    // whole range representable. This project has already paid once for two
-    // magnitudes formed in different precisions (motionCore/Compare.h).
-    const double parts[4] = {static_cast<double>(imaginary[0]), static_cast<double>(imaginary[1]),
-                             static_cast<double>(imaginary[2]), static_cast<double>(value.w)};
-    double lengthSquared = 0.0;
-    for (const double part : parts)
-    {
-        lengthSquared += part * part;
-    }
-    const double length = std::sqrt(lengthSquared);
-    // Left alone when there is nothing to divide by: the validators this
-    // conversion runs first have already refused a zero-magnitude rotation, and
-    // repairing one here would put an identity where a refusal belongs.
-    if (!std::isfinite(length) || length <= 0.0)
-    {
-        return pxr::GfQuatf(value.w, imaginary);
-    }
-    const double inverse = 1.0 / length;
-    return pxr::GfQuatf(static_cast<float>(parts[3] * inverse),
-                        pxr::GfVec3f(static_cast<float>(parts[0] * inverse),
-                                     static_cast<float>(parts[1] * inverse),
-                                     static_cast<float>(parts[2] * inverse)));
+    const SignedPermutationBasis shared{basis.component, basis.negate, basis.determinant,
+                                        basis.scale};
+    return ApplyBasisToRotation(
+        shared, pxr::GfQuatf(value.w, pxr::GfVec3f(value.x, value.y, value.z)));
 }
 
 SourceQuat
