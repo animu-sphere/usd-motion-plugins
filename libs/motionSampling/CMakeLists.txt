@@ -10,8 +10,6 @@ project(motionSampling
     DESCRIPTION "Motion sampling with status, interpolation, resampling, filtering and blending"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
-# public interface asks consumers for no more than C++17.
 usdmotion_component_project(TESTS_OPTION MOTIONSAMPLING_BUILD_TESTS)
 
 # Like motionCore, motionSampling uses only OpenUSD's Gf value types. It has no

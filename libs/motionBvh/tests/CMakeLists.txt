@@ -73,7 +73,9 @@ if(EXISTS "${_motion_bvh_recorded}" AND EXISTS "${_motion_bvh_profiles}")
     # Unlike every other test here, this one reaches canonical motion and
     # therefore Gf -- so it needs what the runtime's DLLs need, the way
     # libs/motionSource/tests does. The paragraph above about loading nothing is
-    # about the other four executables.
+    # about the other four executables. The library itself never requires
+    # OpenUSD, so this test does: standalone, nothing else here would.
+    usdmotion_require_openusd()
     usdmotion_test_windows_path(TESTS motionBvh_recordedConversion OPENUSD gf)
 endif()
 

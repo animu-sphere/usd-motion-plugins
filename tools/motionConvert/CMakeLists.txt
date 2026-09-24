@@ -37,10 +37,10 @@ usdmotion_use_utf8_code_page(motion_convert)
 
 target_compile_features(motion_convert PRIVATE cxx_std_17)
 target_link_libraries(motion_convert
-    PRIVATE motionBvh::motionBvh motionSource::motionSource motionUsd::motionUsd)
-
-target_link_libraries(motion_convert
     PRIVATE
+        motionBvh::motionBvh
+        motionSource::motionSource
+        motionUsd::motionUsd
         usdmotion::pxr::usd
         usdmotion::pxr::usdGeom
         usdmotion::pxr::usdSkel

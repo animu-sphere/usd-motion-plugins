@@ -10,8 +10,6 @@ project(motionRecording
     DESCRIPTION "Motion stream intake, recording, the capture trace format and replay"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
-# public interface asks consumers for no more than C++17.
 usdmotion_component_project(TESTS_OPTION MOTIONRECORDING_BUILD_TESTS)
 
 # Like motionCore, motionRecording uses only OpenUSD's Gf value types. It has no

@@ -175,6 +175,16 @@ Code arrives from `usd-vrm-plugins` under that repository's moving rules
   ([USD_MAPPING.md §8](../design/USD_MAPPING.md#8-versioning)).
 - Both build modes, `ost` and plain CMake, are kept working, and every
   package is consumed from a clean installed prefix in CI.
+- Each component is a self-contained CMake project that builds in the
+  workspace, standalone, and against installed packages. What they share is
+  `cmake/`, reached from every component by a relative path:
+  `UsdMotionProject.cmake` (the version and the project policy),
+  `UsdMotionOpenUsd.cmake` (the pin, OpenUSD's targets as
+  `usdmotion::pxr::<name>`, and the OpenExec probe), `UsdMotionTargets.cmake`
+  (a sibling package, and `/utf-8`), `UsdMotionInstall.cmake`,
+  `UsdMotionTesting.cmake` and `UsdMotionUtf8CodePage.cmake`. A component's
+  `CMakeLists.txt` keeps what is its own: its sources, its `PUBLIC` and
+  `PRIVATE` links, its definitions, its install and its tests.
 
 ## 5. Invariants
 

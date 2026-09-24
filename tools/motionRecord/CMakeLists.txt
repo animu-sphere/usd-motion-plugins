@@ -36,10 +36,7 @@ target_link_libraries(motion_record
     PRIVATE
         motionRecording::motionRecording
         motionSampling::motionSampling
-        motionUsd::motionUsd)
-
-target_link_libraries(motion_record
-    PRIVATE
+        motionUsd::motionUsd
         usdmotion::pxr::usd
         usdmotion::pxr::usdGeom
         usdmotion::pxr::usdSkel

@@ -19,7 +19,7 @@ on:
       - "**/openstrata.library.yaml"
       - "**/openstrata.tool.yaml"
       - "**/CMakeLists.txt"
-      - "cmake/UsdMotionOpenUsd.cmake"
+      - "cmake/*.cmake"
       - "scripts/check_docs.py"
       - ".github/workflows/docs-check.yml"
   push:
@@ -33,7 +33,7 @@ on:
       - "**/openstrata.library.yaml"
       - "**/openstrata.tool.yaml"
       - "**/CMakeLists.txt"
-      - "cmake/UsdMotionOpenUsd.cmake"
+      - "cmake/*.cmake"
       - "scripts/check_docs.py"
       - ".github/workflows/docs-check.yml"
   workflow_dispatch:

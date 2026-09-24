@@ -10,8 +10,6 @@ project(motionRetarget
     DESCRIPTION "Humanoid retargeting onto a target skeleton described as plain values"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
-# public interface asks consumers for no more than C++17.
 usdmotion_component_project(TESTS_OPTION MOTIONRETARGET_BUILD_TESTS)
 
 # motionRetarget takes a rig as plain values and returns plain values: OpenUSD

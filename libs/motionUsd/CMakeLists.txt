@@ -10,8 +10,6 @@ project(motionUsd
     DESCRIPTION "MotionClip to and from OpenUSD UsdSkel"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
-# public interface asks consumers for no more than C++17.
 usdmotion_component_project(TESTS_OPTION MOTIONUSD_BUILD_TESTS)
 
 # motionUsd is the one library here that authors a stage: it links OpenUSD's

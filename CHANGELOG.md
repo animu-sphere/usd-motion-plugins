@@ -9,6 +9,31 @@ separate from the package version
 
 ## [Unreleased]
 
+### Changed
+
+- **The CMake build shares its infrastructure through `cmake/`.** The root
+  and every library, tool and bundle include `cmake/UsdMotionProject.cmake`,
+  which reads `VERSION`, applies the C++20 and build-type policy, resolves
+  OpenUSD under the 26.08 pin, reaches sibling packages, installs a library as
+  its `<P>::<P>` package and supplies the test plumbing. The eleven hard-coded
+  standalone fallback versions are gone; every project reads `VERSION`, and
+  `check_docs.py` fails one that restates a number. OpenUSD's targets are
+  linked as `usdmotion::pxr::<name>` whichever spelling the install exports.
+  Package names, targets and every exported CMake file are unchanged, except
+  as below.
+- **`motionSource` and `motionBvh` install `SameMinorVersion` package
+  versions**, like the other five libraries: while a package is 0.x, a
+  consumer asking for 0.5 is not handed 0.6
+  ([DEPENDENCIES.md §2](docs/architecture/DEPENDENCIES.md#2-toolchain)).
+
+### Fixed
+
+- `motionBvhConfig.cmake` guarded its `find_dependency(motionSource)` on a C++
+  namespace rather than the `motionSource::motionSource` target, so the guard
+  never held.
+- `execMotion`'s boundary test looked for `USDVRM_TEST_PYTHON`, a name from
+  `usd-vrm-plugins` that nothing here sets; it uses `USDMOTION_TEST_PYTHON`.
+
 ## [0.5.1] - 2026-09-24
 
 A publication release. It changes no library, bundle or tool behaviour. What
