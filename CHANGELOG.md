@@ -9,6 +9,17 @@ separate from the package version
 
 ## [Unreleased]
 
+### Added
+
+- **`motionCore` now owns signed-permutation basis conversion (CS-O1).**
+  `SignedPermutationBasis` and its validated position/quaternion operations
+  serve recorded readers now and live connectors after their dependency pins
+  move to 0.5.2. `motionSource` keeps its profile
+  interpretation and public `CanonicalBasis` type, delegating only the
+  arithmetic to the core. The added public
+  API advances the workspace package version to 0.5.2; the release is not yet
+  published.
+
 ### Changed
 
 - **The public live-stream shape is settled (MC-O5).** The existing

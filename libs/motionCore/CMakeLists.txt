@@ -17,6 +17,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONCORE_BUILD_TESTS)
 usdmotion_require_openusd()
 
 add_library(motionCore STATIC
+    src/BasisConversion.cpp
     src/Compare.cpp
     src/MotionPose.cpp)
 add_library(motionCore::motionCore ALIAS motionCore)

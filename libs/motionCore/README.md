@@ -6,6 +6,9 @@ connector and format repository shares
 vocabulary (`HumanJoint`, version 1: 55 joints), `openstrata::motion::MotionPose`,
 `MotionClip`, independent `RootMotion`, `MotionChannelSet`, `SourceMetadata`
 and the declarative `MotionConstraintSet`.
+It also supplies the signed-permutation basis operation used at source intake
+(`BasisConversion.h`); source adapters remain responsible for choosing their
+own basis and refusing malformed input.
 
 It deliberately has no file parser, USD stage authoring, plugin registration,
 network protocol or vendor SDK. The sole OpenUSD dependency is the small `Gf`
@@ -14,7 +17,7 @@ refuses any other, and any product or avatar-format name in the code.
 
 All coordinates are right-handed, Y-up, metres. `World`, `Character`,
 `Skeleton`, and `JointLocal` identify the reference frame of a constraint;
-the conversion and USD-stage authoring belong to consumers. Root motion is
+applying the conversion and USD-stage authoring belong to consumers. Root motion is
 never encoded by mutating a hips-local rotation in this API.
 
 Comparing those values takes two operations rather than one, because the
