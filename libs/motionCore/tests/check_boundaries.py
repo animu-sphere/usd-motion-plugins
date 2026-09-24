@@ -136,9 +136,17 @@ def main() -> int:
                     errors.append(f"{path}:{number}: product name '{match.group(0)}' "
                                   "in motionCore's code")
 
-    cmake = (source / "CMakeLists.txt").read_text(encoding="utf-8")
-    if re.search(r"(?:target_link_libraries\([^\n]*(?:usd|sdf|plug|ar)|"
-                 r"pxr::(?:usd|sdf|plug|ar))", cmake, re.IGNORECASE):
+    # What the library links, read as names -- the last `::` segment of each
+    # entry of each target_link_libraries call -- so the `usdmotion::pxr::`
+    # alias prefix (cmake/UsdMotionOpenUsd.cmake) is not mistaken for a stage
+    # library, and a comment is not mistaken for a link.
+    cmake = re.sub(r"#[^\n]*", "",
+                   (source / "CMakeLists.txt").read_text(encoding="utf-8"))
+    linked = re.findall(r"target_link_libraries\(([^)]*)\)", cmake)
+    names = {name.split("::")[-1] for call in linked for name in call.split()}
+    if not linked:
+        errors.append("motionCore: no link line found; the link check examined nothing")
+    if names - {"motionCore", "PUBLIC", "PRIVATE", "INTERFACE", "gf"}:
         errors.append("motionCore CMake must link only the OpenUSD gf value library")
 
     try:

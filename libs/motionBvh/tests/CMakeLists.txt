@@ -1,12 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
-# NDEBUG compiles `assert()` away, and the root CMakeLists defaults
-# single-config builds to Release -- so a suite built the normal way would print
-# "verified" and return 0 without having checked anything. Undefine it for the
-# test targets only. See libs/motionRuntime/tests/CMakeLists.txt, which hit this
-# first.
-set(_motion_bvh_assertions $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
-
 # The frozen diagnostic set: its strings, its two halves, its formatting.
 add_executable(motionBvh_diagnostics_tests test_diagnostics.cpp)
 # The syntax model, with no parser anywhere near it.
@@ -26,13 +19,8 @@ foreach(_motion_bvh_test motionBvh_diagnostics_tests motionBvh_document_tests
                          motionBvh_parser_tests motionBvh_extract_tests
                          motionBvh_conversion_tests)
     target_link_libraries(${_motion_bvh_test} PRIVATE motionBvh::motionBvh)
-    target_compile_options(${_motion_bvh_test} PRIVATE ${_motion_bvh_assertions})
-    if(MSVC)
-        # The headers cite roadmap sections by their `§` sign, and MSVC reads
-        # source in the *system* code page unless told otherwise -- so a
-        # Japanese-Windows build warns C4819 on every include without this.
-        target_compile_options(${_motion_bvh_test} PRIVATE /utf-8)
-    endif()
+    usdmotion_keep_assertions(${_motion_bvh_test})
+    usdmotion_target_utf8(${_motion_bvh_test} PRIVATE)
 endforeach()
 
 add_test(NAME motionBvh_diagnostics COMMAND motionBvh_diagnostics_tests)
@@ -85,25 +73,10 @@ if(EXISTS "${_motion_bvh_recorded}" AND EXISTS "${_motion_bvh_profiles}")
     # Unlike every other test here, this one reaches canonical motion and
     # therefore Gf -- so it needs what the runtime's DLLs need, the way
     # libs/motionSource/tests does. The paragraph above about loading nothing is
-    # about the other four executables.
-    if(WIN32)
-        if(TARGET gf)
-            set(_motion_bvh_gf gf)
-        else()
-            set(_motion_bvh_gf pxr::gf)
-        endif()
-        set(_motion_bvh_conversion_path
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>"
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:${_motion_bvh_gf}>/../bin")
-        if(USDMOTION_TEST_PYTHON)
-            get_filename_component(_motion_bvh_python_dir
-                                   "${USDMOTION_TEST_PYTHON}" DIRECTORY)
-            list(APPEND _motion_bvh_conversion_path
-                 "PATH=path_list_prepend:${_motion_bvh_python_dir}")
-        endif()
-        set_tests_properties(motionBvh_recordedConversion PROPERTIES
-            ENVIRONMENT_MODIFICATION "${_motion_bvh_conversion_path}")
-    endif()
+    # about the other four executables. The library itself never requires
+    # OpenUSD, so this test does: standalone, nothing else here would.
+    usdmotion_require_openusd()
+    usdmotion_test_windows_path(TESTS motionBvh_recordedConversion OPENUSD gf)
 endif()
 
 if(USDMOTION_TEST_PYTHON)

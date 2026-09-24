@@ -16,8 +16,9 @@ every Markdown file, this fails when:
 External links (`http:`, `https:`, `mailto:`) are not fetched.
 
 Mirrors -- docs/architecture/WORKSPACE.md §4: the repository-root VERSION is
-the single product version. openstrata.toml, every component manifest and
-every CMake fallback mirror it, and every range a manifest requires a sibling
+the single product version. openstrata.toml and every component manifest
+mirror it, no CMake project restates it (each reads it through
+cmake/UsdMotionProject.cmake), and every range a manifest requires a sibling
 in admits it. The OpenUSD pin in cmake/PIN_MODULE is the release
 docs/architecture/DEPENDENCIES.md names and every CI cell requires. CHANGELOG.md
 has a section for VERSION or an `[Unreleased]` one.
@@ -188,10 +189,23 @@ def check_mirrors(root: pathlib.Path) -> list[str]:
     for manifest in sorted(root.glob("*/*/openstrata.*.yaml")):
         expect(manifest, r"^\s+version:\s*([0-9][^\s#]*)", version, "version")
         errors.extend(check_ranges(root, manifest, version))
-    for cmake in sorted(root.glob("*/*/CMakeLists.txt")):
-        if "../../VERSION" in cmake.read_text(encoding="utf-8"):
-            expect(cmake, r'set\(_\w+_version "([^"]+)"\)', version,
-                   "standalone fallback version")
+    # No CMake project restates the number, not even as a standalone fallback:
+    # every project() takes it from usdmotion_read_version(), which reads VERSION.
+    # The installed consumer is outside this rule: it is a stranger's project.
+    projects = [root / "CMakeLists.txt"]
+    for kind in ("libs", "tools", "plugins"):
+        projects += sorted(root.glob(f"{kind}/*/CMakeLists.txt"))
+    for cmake in projects:
+        text = re.sub(r"#[^\n]*", "", cmake.read_text(encoding="utf-8"))
+        where = cmake.relative_to(root).as_posix()
+        if "usdmotion_read_version(" not in text:
+            errors.append(f"{where}: does not read VERSION through "
+                          f"usdmotion_read_version()")
+        if re.search(r"\bproject\([^)]*\bVERSION\s+[0-9]", text) or \
+                re.search(r'set\(\s*\w*version\w*\s+"?[0-9]+\.[0-9]', text,
+                          re.IGNORECASE):
+            errors.append(f"{where}: restates a version number instead of "
+                          f"reading VERSION")
 
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     if f"## [{version}]" not in changelog and "## [Unreleased]" not in changelog:

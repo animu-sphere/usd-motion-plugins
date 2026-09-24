@@ -24,9 +24,10 @@ current components. Every value is taken from the sibling repositories so that
 | | |
 | --- | --- |
 | Language | C++20 |
-| Build | CMake 3.22 or later; `CMakePresets.json` for plain CMake |
+| Build | CMake 3.22 or later; `CMakePresets.json` for plain CMake. The shared build infrastructure is `cmake/`, and each component's `CMakeLists.txt` states only what it builds, links and installs |
+| Package versions | every library's installed `<P>ConfigVersion.cmake` is `SameMinorVersion` while the package is 0.x: a minor release may break a 0.x API, so a consumer asking for 0.5 is never handed 0.6. A package declared stable moves to `SameMajorVersion`, in its `usdmotion_install_library()` call |
 | Compilers | MSVC on Windows, Clang on macOS arm64, GCC on Linux — the siblings' three lanes |
-| OpenStrata | `ost` 0.23.4, pinned in `openstrata.ci.yaml` and kept in sync with the consuming ecosystem |
+| OpenStrata | `ost` 0.23.6, pinned in `openstrata.ci.yaml` and kept in sync with the consuming ecosystem |
 | Tests | as in the siblings: plain executables registered with CTest, checking with `assert()` compiled into Release builds, unless the scaffold records a reason to differ |
 | Python | the interpreter OpenUSD was built against, for stage tests and tooling; Python bindings are later (design policy §25) |
 

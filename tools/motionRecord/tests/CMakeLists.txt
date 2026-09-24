@@ -15,12 +15,7 @@ get_filename_component(_motion_recording_corpus
 if(EXISTS "${_motion_recording_corpus}")
     # This test needs the USD runtime twice over: the executable it launches
     # links the stage libraries, and the script opens the result with pxr.
-    set(_usd_root "")
-    if(pxr_DIR AND EXISTS "${pxr_DIR}/bin")
-        set(_usd_root "${pxr_DIR}")
-    elseif(pxr_DIR)
-        get_filename_component(_usd_root "${pxr_DIR}/../../.." ABSOLUTE)
-    endif()
+    usdmotion_openusd_root(_usd_root)
 
     add_test(NAME motion_record_replay
         COMMAND "${USDMOTION_TEST_PYTHON}"

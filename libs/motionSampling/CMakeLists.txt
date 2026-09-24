@@ -2,49 +2,21 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_sampling_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_sampling_version}" _motion_sampling_version)
-else()
-    set(_motion_sampling_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionSampling
-    VERSION ${_motion_sampling_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "Motion sampling with status, interpolation, resampling, filtering and blending"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2); the
-# public interface asks consumers for no more than C++17.
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(NOT DEFINED MOTIONSAMPLING_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_sampling_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_sampling_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONSAMPLING_BUILD_TESTS "Build motionSampling tests"
-           ${_motion_sampling_tests_default})
-endif()
+usdmotion_component_project(TESTS_OPTION MOTIONSAMPLING_BUILD_TESTS)
 
 # Like motionCore, motionSampling uses only OpenUSD's Gf value types. It has no
 # USD stage, Sdf, plug, or file-format dependency (WORKSPACE.md §2).
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 
-# In the workspace build motionCore is already an in-tree target; a standalone
-# configure resolves its installed package.
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore REQUIRED CONFIG)
-endif()
+usdmotion_require_dependency(motionCore)
 
 add_library(motionSampling STATIC
     src/Blend.cpp
@@ -54,9 +26,7 @@ add_library(motionSampling STATIC
     src/PoseBuffer.cpp
     src/Resample.cpp)
 add_library(motionSampling::motionSampling ALIAS motionSampling)
-set_target_properties(motionSampling PROPERTIES
-    EXPORT_NAME motionSampling
-    POSITION_INDEPENDENT_CODE ON)
+set_target_properties(motionSampling PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(motionSampling PUBLIC cxx_std_17)
 target_compile_definitions(motionSampling PUBLIC MOTIONSAMPLING_STATIC)
@@ -66,50 +36,13 @@ target_include_directories(motionSampling
         "$<INSTALL_INTERFACE:include>")
 target_link_libraries(motionSampling PUBLIC motionCore::motionCore)
 
-if(MSVC)
-    # PUBLIC, not PRIVATE: the installed headers carry UTF-8 (the §-references
-    # into the contracts), so every consumer that includes them needs the flag
-    # too or MSVC warns C4819 on a non-UTF-8 code page.
-    target_compile_options(motionSampling PUBLIC /utf-8)
-endif()
+# PUBLIC: the installed headers cite the contracts by their `§` sign.
+usdmotion_target_utf8(motionSampling PUBLIC)
 
-include(GNUInstallDirs)
-install(TARGETS motionSampling
-    EXPORT motionSamplingTargets
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/motionSamplingConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    # While the API is 0.x a minor release may break it, as motionCore's does.
-    COMPATIBILITY SameMinorVersion)
-install(EXPORT motionSamplingTargets
-    FILE motionSamplingTargets.cmake
-    NAMESPACE motionSampling::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/motionSamplingConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/motionSampling")
+usdmotion_install_library(TARGET motionSampling PACKAGE motionSampling)
 
 if(MOTIONSAMPLING_BUILD_TESTS)
     enable_testing()
-    # In the workspace the root has already found the interpreter (the root
-    # CMakeLists.txt says why under its own name); standalone, find it here.
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

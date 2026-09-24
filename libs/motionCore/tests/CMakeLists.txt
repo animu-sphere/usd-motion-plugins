@@ -2,21 +2,13 @@
 
 add_executable(motionCore_tests test_motion_pose.cpp)
 add_executable(motionCore_compare_tests test_compare.cpp)
-# These suites check with `assert()`, which NDEBUG compiles away -- and Release
-# is the default build type, so NDEBUG is undefined for them explicitly. A suite
-# that asserts nothing in the configuration CI runs passes by construction.
-foreach(_motion_core_test motionCore_tests motionCore_compare_tests)
-    target_link_libraries(${_motion_core_test} PRIVATE motionCore::motionCore)
-    target_compile_options(${_motion_core_test}
-        PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
-endforeach()
+target_link_libraries(motionCore_tests PRIVATE motionCore::motionCore)
+target_link_libraries(motionCore_compare_tests PRIVATE motionCore::motionCore)
+usdmotion_keep_assertions(motionCore_tests motionCore_compare_tests)
 add_test(NAME motionCore_unit COMMAND motionCore_tests)
 add_test(NAME motionCore_compare COMMAND motionCore_compare_tests)
-if(WIN32)
-    set_tests_properties(motionCore_unit motionCore_compare PROPERTIES
-        ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:motionCore>")
-endif()
+usdmotion_test_windows_path(TESTS motionCore_unit motionCore_compare
+    TARGETS motionCore)
 
 if(USDMOTION_TEST_PYTHON)
     add_test(NAME motionCore_boundaries

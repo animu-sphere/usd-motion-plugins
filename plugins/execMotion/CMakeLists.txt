@@ -16,53 +16,29 @@
 # for the plain-CMake workflow — the same shape as every sibling member.
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION" _exec_motion_version LIMIT_COUNT 1)
-    string(STRIP "${_exec_motion_version}" _exec_motion_version)
-else()
-    set(_exec_motion_version "0.5.1")  # mirrors openstrata.plugin.yaml
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(ExecMotionPlugin
-    VERSION ${_exec_motion_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "OpenExec computations over canonical motion"
     LANGUAGES CXX)
 
-# C++20 as the workspace builds (docs/architecture/DEPENDENCIES.md §2).
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# The tests option is USDMOTION_BUILD_TESTS itself rather than a member-private
+# spelling: the root defines it for every member, and a private spelling is how
+# usd-vrm-plugins once shipped a workspace lane that built a bundle on three
+# platforms and tested it on none.
+usdmotion_component_project(TESTS_OPTION USDMOTION_BUILD_TESTS)
 
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(NOT _isMultiConfig AND NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
-
-# Spelled USDMOTION_BUILD_TESTS, like every member: the root defines it for
-# all of them, and a member-private spelling is how usd-vrm-plugins once
-# shipped a workspace lane that built a bundle on three platforms and tested
-# it on none.
-if(NOT DEFINED USDMOTION_BUILD_TESTS)
-    option(USDMOTION_BUILD_TESTS "Build usd-motion-plugins tests"
-           ${PROJECT_IS_TOP_LEVEL})
-endif()
-
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
 # The OpenUSD pin, and then the OpenExec probe -- which this member alone
 # calls, because it is the only one that cannot link without OpenExec, and
 # every library and tool here builds against a runtime that has none
 # (docs/architecture/DEPENDENCIES.md §1). A runtime the probe refuses would
 # otherwise fail here as an unresolved symbol.
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
+usdmotion_require_openusd()
 usdmotion_require_openexec()
 
-if(NOT TARGET motionCore::motionCore)
-    find_package(motionCore CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionCore)
 
 # The sampling half, from `motion.filterPose` onward: the node is one step of
 # `PoseFilter` and the algorithm stays in the library (WORKSPACE.md §2, design
@@ -72,25 +48,19 @@ endif()
 # `motion.identityPose` and `motion.sampleAnimation` need none of it -- an exec
 # input arrives already resolved at the evaluated frame, so the sampler had
 # nothing to wrap.
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionSampling)
 
 # The recording half, for one node and one rule: `motion.extractRootMotion` is
 # `ConditionRootMotion`, the intake rule a capture session applies to every
 # frame it accepts. Nothing else here reaches into a session.
-if(NOT TARGET motionRecording::motionRecording)
-    find_package(motionRecording CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionRecording)
 
 # The stage bridge, for one call: `PoseFromStageSample`, the rule that turns a
 # UsdSkelAnimation's already-resolved arrays into a pose. It lived in
 # usd-vrm-plugins' retarget CLI, which a computation cannot call, so this
 # bundle carried a copy until the reading half arrived here (USD_MAPPING.md
 # §7). The call takes values, so this is not a stage edge.
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd CONFIG REQUIRED)
-endif()
+usdmotion_require_dependency(motionUsd)
 
 set(PLUGIN_NAME ExecMotion)
 add_library(${PLUGIN_NAME} SHARED
@@ -107,31 +77,33 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
     motionRecording::motionRecording
     motionUsd::motionUsd)
 
+usdmotion_target_utf8(${PLUGIN_NAME} PRIVATE)
 if(MSVC)
     target_compile_definitions(${PLUGIN_NAME} PRIVATE NOMINMAX _USE_MATH_DEFINES)
-    target_compile_options(${PLUGIN_NAME} PRIVATE /bigobj /utf-8)
+    target_compile_options(${PLUGIN_NAME} PRIVATE /bigobj)
 endif()
 
 # The exec half is named explicitly rather than taken from usd_ms: the
 # monolithic target does not carry the exec libraries, and `esf`/`esfUsd`/`ef`
 # are here because the public exec headers include them transitively — the same
-# list `usdmotion_require_openexec()` probes for.
-set(_exec_motion_targets)
-foreach(_t IN ITEMS arch tf gf vt plug sdf usd usdSkel
-                    vdf ef esf esfUsd exec execUsd)
-    if(TARGET ${_t})
-        list(APPEND _exec_motion_targets ${_t})
-    elseif(TARGET pxr::${_t})
-        list(APPEND _exec_motion_targets pxr::${_t})
-    else()
-        message(FATAL_ERROR
-            "execMotion needs the OpenUSD target '${_t}', which this install "
-            "does not define. usdmotion_require_openexec() should have "
-            "refused this runtime already; if it did not, its probe list "
-            "and this one have drifted apart.")
-    endif()
-endforeach()
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${_exec_motion_targets})
+# list `usdmotion_require_openexec()` probes for. A name this runtime lacks
+# fails at generate time; if the probe passed, its list and this one have
+# drifted apart.
+target_link_libraries(${PLUGIN_NAME} PRIVATE
+    usdmotion::pxr::arch
+    usdmotion::pxr::tf
+    usdmotion::pxr::gf
+    usdmotion::pxr::vt
+    usdmotion::pxr::plug
+    usdmotion::pxr::sdf
+    usdmotion::pxr::usd
+    usdmotion::pxr::usdSkel
+    usdmotion::pxr::vdf
+    usdmotion::pxr::ef
+    usdmotion::pxr::esf
+    usdmotion::pxr::esfUsd
+    usdmotion::pxr::exec
+    usdmotion::pxr::execUsd)
 
 set(OPENSTRATA_PLUGIN_LIBRARY_PREFIX "lib")
 set_target_properties(${PLUGIN_NAME} PROPERTIES
@@ -153,5 +125,6 @@ configure_file(
 
 if(USDMOTION_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     enable_testing()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

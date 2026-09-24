@@ -13,49 +13,20 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_convert_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_convert_version}" _motion_convert_version)
-else()
-    set(_motion_convert_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionConvert
-    VERSION ${_motion_convert_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "A recorded source and a named profile become a motion stage"
     LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+usdmotion_component_project(TESTS_OPTION MOTIONCONVERT_BUILD_TESTS)
 
-if(NOT DEFINED MOTIONCONVERT_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_convert_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_convert_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONCONVERT_BUILD_TESTS "Build motion_convert tests"
-           ${_motion_convert_tests_default})
-endif()
-
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
-if(NOT TARGET motionBvh::motionBvh)
-    find_package(motionBvh REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSource::motionSource)
-    find_package(motionSource REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_openusd()
+usdmotion_require_dependency(motionBvh)
+usdmotion_require_dependency(motionSource)
+usdmotion_require_dependency(motionUsd)
 
 add_executable(motion_convert
     src/ClipWriter.cpp
@@ -66,21 +37,21 @@ usdmotion_use_utf8_code_page(motion_convert)
 
 target_compile_features(motion_convert PRIVATE cxx_std_17)
 target_link_libraries(motion_convert
-    PRIVATE motionBvh::motionBvh motionSource::motionSource motionUsd::motionUsd)
+    PRIVATE
+        motionBvh::motionBvh
+        motionSource::motionSource
+        motionUsd::motionUsd
+        usdmotion::pxr::usd
+        usdmotion::pxr::usdGeom
+        usdmotion::pxr::usdSkel
+        usdmotion::pxr::sdf
+        usdmotion::pxr::tf
+        usdmotion::pxr::gf
+        usdmotion::pxr::vt
+        usdmotion::pxr::arch)
 
-foreach(_usd_lib usd usdGeom usdSkel sdf tf gf vt arch)
-    if(TARGET ${_usd_lib})
-        target_link_libraries(motion_convert PRIVATE ${_usd_lib})
-    elseif(TARGET pxr::${_usd_lib})
-        target_link_libraries(motion_convert PRIVATE pxr::${_usd_lib})
-    else()
-        message(FATAL_ERROR
-                "motion_convert requires the OpenUSD '${_usd_lib}' target.")
-    endif()
-endforeach()
-
+usdmotion_target_utf8(motion_convert PRIVATE)
 if(MSVC)
-    target_compile_options(motion_convert PRIVATE /utf-8)
     # This tool includes the canonical half, so windows.h's min/max macros meet
     # OpenUSD's own numeric_limits<>::max() uses in tf's robin map.
     target_compile_definitions(motion_convert PRIVATE NOMINMAX _USE_MATH_DEFINES)
@@ -95,8 +66,7 @@ foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endforeach()
 
-include(GNUInstallDirs)
-install(TARGETS motion_convert RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+usdmotion_install_tool(motion_convert)
 
 # The profiles ship beside the tool, at the location ProfileLocator.cpp derives
 # from the executable's own path: a converter with no profile available refuses
@@ -118,11 +88,6 @@ endif()
 
 if(MOTIONCONVERT_BUILD_TESTS)
     enable_testing()
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

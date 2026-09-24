@@ -12,41 +12,17 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_bvh_inspect_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_bvh_inspect_version}" _motion_bvh_inspect_version)
-else()
-    set(_motion_bvh_inspect_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionBvhInspect
-    VERSION ${_motion_bvh_inspect_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "What a BVH file holds, and which profiles fit it"
     LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+usdmotion_component_project(TESTS_OPTION MOTIONBVHINSPECT_BUILD_TESTS)
 
-if(NOT DEFINED MOTIONBVHINSPECT_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_bvh_inspect_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_bvh_inspect_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONBVHINSPECT_BUILD_TESTS "Build motion_bvh_inspect tests"
-           ${_motion_bvh_inspect_tests_default})
-endif()
-
-# A standalone configure of this directory resolves the library as an installed
-# package; the composed build already has the in-tree target.
-if(NOT TARGET motionBvh::motionBvh)
-    find_package(motionBvh REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_dependency(motionBvh)
 
 add_executable(motion_bvh_inspect
     src/Options.cpp
@@ -57,11 +33,7 @@ usdmotion_use_utf8_code_page(motion_bvh_inspect)
 target_compile_features(motion_bvh_inspect PRIVATE cxx_std_17)
 target_link_libraries(motion_bvh_inspect PRIVATE motionBvh::motionBvh)
 
-if(MSVC)
-    # The headers cite contract sections by their `§` sign, and MSVC reads
-    # source in the *system* code page unless told otherwise.
-    target_compile_options(motion_bvh_inspect PRIVATE /utf-8)
-endif()
+usdmotion_target_utf8(motion_bvh_inspect PRIVATE)
 
 # Staged into the member root's bin/: `ost plugin package` reads the
 # directories openstrata.tool.yaml declares rather than a build tree.
@@ -72,16 +44,10 @@ foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endforeach()
 
-include(GNUInstallDirs)
-install(TARGETS motion_bvh_inspect RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+usdmotion_install_tool(motion_bvh_inspect)
 
 if(MOTIONBVHINSPECT_BUILD_TESTS)
     enable_testing()
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

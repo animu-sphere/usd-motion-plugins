@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# UsdMotionOpenUsd.cmake -- the workspace's OpenUSD pin, enforced in one place.
+# UsdMotionOpenUsd.cmake -- the workspace's OpenUSD pin, enforced in one place,
+# and OpenUSD's CMake target names, spelled one way.
 #
 # OpenUSD is 26.08 and nothing else (docs/architecture/DEPENDENCIES.md §1). A
 # plugin built against one OpenUSD release is not loadable in another, and
@@ -8,16 +9,24 @@
 # process, so this is the release the rest of the ecosystem pins
 # (usd-vrm-plugins' cmake/UsdVrmOpenUsd.cmake).
 #
-# Every entry point that resolves OpenUSD includes this immediately after its
-# `find_package(pxr ...)`: the root project, each library built standalone,
-# and the optional plugins/execMotion bundle when it arrives. A component built
-# standalone by `ost` never composes the root project, so the pin travels with
-# the find_package call, not with the root.
+# Every entry point that links OpenUSD calls `usdmotion_require_openusd()`: the
+# root project, and each library, tool and bundle, which `ost` builds standalone
+# with no root project in scope. So the pin travels with the component rather
+# than with the root. A member that names no OpenUSD (motionBvh,
+# motion_bvh_inspect) does not call it, and says why.
 #
 # WHY NOT `find_package(pxr 26.08 EXACT ...)`: OpenUSD installs no
 # pxrConfigVersion.cmake, so any version argument makes find_package fail with
 # "no config version file" whichever OpenUSD is present. pxrConfig.cmake does
 # set the version variables directly, and those are what this tests.
+#
+# The target names: an OpenUSD install exports its libraries bare (`gf`) or
+# namespaced (`pxr::gf`) depending on how it was built. This module aliases
+# whichever exists as `usdmotion::pxr::<name>`, so a component links one
+# spelling and the difference stays here. The alias resolves to the imported
+# target, and an exported package records the imported name, so nothing a
+# consumer reads changes. A name absent from the install gets no alias, and
+# linking it fails at generate time naming the target.
 #
 # The OpenExec probe is a function rather than part of the pin, because
 # `plugins/execMotion` is the only member that evaluates anything
@@ -26,7 +35,8 @@
 # `usdmotion_require_openexec()`. In usd-vrm-plugins, where the whole workspace
 # is committed to OpenExec, the same probe runs unconditionally.
 #
-# Sets, for callers that report build metadata:
+# `usdmotion_require_openusd()` sets, in its caller's scope, beside what
+# pxrConfig.cmake sets (PXR_INCLUDE_DIRS and the rest):
 #   USDMOTION_OPENUSD_RELEASE   - "26.08"
 #
 # `usdmotion_require_openexec()` sets, in its caller's scope:
@@ -40,45 +50,78 @@ include_guard(GLOBAL)
 set(USDMOTION_OPENUSD_REQUIRED_PXR_VERSION 2608)
 set(USDMOTION_OPENUSD_REQUIRED_RELEASE "26.08")
 
-if(NOT pxr_FOUND)
-    message(FATAL_ERROR
-        "UsdMotionOpenUsd.cmake was included before OpenUSD was resolved. "
-        "Include it after find_package(pxr REQUIRED CONFIG).")
-endif()
+# Every OpenUSD library this repository names, and so every name that gets a
+# `usdmotion::pxr::` alias. A new one is a line here.
+set(USDMOTION_OPENUSD_TARGETS
+    arch tf gf vt plug sdf usd usdGeom usdSkel
+    hd usdImaging
+    vdf ef esf esfUsd exec execGeom execIr execUsd usdExecImaging usdIrImaging)
 
-if(NOT DEFINED PXR_VERSION)
-    message(FATAL_ERROR
-        "This OpenUSD install publishes no PXR_VERSION, so its version cannot "
-        "be verified. usd-motion-plugins requires OpenUSD "
-        "${USDMOTION_OPENUSD_REQUIRED_RELEASE} exactly.\n"
-        "  pxrConfig.cmake: ${pxr_DIR}")
-endif()
+# usdmotion_require_openusd()
+#
+# Resolves OpenUSD unless the root already has, refuses any release but the
+# pin, and aliases its targets. A macro, because find_package(pxr) must set
+# PXR_INCLUDE_DIRS and its other variables in the caller's scope.
+macro(usdmotion_require_openusd)
+    if(NOT pxr_FOUND)
+        find_package(pxr REQUIRED CONFIG)
+    endif()
+    _usdmotion_check_openusd_release()
+    _usdmotion_alias_openusd_targets()
+endmacro()
 
-if(DEFINED PXR_MINOR_VERSION AND DEFINED PXR_PATCH_VERSION)
-    # 26 + 8 -> "26.08"; OpenUSD zero-pads the month in every name it uses.
-    string(REGEX REPLACE "^([0-9])$" "0\\1" _usdmotion_patch "${PXR_PATCH_VERSION}")
-    set(USDMOTION_OPENUSD_RELEASE "${PXR_MINOR_VERSION}.${_usdmotion_patch}")
-    unset(_usdmotion_patch)
-else()
-    set(USDMOTION_OPENUSD_RELEASE "${PXR_VERSION}")
-endif()
+function(_usdmotion_check_openusd_release)
+    if(NOT DEFINED PXR_VERSION)
+        message(FATAL_ERROR
+            "This OpenUSD install publishes no PXR_VERSION, so its version "
+            "cannot be verified. usd-motion-plugins requires OpenUSD "
+            "${USDMOTION_OPENUSD_REQUIRED_RELEASE} exactly.\n"
+            "  pxrConfig.cmake: ${pxr_DIR}")
+    endif()
 
-if(NOT PXR_VERSION EQUAL USDMOTION_OPENUSD_REQUIRED_PXR_VERSION)
-    message(FATAL_ERROR
-        "Unsupported OpenUSD: found ${USDMOTION_OPENUSD_RELEASE} "
-        "(PXR_VERSION ${PXR_VERSION}), require "
-        "${USDMOTION_OPENUSD_REQUIRED_RELEASE} "
-        "(PXR_VERSION ${USDMOTION_OPENUSD_REQUIRED_PXR_VERSION}) exactly.\n"
-        "  pxrConfig.cmake: ${pxr_DIR}\n"
-        "OpenUSD guarantees no ABI stability across releases, so a plugin "
-        "built against another release could not be loaded beside the rest "
-        "of the ecosystem. See docs/architecture/DEPENDENCIES.md.")
-endif()
+    if(DEFINED PXR_MINOR_VERSION AND DEFINED PXR_PATCH_VERSION)
+        # 26 + 8 -> "26.08"; OpenUSD zero-pads the month in every name it uses.
+        string(REGEX REPLACE "^([0-9])$" "0\\1" _patch "${PXR_PATCH_VERSION}")
+        set(_release "${PXR_MINOR_VERSION}.${_patch}")
+    else()
+        set(_release "${PXR_VERSION}")
+    endif()
 
-# include_guard(GLOBAL) makes this the only time the line is printed per
-# configure, however many members include the module.
-message(STATUS
-    "OpenUSD ${USDMOTION_OPENUSD_RELEASE} (PXR_VERSION ${PXR_VERSION})")
+    if(NOT PXR_VERSION EQUAL USDMOTION_OPENUSD_REQUIRED_PXR_VERSION)
+        message(FATAL_ERROR
+            "Unsupported OpenUSD: found ${_release} "
+            "(PXR_VERSION ${PXR_VERSION}), require "
+            "${USDMOTION_OPENUSD_REQUIRED_RELEASE} "
+            "(PXR_VERSION ${USDMOTION_OPENUSD_REQUIRED_PXR_VERSION}) exactly.\n"
+            "  pxrConfig.cmake: ${pxr_DIR}\n"
+            "OpenUSD guarantees no ABI stability across releases, so a plugin "
+            "built against another release could not be loaded beside the rest "
+            "of the ecosystem. See docs/architecture/DEPENDENCIES.md.")
+    endif()
+
+    # Once per configure, however many members require OpenUSD.
+    get_property(_reported GLOBAL PROPERTY _USDMOTION_OPENUSD_REPORTED)
+    if(NOT _reported)
+        message(STATUS "OpenUSD ${_release} (PXR_VERSION ${PXR_VERSION})")
+        set_property(GLOBAL PROPERTY _USDMOTION_OPENUSD_REPORTED TRUE)
+    endif()
+    set(USDMOTION_OPENUSD_RELEASE "${_release}" PARENT_SCOPE)
+endfunction()
+
+# Aliases are scoped to the directory that creates them and those below it, as
+# pxr's own imported targets are, so the root's aliases serve every member of
+# the workspace and a standalone member creates its own.
+function(_usdmotion_alias_openusd_targets)
+    foreach(_name IN LISTS USDMOTION_OPENUSD_TARGETS)
+        if(TARGET usdmotion::pxr::${_name})
+            continue()
+        elseif(TARGET ${_name})
+            add_library(usdmotion::pxr::${_name} ALIAS ${_name})
+        elseif(TARGET pxr::${_name})
+            add_library(usdmotion::pxr::${_name} ALIAS pxr::${_name})
+        endif()
+    endforeach()
+endfunction()
 
 # ---------------------------------------------------------------------------
 # The OpenExec capability probe, for the one member that needs it
@@ -144,7 +187,7 @@ function(usdmotion_require_openexec)
             endif()
         endforeach()
 
-        if(NOT TARGET ${_component})
+        if(NOT TARGET usdmotion::pxr::${_component})
             list(APPEND _missing "${_component} (no imported CMake target)")
         elseif(NOT _header_found)
             list(APPEND _missing "${_component} (headers absent: ${_header})")

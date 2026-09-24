@@ -11,49 +11,20 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION"
-         _motion_record_version LIMIT_COUNT 1)
-    string(STRIP "${_motion_record_version}" _motion_record_version)
-else()
-    set(_motion_record_version "0.5.1")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionProject.cmake")
+usdmotion_read_version(USDMOTION_VERSION)
 
 project(motionRecord
-    VERSION ${_motion_record_version}
+    VERSION ${USDMOTION_VERSION}
     DESCRIPTION "A recorded trace becomes a motion stage"
     LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+usdmotion_component_project(TESTS_OPTION MOTIONRECORD_BUILD_TESTS)
 
-if(NOT DEFINED MOTIONRECORD_BUILD_TESTS)
-    if(DEFINED USDMOTION_BUILD_TESTS)
-        set(_motion_record_tests_default "${USDMOTION_BUILD_TESTS}")
-    else()
-        set(_motion_record_tests_default "${PROJECT_IS_TOP_LEVEL}")
-    endif()
-    option(MOTIONRECORD_BUILD_TESTS "Build motion_record tests"
-           ${_motion_record_tests_default})
-endif()
-
-if(NOT pxr_FOUND)
-    find_package(pxr REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionOpenUsd.cmake")
-if(NOT TARGET motionRecording::motionRecording)
-    find_package(motionRecording REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionSampling::motionSampling)
-    find_package(motionSampling REQUIRED CONFIG)
-endif()
-if(NOT TARGET motionUsd::motionUsd)
-    find_package(motionUsd REQUIRED CONFIG)
-endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/UsdMotionUtf8CodePage.cmake")
+usdmotion_require_openusd()
+usdmotion_require_dependency(motionRecording)
+usdmotion_require_dependency(motionSampling)
+usdmotion_require_dependency(motionUsd)
 
 add_executable(motion_record
     src/Options.cpp
@@ -65,21 +36,18 @@ target_link_libraries(motion_record
     PRIVATE
         motionRecording::motionRecording
         motionSampling::motionSampling
-        motionUsd::motionUsd)
+        motionUsd::motionUsd
+        usdmotion::pxr::usd
+        usdmotion::pxr::usdGeom
+        usdmotion::pxr::usdSkel
+        usdmotion::pxr::sdf
+        usdmotion::pxr::tf
+        usdmotion::pxr::gf
+        usdmotion::pxr::vt
+        usdmotion::pxr::arch)
 
-foreach(_usd_lib usd usdGeom usdSkel sdf tf gf vt arch)
-    if(TARGET ${_usd_lib})
-        target_link_libraries(motion_record PRIVATE ${_usd_lib})
-    elseif(TARGET pxr::${_usd_lib})
-        target_link_libraries(motion_record PRIVATE pxr::${_usd_lib})
-    else()
-        message(FATAL_ERROR
-                "motion_record requires the OpenUSD '${_usd_lib}' target.")
-    endif()
-endforeach()
-
+usdmotion_target_utf8(motion_record PRIVATE)
 if(MSVC)
-    target_compile_options(motion_record PRIVATE /utf-8)
     # windows.h's min/max macros meet OpenUSD's own numeric_limits<>::max()
     # uses in tf's robin map.
     target_compile_definitions(motion_record PRIVATE NOMINMAX _USE_MATH_DEFINES)
@@ -94,16 +62,10 @@ foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endforeach()
 
-include(GNUInstallDirs)
-install(TARGETS motion_record RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+usdmotion_install_tool(motion_record)
 
 if(MOTIONRECORD_BUILD_TESTS)
     enable_testing()
-    if(NOT USDMOTION_TEST_PYTHON)
-        find_package(Python3 COMPONENTS Interpreter QUIET)
-        if(Python3_Interpreter_FOUND)
-            set(USDMOTION_TEST_PYTHON "${Python3_EXECUTABLE}")
-        endif()
-    endif()
+    usdmotion_find_test_python()
     add_subdirectory(tests)
 endif()

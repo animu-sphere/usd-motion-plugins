@@ -41,13 +41,7 @@ add_test(NAME workspace_motion_profiles_absent_misplaced
         --corpus "${_motion_profile_fixture}/corpus")
 set_tests_properties(workspace_motion_profiles_absent_misplaced PROPERTIES WILL_FAIL TRUE)
 
-# The OpenUSD install root, from where pxrConfig.cmake was found.
-set(_usd_root "")
-if(pxr_DIR AND EXISTS "${pxr_DIR}/bin")
-    set(_usd_root "${pxr_DIR}")
-elseif(pxr_DIR)
-    get_filename_component(_usd_root "${pxr_DIR}/../../.." ABSOLUTE)
-endif()
+usdmotion_openusd_root(_usd_root)
 
 # The installed-consumer lane: install this build tree into a clean prefix and
 # consume every package installed_consumer/packages.json lists from a project

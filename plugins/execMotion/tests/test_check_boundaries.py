@@ -217,6 +217,25 @@ _expect(rules.forbidden_imports(POSIX_BASELINE, False, "case") == [],
 
 
 # ---------------------------------------------------------------------------
+# Links
+# ---------------------------------------------------------------------------
+
+# An OpenUSD library is allowed under each name the build can hand in: bare,
+# namespaced by the install, or under cmake/UsdMotionOpenUsd.cmake's alias. The
+# prefix is not the grant -- a library outside the allow-list is reported under
+# every spelling.
+WORKSPACE = {"motionCore::motionCore"}
+for spelling in ("exec", "pxr::exec", "usdmotion::pxr::exec"):
+    _expect(rules.link_errors("case", f"motionCore::motionCore|{spelling}",
+                              WORKSPACE) == [],
+            f"the allowed OpenUSD link '{spelling}' was reported")
+for spelling in ("usdImaging", "pxr::usdImaging", "usdmotion::pxr::usdImaging",
+                 "usdmotion::usdImaging", "motionRetarget::motionRetarget"):
+    _expect(len(rules.link_errors("case", spelling, WORKSPACE)) == 1,
+            f"the link '{spelling}' was not reported")
+
+
+# ---------------------------------------------------------------------------
 # The schema partition
 # ---------------------------------------------------------------------------
 
