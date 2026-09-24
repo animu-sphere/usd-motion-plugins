@@ -9,7 +9,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 | Document | Contents |
 | --- | --- |
-| [current.md](current.md) | What is left after v0.5.0: the consumers' deletions, the parity evidence, and the first publication's two unproven steps. |
+| [current.md](current.md) | What is left after the imports: the first consumer that has never heard of VRM, and the work beyond the imports. |
 
 ## Status at a glance
 

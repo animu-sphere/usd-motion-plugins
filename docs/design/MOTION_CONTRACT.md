@@ -262,7 +262,7 @@ A recorded file carries its own provenance: the format, the file's identity,
 the producer label and version, and the profile it was read under.
 `usd-vrm-plugins` settled how that relates to `SourceMetadata` before a
 converter set its first field
-([its MOTION_CONTRACT.md, "Recorded-source provenance"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#recorded-source-provenance-v070)),
+([its MOTION_CONTRACT.md, "Recorded-source provenance"](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#recorded-source-provenance-v070)),
 and `motionSource` arrives with it:
 
 | Recorded-source provenance | `SourceMetadata` |
@@ -301,7 +301,7 @@ held discrete values.
 
 **API from the OpenExec evidence.** `usd-vrm-plugins`' OpenExec nodes
 wrapped these libraries and found where a wrapper could not reach
-([its boundary consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/boundary-consolidation.md)).
+([its boundary consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/boundary-consolidation.md)).
 All four were fixed after the move, in a change of their own. Each is a pure
 function, and the streaming class beside it calls it, so the rule has one
 implementation:
@@ -391,7 +391,7 @@ A tracker source observes numbered devices, not joints: a position and an
 orientation in the receiving application's space, under an index into whatever
 the wearer strapped on. `usd-vrm-plugins` decided it gets **no type in
 `motionCore`**
-([its MOTION_CONTRACT.md, "Tracker observations"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#tracker-observations-and-where-they-are-not-v080)).
+([its MOTION_CONTRACT.md, "Tracker observations"](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#tracker-observations-and-where-they-are-not-v080)).
 Every reader of this contract takes a pose: the retargeter, the trace format,
 the comparison and the OpenExec nodes. A tracker sample here would have no
 reader and three standing obligations: equality, comparison and a place in the

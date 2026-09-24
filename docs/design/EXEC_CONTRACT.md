@@ -295,5 +295,6 @@ Each is a dated report in `usd-vrm-plugins`, OpenUSD 26.08:
 [display](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-display.md),
 [parity](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-parity.md),
 [driver](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/reports/openusd/26.08-openexec-driver.md).
-The driver contract as that repository states it is its
-[MOTION_CONTRACT.md, "OpenExec driver contract"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#openexec-driver-contract-after-v080).
+The driver contract as that repository stated it before it moved here is
+the last revision of its
+[MOTION_CONTRACT.md, "OpenExec driver contract"](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#openexec-driver-contract-after-v080).

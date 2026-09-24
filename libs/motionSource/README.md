@@ -8,7 +8,7 @@ convention, with no file format anywhere in it.
 
 A reader knows a file format and no semantics; this layer knows semantics and no
 file format; and a declarative producer profile supplies what neither can know
-on its own ([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+on its own ([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 The arrow `motionBvh -> motionSource` never reverses — the day a
 format-shaped field lands here is the day a second reader cannot be added
 without changing every signature above it, which is the entire reason this layer
@@ -34,7 +34,7 @@ rather than here: a product name may appear in one precisely because no code in
 this library has a name for it.
 
 Still to come: the second producer's profile
-([§12](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+([§12](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 ## The decisions the model is shaped by
 
@@ -66,7 +66,7 @@ part of it. The derivation is one-way and narrowing, and
 [`CanonicalMetadata.h`](include/motionSource/CanonicalMetadata.h) states what it
 drops and where those facts survive instead. Settling this before the converter
 set its first field was a
-[contract item](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md) rather than an
+[contract item](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md) rather than an
 implementation detail; the answer is in
 [MOTION_CONTRACT.md](../../docs/design/MOTION_CONTRACT.md).
 
@@ -79,7 +79,7 @@ exists. So `MatchSourceProfile` returns a `SourceProfileRefusal` naming the
 profile maps it onto that reader's codes. Structural invariants of the values
 this library owns stay plain text, which is a different thing and stated as one
 ([`SourceProfile.h`](include/motionSource/SourceProfile.h),
-[recorded-motion-sources.md §10](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+[recorded-motion-sources.md §10](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 ## No producer, no format
 

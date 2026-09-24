@@ -22,6 +22,15 @@ separate from the package version
 
 ### Changed
 
+- **The documentation states ownership instead of status.** The root README
+  follows the shared shape (Scope, Architecture, Components, Documentation,
+  Build, License), says this repository is the canonical owner of generic
+  motion semantics, and carries no release status. The documentation
+  guidelines add the cross-repository rule — link a sibling's contract, never
+  restate it — and the root README rules. Links into `usd-vrm-plugins`'
+  motion documents point at its archive, or at the last revision of a
+  superseded contract. The roadmap drops the consumers' deletions and the
+  parity reproduction, both done.
 - **The public live-stream shape is settled (MC-O5).** The existing
   `LiveCaptureSource::Push` intake and `IMotionSource::Sample` read are the
   boundary used by `motion-connectors`' shared VMC adapter. Each actor has its
