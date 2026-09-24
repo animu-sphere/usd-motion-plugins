@@ -57,16 +57,30 @@ if(MSVC)
     target_compile_definitions(motion_convert PRIVATE NOMINMAX _USE_MATH_DEFINES)
 endif()
 
-# Staged into the member root's bin/: `ost plugin package` reads the
-# directories openstrata.tool.yaml declares rather than a build tree.
-set_target_properties(motion_convert PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-    set_target_properties(motion_convert PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-endforeach()
+# Staged into the member's binary-tree bin/, the directory openstrata.tool.yaml
+# declares, where `ost build` finds it (cmake/UsdMotionStage.cmake).
+usdmotion_stage_tool(motion_convert)
 
 usdmotion_install_tool(motion_convert)
+
+# The profiles are staged beside the tool as an install puts them, in
+# <stage>/share/, so a converter run from the build tree finds them by the rule
+# that finds them in an installed prefix: <exe>/../share/... (ProfileLocator.cpp).
+# Copied only when they differ, and re-globbed when one is added.
+file(GLOB _motion_convert_profiles CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/../../profiles/motion/*.yaml")
+if(_motion_convert_profiles)
+    usdmotion_member_stage(_motion_convert_stage)
+    set(_motion_convert_profile_stage
+        "${_motion_convert_stage}/share/usd-motion-plugins/profiles/motion")
+    add_custom_target(motion_convert_profiles ALL
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_motion_convert_profile_stage}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                ${_motion_convert_profiles} "${_motion_convert_profile_stage}"
+        COMMENT "Staging the motion profiles beside motion_convert"
+        VERBATIM)
+    add_dependencies(motion_convert motion_convert_profiles)
+endif()
 
 # The profiles ship beside the tool, at the location ProfileLocator.cpp derives
 # from the executable's own path: a converter with no profile available refuses

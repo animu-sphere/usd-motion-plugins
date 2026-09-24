@@ -11,16 +11,10 @@ strata.lock
 /.ost-ci/
 /.ost-ci-home/
 
-# Built plugin libraries are staged into each bundle's lib/ by the build, and
-# tools into their own bin/.
-/plugins/*/lib/
-/tools/*/bin/
-
-# Generated into bundle resources by the build: plugInfo.json names this
-# platform's library suffix, and buildInfo.json varies per commit, toolchain
-# and platform.
-/plugins/*/plugin/resources/*/plugInfo.json
-/plugins/*/plugin/resources/*/buildInfo.json
+# Nothing the build produces lands in the source tree: bundles and tools are
+# staged in the binary tree (cmake/UsdMotionStage.cmake), so a lib/, bin/ or
+# plugInfo.json appearing under plugins/ or tools/ is a regression for
+# `git status` to show, not to hide.
 
 # --- CMake / MSVC generated ---
 CMakeCache.txt

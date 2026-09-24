@@ -111,11 +111,13 @@ first hit wins:
 1. every `--profile-dir`, in the order given
 2. `USDMOTION_PROFILE_PATH`, a list in the platform's PATH separator
 3. `<exe>/../share/usd-motion-plugins/profiles/motion` — a `cmake --install`
-   prefix, where the tools land in `<prefix>/bin/`
+   prefix, where the tools land in `<prefix>/bin/`, and this repository's build
+   tree, which stages the profiles beside the tool the same way
 4. `<exe>/../../../share/usd-motion-plugins/profiles/motion` — an installed
    product, where `ost plugin product install` puts a tool member in
    `<prefix>/tools/<member>/bin/` and the product's data in `<prefix>/share/`
-5. `<exe>/../../../profiles/motion` — this repository
+5. `<exe>/../../../profiles/motion` — a tool placed in this repository's own
+   `tools/<member>/bin/`, which no build does any more
 
 The last two are offered only when the executable really is in a
 `tools/<member>/bin/`; from anywhere else they would climb past a prefix

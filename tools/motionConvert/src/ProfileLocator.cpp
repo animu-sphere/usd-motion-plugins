@@ -145,11 +145,12 @@ ProfileSearchPath(const std::vector<std::string>& extraDirs)
     if (!executableDir.empty())
     {
         // <prefix>/bin/<exe> -> <prefix>/share/... : a `cmake --install`
-        // prefix, and a member archive unpacked on its own.
+        // prefix, a member archive unpacked on its own, and this repository's
+        // build tree, which stages the profiles beside the tool.
         directories.push_back(executableDir.parent_path() / "share" / "usd-motion-plugins" /
                               "profiles" / "motion");
         // <prefix>/tools/<member>/bin/<exe> -> <prefix>/share/... : an
-        // installed product, and this repository's own build tree. The two
+        // installed product. The two
         // installed layouts agree about where the data is relative to the
         // prefix and disagree about how deep the tool sits inside it, so each
         // needs its own rule.

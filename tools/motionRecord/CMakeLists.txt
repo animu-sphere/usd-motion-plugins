@@ -53,14 +53,9 @@ if(MSVC)
     target_compile_definitions(motion_record PRIVATE NOMINMAX _USE_MATH_DEFINES)
 endif()
 
-# Staged into the member root's bin/: `ost plugin package` reads the
-# directories openstrata.tool.yaml declares rather than a build tree.
-set_target_properties(motion_record PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-    set_target_properties(motion_record PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-endforeach()
+# Staged into the member's binary-tree bin/, the directory openstrata.tool.yaml
+# declares, where `ost build` finds it (cmake/UsdMotionStage.cmake).
+usdmotion_stage_tool(motion_record)
 
 usdmotion_install_tool(motion_record)
 

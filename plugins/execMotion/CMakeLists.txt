@@ -105,23 +105,35 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
     usdmotion::pxr::exec
     usdmotion::pxr::execUsd)
 
+# The library is named lib<name> on every platform, which is the name
+# plugInfo.json.in spells.
 set(OPENSTRATA_PLUGIN_LIBRARY_PREFIX "lib")
 set_target_properties(${PLUGIN_NAME} PROPERTIES
-    PREFIX "${OPENSTRATA_PLUGIN_LIBRARY_PREFIX}"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib")
-foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-    set_target_properties(${PLUGIN_NAME} PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-        LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-        RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/lib")
-endforeach()
+    PREFIX "${OPENSTRATA_PLUGIN_LIBRARY_PREFIX}")
 
+# The registration names this platform's library suffix, so it is generated,
+# into the binary tree; nothing here writes into the source tree.
+set(_exec_motion_resources "plugin/resources/execMotion")
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/plugin/resources/execMotion/plugInfo.json.in"
-    "${CMAKE_CURRENT_SOURCE_DIR}/plugin/resources/execMotion/plugInfo.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/${_exec_motion_resources}/plugInfo.json.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json"
     @ONLY)
+
+# The build's own stage, which the tests load (cmake/UsdMotionStage.cmake).
+usdmotion_stage_bundle(${PLUGIN_NAME}
+    PLUG_INFO "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json"
+    RESOURCES "${_exec_motion_resources}")
+
+# What ships: the library in lib/ beside the registration at the path
+# openstrata.plugin.yaml's `usd.plug_info` names, so plugInfo.json's
+# LibraryPath (../../../lib/...) holds in any prefix. `ost plugin build`
+# installs this into the bundle's target-local stage, and `ost plugin test` and
+# `ost plugin package` read it from there.
+install(TARGETS ${PLUGIN_NAME}
+    RUNTIME DESTINATION lib
+    LIBRARY DESTINATION lib)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json"
+    DESTINATION "${_exec_motion_resources}")
 
 if(USDMOTION_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     enable_testing()
