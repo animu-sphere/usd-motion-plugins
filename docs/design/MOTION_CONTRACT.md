@@ -337,9 +337,17 @@ recorded session replayable byte for byte. Intake decisions are explicit and
 - **Bounds.** A queue has a declared capacity and reports what it dropped
   (design policy §34).
 
-The design policy's §6 leaves pull (`TryRead`) and push (`SetSink`) open; the
-imported code is push-into-a-buffer with pull sampling, and a runtime wraps it
-in either (MC-O5).
+**MC-O5 is resolved:** `LiveCaptureSource` is the public live-stream intake.
+The producer calls `Push(MotionPose)` for each actor's canonical pose in
+timestamp order. The consumer reads through `IMotionSource::Sample` at its
+evaluation time; `LiveCaptureSource` owns clock alignment, conditioning and
+the bounded pose history. `motion-connectors`' public read remains
+`IMotionConnector::Poll(MotionFrame&)`, with the consumer routing each actor's
+pose to its own intake. `SetSourceMetadata` establishes stream provenance;
+each pushed pose keeps its own source timestamp and sequence number. The
+connector's frame buffer and this intake have separate responsibilities. The
+first VMC connector-to-intake test exercises this boundary, so no additional
+`MotionStream` class or callback interface is required.
 
 ## 10. Recording and the trace format
 
@@ -397,12 +405,11 @@ constraint.
 ## 13. Open questions
 
 MC-O1, the joint vocabulary, was decided on 2026-09-19 (§2.1); MC-O4 was
-narrowed the same day (§6).
+narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
 | MC-O2 | Per-joint translations beyond the hips: which producer needs them, and whether they are optional arrays as design policy §5.1 sketches | a producer that delivers them |
 | MC-O3 | Root motion for producers with two translation channels (VMC root position vs hips offset) | one recorded session from each of two VMC senders — operator work in `motion-connectors` |
 | MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
-| MC-O5 | `MotionStream`'s public shape: pull, push, or the imported buffer with both wrappers | `motion-connectors`' first consumer |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |

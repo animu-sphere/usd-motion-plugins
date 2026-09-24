@@ -22,10 +22,12 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 | `motionRecording/ReplaySender.h` | `ReplaySender` — pushes a recorded trace as a caller-driven clock advances |
 | `motionRecording/MotionRecorder.h` | `MotionRecorder` — accumulates evaluated poses back into a `MotionClip`, with the status of every tick |
 
-`LiveCaptureSource` is the imported shape of the contract's `MotionStream`:
-push into a buffer, pull by sampling. Whether the published stream is that,
-a pull interface or a push interface is MC-O5, decided by `motion-connectors`'
-first consumer, so the imported name is kept until then.
+`LiveCaptureSource` is the public live-stream intake: a connector consumer
+pushes each actor's canonical pose into its own source, then reads at evaluation
+time through `IMotionSource::Sample`. It sets the stream's provenance with
+`SetSourceMetadata`; the pushed pose retains its source timestamp and sequence
+number. This is MC-O5's resolved shape, exercised by `motion-connectors`'
+VMC connector-to-intake test.
 
 ## No transport, no wall clock
 

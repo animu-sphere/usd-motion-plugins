@@ -56,10 +56,11 @@ consumer.
 ## Open decisions
 
 They are listed, in the order they block work, in
-[the roadmap README](README.md#open-decisions). The ones a consumer is most
-likely to reach first are **MC-O5** (`MotionStream`'s public shape, which
-`motion-connectors` needs) and **USD-O5** (the `Bindings` prim, which
-`usd-avatar-runtime` needs).
+[the roadmap README](README.md#open-decisions). The next consumer-facing
+decision is **USD-O5** (the `Bindings` prim, which `usd-avatar-runtime` needs).
+MC-O5 was resolved with `motion-connectors`' first shared connector-to-intake
+test; [MOTION §9](../design/MOTION_CONTRACT.md#9-motionstream-intake) records
+the public stream shape.
 
 ## Completion criteria
 
