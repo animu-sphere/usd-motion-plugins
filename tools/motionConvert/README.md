@@ -25,7 +25,7 @@ That is the whole claim. It reports no unit, no up axis, no handedness, no
 rotation order and no humanoid bone, because a BVH file states none of them —
 they are facts about the application that *wrote* the file, and they live in a
 declarative producer profile one layer up
-([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 ## Sections
 
@@ -56,7 +56,7 @@ whether a joint's position channels move at all is what separates translation
 animation from a rest offset restated every frame. Both are measurements, and
 both are what a profile has to be written from — which is why the tool that
 takes those measurements comes before the profile schema that consumes them
-(BVH-0 in the [plan](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+(BVH-0 in the [plan](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 ## What it does not do yet
 
@@ -95,7 +95,7 @@ That split is what makes one recording reusable across avatars, separates a
 parsing failure from a retarget failure, and keeps this tool free of VRM schema
 details — the source-rest-to-target-rest correction belongs to `vrmRetarget`,
 which v0.4.0 already shipped, and a converter that applied it would be a second
-one ([§4, §5](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+one ([§4, §5](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 ### There is no default profile
 

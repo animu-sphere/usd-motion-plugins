@@ -10,7 +10,7 @@ translation means, or how to read a rest pose. Those are facts about the
 application that *wrote* the file rather than about the format, so they live in
 a declarative producer profile one layer up, and the conversion that uses them
 belongs to `motionSource`
-([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+([recorded-motion-sources.md §2](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 **There is no producer name anywhere in this library, and there is no default
 profile.** Bake one producer's answers into the parser and the second producer
@@ -62,7 +62,7 @@ Each one is a decision, and each is argued where it is implemented:
 ## Diagnostics
 
 Eleven `MOTION_BVH_*` codes, frozen before the parser was written
-([§6](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)). Five are syntax and are
+([§6](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)). Five are syntax and are
 the only ones the parser raises; six are semantics and belong to the layer where
 a document meets a profile. `DiagnosticIsSyntax` states the split, and the
 boundary check fails a parser source that names a semantic code.
@@ -112,7 +112,7 @@ first place a producer's export became the format's definition.
 162 channels, 853 rows at 50 Hz. It is a different kind of evidence and it is
 kept apart from the shapes rather than added to them, with its own manifest, its
 own expectation table, and the redistribution split
-[§8](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md) describes.
+[§8](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md) describes.
 
 The parser reads it exactly as it reads a two-joint fixture. What that file
 *means* — that its unit is centimetres, that +Y is up, that only its root

@@ -82,7 +82,7 @@ difference is legal and useful, so **none of these cases refuses a retarget**.
 What each one costs is stated and, where it can be, reported under a §7 code.
 `usd-vrm-plugins` decided this on 2026-09-17 (its OpenExec plan's P1-3), with a
 named test holding every row
-([its MOTION_CONTRACT.md, "Partial skeleton policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#partial-skeleton-policy-v090)).
+([its MOTION_CONTRACT.md, "Partial skeleton policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#partial-skeleton-policy-v090)).
 Those tests arrive with `motionRetarget`.
 
 | # | Case | What the retarget does | Reported |
@@ -172,7 +172,7 @@ and says so.
 
 RT-O3, carried from `usd-vrm-plugins`' decision of 2026-09-17 (its OpenExec
 plan's P1-2;
-[its MOTION_CONTRACT.md, "Scale policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#scale-policy-v090)):
+[its MOTION_CONTRACT.md, "Scale policy"](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#scale-policy-v090)):
 
 1. **A bake states each joint's rest scale, constant over the clip.** UsdSkel
    takes an animated joint's local transform from the animation whole, so the
@@ -247,7 +247,7 @@ decisions on 2026-09-19.
 
 `usd-vrm-plugins`' `execVrm` wrapped the retargeter node by node and found
 where a wrapper could not reach
-([its boundary-consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/boundary-consolidation.md#findings-from-the-exec-layer-as-they-land)).
+([its boundary-consolidation findings](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/boundary-consolidation.md#findings-from-the-exec-layer-as-they-land)).
 Each was fixed on arrival, in its own change after the move
 ([WORKSPACE.md §3](../architecture/WORKSPACE.md#3-moving-code-in), rule 4):
 

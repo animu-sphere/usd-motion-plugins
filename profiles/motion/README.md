@@ -5,7 +5,7 @@ recorded output means. Joint names, units, axes and root conventions are facts
 about the *writer* rather than about a file format, so they live here as data and
 the code that reads them never has a name for any of them
 ([WORKSPACE.md §1](../../docs/architecture/WORKSPACE.md),
-[recorded-motion-sources.md §3](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/roadmap/recorded-motion-sources.md)).
+[recorded-motion-sources.md §3](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/archive/motion-split/recorded-motion-sources.md)).
 
 This is the one place a product name may appear outside `adapters/`. The rule it
 looks like it breaks forbids product-conditional *code*; a profile is a
@@ -27,7 +27,7 @@ it. The second one disagreed about three of them, and two were contract changes
 rather than profile ones: it splits the body's placement across a reference node
 and a hips, and its offsets compose into no pose at all, so `rest-offsets` is
 unavailable to it. Both are settled in
-[MOTION_CONTRACT.md](https://github.com/animu-sphere/usd-vrm-plugins/blob/main/docs/design/MOTION_CONTRACT.md#recorded-source-rest-pose-and-the-path-rule-v070).
+[MOTION_CONTRACT.md](https://github.com/animu-sphere/usd-vrm-plugins/blob/e98db79635e431b958c0cf64f088c822a9f73cf2/docs/design/MOTION_CONTRACT.md#recorded-source-rest-pose-and-the-path-rule-v070).
 
 The second profile also shows what a *second file from the same producer* is
 for. Its two rows are one walk and one standing clip, and neither alone
