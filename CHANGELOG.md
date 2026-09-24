@@ -11,6 +11,11 @@ separate from the package version
 
 ### Changed
 
+- **`ost` is pinned to 0.23.6**, in `openstrata.ci.yaml`, the rendered source
+  CI and the release lane. 0.23.5 and 0.23.6 stage an installable bundle and a
+  root-built tool per target and package from that stage, which is what moving
+  `execMotion`'s and the CLIs' outputs out of the source tree needs. Nothing
+  moves yet: without install rules a bundle keeps its source-tree outputs.
 - **The CMake build shares its infrastructure through `cmake/`.** The root
   and every library, tool and bundle include `cmake/UsdMotionProject.cmake`,
   which reads `VERSION`, applies the C++20 and build-type policy, resolves
