@@ -25,7 +25,6 @@ The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| MC-O5 | `MotionStream`'s public shape | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | v0.3.0 |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |
 | MC-O6 | Tracking state | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a live producer |

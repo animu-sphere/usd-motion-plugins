@@ -11,6 +11,11 @@ separate from the package version
 
 ### Changed
 
+- **The public live-stream shape is settled (MC-O5).** The existing
+  `LiveCaptureSource::Push` intake and `IMotionSource::Sample` read are the
+  boundary used by `motion-connectors`' shared VMC adapter. Each actor has its
+  own intake, and the producer's source timestamp survives it.
+
 - **A build writes nothing into the source tree.** `execMotion`'s library and
   its generated `plugInfo.json`, and the three CLIs, were built into
   `plugins/execMotion/lib/`, `plugins/execMotion/plugin/resources/` and
