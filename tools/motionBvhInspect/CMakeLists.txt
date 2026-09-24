@@ -35,14 +35,9 @@ target_link_libraries(motion_bvh_inspect PRIVATE motionBvh::motionBvh)
 
 usdmotion_target_utf8(motion_bvh_inspect PRIVATE)
 
-# Staged into the member root's bin/: `ost plugin package` reads the
-# directories openstrata.tool.yaml declares rather than a build tree.
-set_target_properties(motion_bvh_inspect PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
-    set_target_properties(motion_bvh_inspect PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-endforeach()
+# Staged into the member's binary-tree bin/, the directory openstrata.tool.yaml
+# declares, where `ost build` finds it (cmake/UsdMotionStage.cmake).
+usdmotion_stage_tool(motion_bvh_inspect)
 
 usdmotion_install_tool(motion_bvh_inspect)
 

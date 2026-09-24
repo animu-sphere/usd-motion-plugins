@@ -11,6 +11,21 @@ separate from the package version
 
 ### Changed
 
+- **A build writes nothing into the source tree.** `execMotion`'s library and
+  its generated `plugInfo.json`, and the three CLIs, were built into
+  `plugins/execMotion/lib/`, `plugins/execMotion/plugin/resources/` and
+  `tools/*/bin/`, because `ost` packaged them from there. They are now staged in
+  each member's binary directory (`cmake/UsdMotionStage.cmake`), one stage per
+  configuration under a multi-config generator, so Debug and Release no longer
+  overwrite each other. `execMotion` gains install rules, which `ost plugin
+  build` (0.23.5 and later) installs into the bundle's target-local stage for
+  `ost plugin test` and `ost plugin package`; its package no longer carries
+  `plugInfo.json.in`. `motion_convert`'s build stages the profiles beside it,
+  so a converter run from the build tree still finds them with no flags. The
+  `.gitignore` entries that hid those outputs are gone: a checkout built before
+  this change can delete `plugins/execMotion/lib/`,
+  `plugins/execMotion/plugin/resources/execMotion/plugInfo.json` and
+  `tools/*/bin/`.
 - **`ost` is pinned to 0.23.6**, in `openstrata.ci.yaml`, the rendered source
   CI and the release lane. 0.23.5 and 0.23.6 stage an installable bundle and a
   root-built tool per target and package from that stage, which is what moving

@@ -182,9 +182,18 @@ Code arrives from `usd-vrm-plugins` under that repository's moving rules
   `UsdMotionOpenUsd.cmake` (the pin, OpenUSD's targets as
   `usdmotion::pxr::<name>`, and the OpenExec probe), `UsdMotionTargets.cmake`
   (a sibling package, and `/utf-8`), `UsdMotionInstall.cmake`,
-  `UsdMotionTesting.cmake` and `UsdMotionUtf8CodePage.cmake`. A component's
-  `CMakeLists.txt` keeps what is its own: its sources, its `PUBLIC` and
-  `PRIVATE` links, its definitions, its install and its tests.
+  `UsdMotionStage.cmake`, `UsdMotionTesting.cmake` and
+  `UsdMotionUtf8CodePage.cmake`. A component's `CMakeLists.txt` keeps what is
+  its own: its sources, its `PUBLIC` and `PRIVATE` links, its definitions, its
+  install and its tests.
+- A build writes nothing into the source tree. Each member is staged in its
+  binary directory, laid out as the member is (a tool's `bin/`, a bundle's
+  `lib/` beside its `plugin/resources/`), one stage per configuration under a
+  multi-config generator; the build's tests run against that stage. What ships
+  is what the install rules install: `ost plugin build` installs the bundle
+  into its target-local stage, which `ost plugin test` and `ost plugin package`
+  read, and `ost build` takes each tool from its member's `bin/` in the root
+  build tree.
 
 ## 5. Invariants
 

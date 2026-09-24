@@ -314,13 +314,14 @@ endif()
 # ---------------------------------------------------------------------------
 # Environment
 # ---------------------------------------------------------------------------
-# The bundle's own resource directory is what PXR_PLUGINPATH_NAME points at, and
-# its plugInfo.json resolves LibraryPath relative to itself -- so the staged
-# tree the bundle already produces is what the test loads, not a copy.
+# The bundle's staged resource directory is what PXR_PLUGINPATH_NAME points at,
+# and its plugInfo.json resolves LibraryPath relative to itself -- so the stage
+# the build already produces in the binary tree is what the test loads, not a
+# copy (cmake/UsdMotionStage.cmake).
 usdmotion_openusd_root(_usd_root)
 
-set(_bundle_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
-set(_plug_resources "${_bundle_dir}/plugin/resources/execMotion")
+set(_bundle_lib "$<TARGET_FILE_DIR:${PLUGIN_NAME}>")
+set(_plug_resources "${_bundle_lib}/../plugin/resources/execMotion")
 
 # motionCore is static, so nothing of it is loaded at run time; OpenUSD is not,
 # and on Windows a plain-CMake ctest run finds none of it without this. Same
@@ -329,7 +330,7 @@ set(_plug_resources "${_bundle_dir}/plugin/resources/execMotion")
 set(_exec_motion_env
     "PATH=path_list_prepend:${_usd_root}/bin"
     "PATH=path_list_prepend:${_usd_root}/lib"
-    "PATH=path_list_prepend:${_bundle_dir}/lib"
+    "PATH=path_list_prepend:${_bundle_lib}"
     "PXR_PLUGINPATH_NAME=path_list_prepend:${_plug_resources}")
 
 set_tests_properties(execMotion_mechanism execMotion_sample execMotion_filter
