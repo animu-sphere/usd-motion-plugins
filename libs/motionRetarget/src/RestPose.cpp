@@ -76,6 +76,36 @@ SourceRestPose::GetWorldRestRotation(openstrata::motion::HumanJoint bone) const
     return world.GetNormalized();
 }
 
+pxr::GfQuatf
+TargetRestPose::GetLocalRestRotation(const SkeletonDescriptor& skeleton, int jointIndex) const
+{
+    if (jointIndex < 0 || static_cast<std::size_t>(jointIndex) >= skeleton.GetSize())
+    {
+        return Identity();
+    }
+    const auto slot = static_cast<std::size_t>(jointIndex);
+    if (slot < localRotations.size() && localRotations[slot])
+    {
+        return localRotations[slot]->GetNormalized();
+    }
+    return skeleton.GetJoints()[slot].restRotation.GetNormalized();
+}
+
+pxr::GfQuatf
+TargetRestPose::GetWorldRestRotation(const SkeletonDescriptor& skeleton, int jointIndex) const
+{
+    pxr::GfQuatf world = Identity();
+    int cursor = jointIndex;
+    for (std::size_t depth = 0;
+         depth < skeleton.GetSize() && cursor >= 0 && static_cast<std::size_t>(cursor) < skeleton.GetSize();
+         ++depth)
+    {
+        world = GetLocalRestRotation(skeleton, cursor) * world;
+        cursor = skeleton.GetJoints()[static_cast<std::size_t>(cursor)].parent;
+    }
+    return world.GetNormalized();
+}
+
 RestPoseCorrection::RestPoseCorrection()
 {
     pre.fill(Identity());
@@ -114,6 +144,13 @@ RestPoseCorrection
 ComputeRestPoseCorrection(const SourceRestPose& source, const SkeletonDescriptor& target,
                           const RetargetMap& map)
 {
+    return ComputeRestPoseCorrection(source, target, map, TargetRestPose());
+}
+
+RestPoseCorrection
+ComputeRestPoseCorrection(const SourceRestPose& source, const SkeletonDescriptor& target,
+                          const RetargetMap& map, const TargetRestPose& targetReference)
+{
     RestPoseCorrection correction;
     const std::vector<SkeletonJoint>& joints = target.GetJoints();
 
@@ -138,8 +175,8 @@ ComputeRestPoseCorrection(const SourceRestPose& source, const SkeletonDescriptor
                 : Identity();
 
         const SkeletonJoint& joint = joints[static_cast<std::size_t>(jointIndex)];
-        const pxr::GfQuatf targetRest = joint.restRotation.GetNormalized();
-        const pxr::GfQuatf targetParentRest = target.GetWorldRestRotation(joint.parent);
+        const pxr::GfQuatf targetRest = targetReference.GetLocalRestRotation(target, jointIndex);
+        const pxr::GfQuatf targetParentRest = targetReference.GetWorldRestRotation(target, joint.parent);
 
         if (IsIdentityRotation(sourceRest) && IsIdentityRotation(sourceParentRest) &&
             IsIdentityRotation(targetRest) && IsIdentityRotation(targetParentRest))

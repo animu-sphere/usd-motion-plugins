@@ -121,6 +121,9 @@ MOTIONRETARGET_API bool GetJointWorldTransform(const SkeletonDescriptor& skeleto
 struct RetargetOptions
 {
     RootMotionOptions rootMotion;
+    // Reference orientation used only to correct driven rotations. Unset
+    // joints, and joints a clip does not drive, retain the UsdSkel rest.
+    TargetRestPose targetRest;
 
     // The bones this target requires, in the order the caller wants them
     // reported. Empty -- the default -- requires nothing: the joint vocabulary

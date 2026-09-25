@@ -15,7 +15,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 ## It never opens a stage
 
 The target rig arrives as plain values: a `SkeletonDescriptor`, a
-`RetargetMap` and a `SourceRestPose`, not a `UsdSkelSkeleton`. Reading them off
+`RetargetMap`, a `SourceRestPose`, and optionally a `TargetRestPose`, not a `UsdSkelSkeleton`. Reading them off
 a stage is the caller's job. A format repository does it from its own binding,
 and `motionUsd` does it from a skeleton. That keeps the retarget testable
 without USD composition, and usable by a live source that has no stage at all.
@@ -26,7 +26,7 @@ without USD composition, and usable by a live source that has no stage at all.
 | --- | --- |
 | `motionRetarget/SkeletonDescriptor.h` | `SkeletonJoint`, `SkeletonDescriptor`: joint tokens, parents derived from `a/b/c` joint paths, decomposed rest transforms with their scale, and `DecomposeRestTransform` |
 | `motionRetarget/RetargetMap.h` | `RetargetMap`: human bone → target joint index, and duplicate-binding reporting |
-| `motionRetarget/RestPose.h` | `SourceRestPose`, `RestPoseCorrection`, `ComputeRestPoseCorrection` |
+| `motionRetarget/RestPose.h` | `SourceRestPose`, optional `TargetRestPose`, `RestPoseCorrection`, `ComputeRestPoseCorrection` |
 | `motionRetarget/RootMotionPolicy.h` | `RootMotionMode` (`Ignore` / `Hips` / `RootJoint`), `RootMotionOptions`, `ResolveRootTranslation` |
 | `motionRetarget/PoseRetargeter.h` | `PoseRetargeter`, `RetargetedPose`, `RetargetedAnimation`, `JointLocalTransforms` (one retargeted sample in a `UsdSkelAnimation`'s shape, scales included), `GetJointWorldTransform`, `DiagnoseRig` |
 | `motionRetarget/Diagnostics.h` | the eight `MOTION_RETARGET_*` codes (`RetargetDiagnosticCode`) and their table, `RetargetDiagnostic`, `RetargetDiagnostics`. The library raises five, and only a caller holding a stage can raise the other three |
@@ -54,6 +54,14 @@ without USD composition, and usable by a live source that has no stage at all.
 
 Unmapped joints keep their rest transform, so a clip that drives only part of a
 rig leaves the rest of it alone instead of collapsing it to identity.
+
+For a rig whose humanoid reference rest differs from its UsdSkel rest, fill
+`RetargetOptions::targetRest.localRotations` in the target skeleton's joint
+order. Each optional rotation is local to that joint's parent; absent entries
+use `SkeletonJoint::restRotation`. The reference affects correction of driven
+bones only. An undriven bone still receives its UsdSkel rest rotation. The
+format adapter decides which joints need an aimed reference, so an MMD adapter
+can select only its arm chain.
 
 ## Building
 

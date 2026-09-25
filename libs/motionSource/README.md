@@ -27,7 +27,7 @@ The value model and its invariants, and the profile contract over them:
 | `SourceProfile.h` | what one producer's export means: the stated vocabulary, `SourceProfile`, `ValidateSourceProfile`, `MatchSourceProfile` and its typed refusals |
 | `SourceProfileFile.h` | a profile as a file: the keys, the small language they are written in, and the line a file that gets one wrong is told about |
 | `CanonicalMetadata.h` | provenance's crossing into `motionCore` |
-| `CanonicalConversion.h` | the converter: the change of basis, the angle composition, the path rule, the rest pose, the root policies, and the four ways a conversion refuses |
+| `CanonicalConversion.h` | the converter: the change of basis, the angle composition, the path rule, the rest pose, the root policies, the four ways a conversion refuses, and public `TPoseDirection` / `ShortestRotation` aim helpers |
 
 The profiles themselves are **data**, in [`profiles/motion/`](../../profiles/motion/)
 rather than here: a product name may appear in one precisely because no code in

@@ -136,6 +136,16 @@ MMD rig — states its rest explicitly; a rest derived by a second traversal of
 the source can disagree with the first and shows as a constant per-joint
 offset that looks like a bad capture.
 
+The target can separately state a humanoid reference rest through
+`RetargetOptions::targetRest`. Its optional local rotations follow the target
+skeleton's joint order, and unspecified joints use their UsdSkel rest. `T` and
+`Tp` in the correction above come from this reference rest. The
+`SkeletonDescriptor` still describes the stage's actual rest transforms, and
+an undriven joint still takes its rotation from that descriptor. With no
+target reference rest, correction is unchanged. A format adapter selects the
+bones it aims; `motionSource::TPoseDirection` and `ShortestRotation` provide
+the canonical directions and swing without imposing a whole-body aim.
+
 ## 6. Root motion
 
 Root motion stays separate from the body (MOTION_CONTRACT §5.3), so where it

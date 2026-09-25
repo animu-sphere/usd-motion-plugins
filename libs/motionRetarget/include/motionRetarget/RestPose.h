@@ -95,6 +95,22 @@ struct SourceRestPoseResult
 // an exec bundle; this is where the two meet.
 MOTIONRETARGET_API SourceRestPoseResult BuildSourceRestPose(const SkeletonDescriptor& semanticSkeleton);
 
+// Optional humanoid reference rest for a target rig. Slots use the target's
+// joint order; an unset slot uses SkeletonJoint::restRotation. This stays
+// separate from the UsdSkel rest, which is also the pose of an undriven joint.
+// Stating local rotations lets an override on an ancestor contribute to every
+// descendant's reference world rotation without changing the skeleton.
+struct TargetRestPose
+{
+    std::vector<std::optional<pxr::GfQuatf>> localRotations;
+
+    // An unset slot uses the skeleton rest; an invalid index returns identity.
+    MOTIONRETARGET_API pxr::GfQuatf GetLocalRestRotation(const SkeletonDescriptor& skeleton,
+                                                       int jointIndex) const;
+    MOTIONRETARGET_API pxr::GfQuatf GetWorldRestRotation(const SkeletonDescriptor& skeleton,
+                                                       int jointIndex) const;
+};
+
 // Per-bone correction carrying a rest-relative rotation from the source rig
 // onto a target whose rest pose differs.
 //
@@ -141,5 +157,9 @@ MOTIONRETARGET_API bool operator!=(const RestPoseCorrection& a, const RestPoseCo
 MOTIONRETARGET_API RestPoseCorrection ComputeRestPoseCorrection(const SourceRestPose& source,
                                                              const SkeletonDescriptor& target,
                                                              const RetargetMap& map);
+MOTIONRETARGET_API RestPoseCorrection ComputeRestPoseCorrection(const SourceRestPose& source,
+                                                             const SkeletonDescriptor& target,
+                                                             const RetargetMap& map,
+                                                             const TargetRestPose& targetRest);
 
 } // namespace openstrata::motion

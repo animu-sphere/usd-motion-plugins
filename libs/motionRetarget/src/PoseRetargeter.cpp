@@ -136,7 +136,7 @@ PoseRetargeter::PoseRetargeter(SkeletonDescriptor skeleton, RetargetMap map, Sou
                                RetargetOptions options)
     : _skeleton(std::move(skeleton)), _map(std::move(map)), _sourceRest(std::move(sourceRest)),
       _options(std::move(options)),
-      _correction(ComputeRestPoseCorrection(_sourceRest, _skeleton, _map))
+      _correction(ComputeRestPoseCorrection(_sourceRest, _skeleton, _map, _options.targetRest))
 {
 }
 

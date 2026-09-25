@@ -212,12 +212,22 @@ MOTIONSOURCE_API SourceQuat ComposeSourceRotation(const SourceEulerAngles& angle
                                                   SourceEulerOrder order,
                                                   SourceAngleUnit unit) noexcept;
 
+// Canonical T-pose direction of a bone's outgoing segment (+Y up, +Z
+// forward, +X character-left). Returns zero where the vocabulary specifies
+// no direction. Format adapters choose which bones to aim.
+MOTIONSOURCE_API pxr::GfVec3f TPoseDirection(openstrata::motion::HumanJoint bone) noexcept;
+
+// Shortest swing between two nonzero unit directions. The caller owns the
+// segment geometry and any roll; this helper contributes only the aim.
+MOTIONSOURCE_API pxr::GfQuatf ShortestRotation(const pxr::GfVec3f& from,
+                                              const pxr::GfVec3f& to) noexcept;
+
 // The clip's own rest pose, per canonical bone, in canonical basis and metres.
 //
 // No parent array: the semantic parent of a bone within a rig carrying
-// `present` is `openstrata::motion::NearestPresentAncestor`, and a second copy of the
-// humanoid taxonomy is a defect waiting to happen. A bone `present` does not
-// carry has no rest and its entries are left at identity and zero.
+// `present` is `openstrata::motion::NearestPresentAncestor`, and a second copy
+// of the humanoid taxonomy is a defect waiting to happen. A bone not present
+// has no rest; its entries are left at identity and zero.
 struct CanonicalRestPose
 {
     MOTIONSOURCE_API CanonicalRestPose();
