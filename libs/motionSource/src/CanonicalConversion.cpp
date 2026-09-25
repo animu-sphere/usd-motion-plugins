@@ -169,7 +169,7 @@ PathFromNearestBoundAncestor(const SourceSkeleton& skeleton, std::size_t jointIn
 // contributes identity, so a rig carrying fingers or a jaw is not refused; it
 // simply gets no T-pose opinion about them.
 pxr::GfVec3f
-TPoseDirection(openstrata::motion::HumanJoint bone) noexcept
+TPoseDirectionImpl(openstrata::motion::HumanJoint bone) noexcept
 {
     const pxr::GfVec3f up(0.0f, 1.0f, 0.0f);
     const pxr::GfVec3f left(1.0f, 0.0f, 0.0f);
@@ -223,7 +223,7 @@ TPoseDirection(openstrata::motion::HumanJoint bone) noexcept
 // exactly the freedom a T-pose does not pin, and which would show up as a
 // forearm or shin rotated about itself while every joint position stayed right.
 pxr::GfQuatf
-ShortestRotation(const pxr::GfVec3f& from, const pxr::GfVec3f& to) noexcept
+ShortestRotationImpl(const pxr::GfVec3f& from, const pxr::GfVec3f& to) noexcept
 {
     const float dot = pxr::GfDot(from, to);
     if (dot > 0.999999f)
@@ -258,6 +258,18 @@ Refuse(SourceConversion result, ConversionRefusal refusal, std::string detail)
 }
 
 } // namespace
+
+pxr::GfVec3f
+TPoseDirection(openstrata::motion::HumanJoint bone) noexcept
+{
+    return TPoseDirectionImpl(bone);
+}
+
+pxr::GfQuatf
+ShortestRotation(const pxr::GfVec3f& from, const pxr::GfVec3f& to) noexcept
+{
+    return ShortestRotationImpl(from, to);
+}
 
 std::string_view
 ConversionRefusalName(ConversionRefusal refusal) noexcept

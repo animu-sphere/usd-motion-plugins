@@ -696,6 +696,75 @@ TestRestPoseCorrectionAccountsForTheWholeAncestorChain()
 }
 
 void
+TestTargetReferenceRestIsSeparateFromUsdSkelRest()
+{
+    using J = openstrata::motion::HumanJoint;
+    const pxr::GfQuatf armAim = Rotation(kAxisZ, 40.0f);
+    const pxr::GfQuatf shoulderAim = Rotation(kAxisY, 15.0f);
+    const pxr::GfQuatf identity(1.0f, pxr::GfVec3f(0.0f));
+
+    openstrata::motion::SkeletonDescriptor skeleton;
+    openstrata::motion::SkeletonJoint shoulder;
+    shoulder.token = "Shoulder";
+    skeleton.AddJoint(shoulder);
+    openstrata::motion::SkeletonJoint arm;
+    arm.token = "Shoulder/Arm";
+    skeleton.AddJoint(arm);
+    skeleton.ResolveParentsFromTokens();
+
+    openstrata::motion::RetargetMap map;
+    assert(map.SetJointIndex(J::LeftShoulder, 0, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::LeftUpperArm, 1, skeleton.GetSize()));
+
+    openstrata::motion::TargetRestPose targetRest;
+    targetRest.localRotations.resize(skeleton.GetSize());
+    targetRest.localRotations[0] = shoulderAim;
+    targetRest.localRotations[1] = armAim;
+    assert(SameOrientation(targetRest.GetWorldRestRotation(skeleton, 1), shoulderAim * armAim));
+    assert(SameOrientation(skeleton.GetWorldRestRotation(1), identity));
+
+    openstrata::motion::SourceRestPose sourceRest;
+    sourceRest.SetParent(J::LeftUpperArm, J::LeftShoulder);
+    const auto correction = openstrata::motion::ComputeRestPoseCorrection(
+        sourceRest, skeleton, map, targetRest);
+    assert(SameOrientation(correction.Apply(J::LeftShoulder, identity), shoulderAim));
+    assert(SameOrientation(correction.Apply(J::LeftUpperArm, identity), armAim));
+    const pxr::GfQuatf animated = Rotation(kAxisX, 25.0f);
+    const pxr::GfQuatf corrected = correction.Apply(J::LeftUpperArm, animated);
+    const pxr::GfQuatf targetDelta =
+        (shoulderAim * corrected) * (shoulderAim * armAim).GetInverse();
+    assert(SameOrientation(targetDelta, animated));
+
+    // A source stating the same reference rest as the target needs no offset.
+    sourceRest.localRotations[static_cast<std::size_t>(J::LeftShoulder)] = shoulderAim;
+    sourceRest.localRotations[static_cast<std::size_t>(J::LeftUpperArm)] = armAim;
+    const auto sameRest = openstrata::motion::ComputeRestPoseCorrection(
+        sourceRest, skeleton, map, targetRest);
+    assert(SameOrientation(sameRest.Apply(J::LeftUpperArm, armAim), armAim));
+
+    openstrata::motion::RetargetOptions options;
+    options.targetRest = targetRest;
+    const openstrata::motion::PoseRetargeter retargeter(skeleton, map,
+                                                       openstrata::motion::SourceRestPose(), options);
+    openstrata::motion::MotionPose pose;
+    pose.validRotations.set(static_cast<std::size_t>(J::LeftUpperArm));
+    const auto driven = retargeter.Retarget(pose);
+    assert(SameOrientation(driven.rotations[1], armAim));
+    assert(SameOrientation(driven.rotations[0], identity));
+
+    pose.validRotations.reset();
+    const auto undriven = retargeter.Retarget(pose);
+    assert(SameOrientation(undriven.rotations[0], identity));
+    assert(SameOrientation(undriven.rotations[1], identity));
+
+    // An empty reference rest preserves the existing correction exactly.
+    assert(openstrata::motion::ComputeRestPoseCorrection(
+               sourceRest, skeleton, map) ==
+           openstrata::motion::ComputeRestPoseCorrection(
+               sourceRest, skeleton, map, openstrata::motion::TargetRestPose()));
+}
+
+void
 TestRootMotionModes()
 {
     const pxr::GfVec3f sourceRest(0.0f, 1.0f, 0.0f);
@@ -1321,6 +1390,7 @@ main()
     TestIdentityRestPosesPassRotationsThrough();
     TestRestPoseCorrectionPreservesTheWorldDelta();
     TestRestPoseCorrectionAccountsForTheWholeAncestorChain();
+    TestTargetReferenceRestIsSeparateFromUsdSkelRest();
     TestRootMotionModes();
     TestDesignTripletHandOff();
     TestUnmappedJointsStayAtRestAndAreReported();

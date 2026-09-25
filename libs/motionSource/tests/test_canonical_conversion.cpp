@@ -1195,6 +1195,20 @@ TestRefusalNamesAreComplete()
     }
 }
 
+void
+TestPublicTPoseAimVocabulary()
+{
+    using J = openstrata::motion::HumanJoint;
+    const pxr::GfVec3f left(1.0f, 0.0f, 0.0f);
+    assert(openstrata::motion::TPoseDirection(J::LeftUpperArm) == left);
+    assert(openstrata::motion::TPoseDirection(J::RightUpperArm) == -left);
+    assert(openstrata::motion::TPoseDirection(J::LeftIndexProximal) == pxr::GfVec3f(0.0f));
+    const pxr::GfVec3f diagonal(0.70710678f, -0.70710678f, 0.0f);
+    const pxr::GfQuatf aim = openstrata::motion::ShortestRotation(
+        diagonal, openstrata::motion::TPoseDirection(J::LeftUpperArm));
+    assert((aim.Transform(diagonal) - left).GetLength() < 1e-5f);
+}
+
 } // namespace
 
 int
@@ -1233,6 +1247,7 @@ main()
     TestInvalidAnimationIsRefused();
     TestQuaternionTrackIsRefusedWithAReason();
     TestRefusalNamesAreComplete();
+    TestPublicTPoseAimVocabulary();
     std::printf("motionSource conversion: verified\n");
     return 0;
 }
