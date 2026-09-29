@@ -9,16 +9,42 @@ separate from the package version
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-30
+
+An API release for the format repositories. A retarget target can state a
+humanoid reference rest apart from its UsdSkel rest, the T-pose directions are
+public, and `motionCore` owns the basis arithmetic. Every existing call keeps
+its behaviour.
+
 ### Added
 
+- **A retarget target can state a humanoid reference rest apart from its
+  UsdSkel rest (issue #32).** `RestPoseCorrection` compared rest rotations
+  only, so a rig whose identity rest is an A-pose — every PMX — and one whose
+  identity rest has level arms were the same pose to it, and the upper arms
+  landed about 40° off in both directions. `usd-mmd-plugins` measured it on
+  17 characters (its report `2026-09-25-phase9-rest-pose-comparison.md`) and
+  showed that a rest stated on the source alone makes PMX to PMX as wrong as
+  the other two cases, so the target had to state one too. `TargetRestPose`
+  (`motionRetarget/RestPose.h`) holds optional local rotations in the target
+  skeleton's joint order; `RetargetOptions::targetRest` carries it into
+  `PoseRetargeter`, and an overload of `ComputeRestPoseCorrection` takes it for
+  `T` and `Tp`. The `SkeletonDescriptor` still describes the stage's rest, an
+  undriven joint still takes its rotation from that descriptor, and with no
+  target rest the correction is what it was
+  ([RETARGETING_POLICY.md §5](docs/design/RETARGETING_POLICY.md#5-rest-pose-correction)).
+- **The T-pose directions are public vocabulary.** `motionSource::TPoseDirection`
+  returns the canonical direction of a bone's outgoing segment, zero where the
+  vocabulary specifies none, and `ShortestRotation` the swing between two unit
+  directions. A format adapter chooses which bones it aims — for MMD, the arm
+  chain alone — and owns the segment geometry and any roll, without copying the
+  direction table.
 - **`motionCore` now owns signed-permutation basis conversion (CS-O1).**
   `SignedPermutationBasis` and its validated position/quaternion operations
   serve recorded readers now and live connectors after their dependency pins
   move to 0.5.2. `motionSource` keeps its profile
   interpretation and public `CanonicalBasis` type, delegating only the
-  arithmetic to the core. The added public
-  API advances the workspace package version to 0.5.2; the release is not yet
-  published.
+  arithmetic to the core.
 
 ### Changed
 
