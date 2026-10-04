@@ -63,6 +63,17 @@ bones only. An undriven bone still receives its UsdSkel rest rotation. The
 format adapter decides which joints need an aimed reference, so an MMD adapter
 can select only its arm chain.
 
+To carry an unbound intermediate's rotation into its nearest bound ancestor,
+set `RetargetOptions::foldUnboundIntermediateRotations = true` and provide
+`SourceRestPose::parents` (or read them with `BuildSourceRestPose`). The option
+defaults to false. It requires compatible ancestor/descendant bindings on the
+target and removes each missing joint's local rest before composing its
+motion, so a rolled rest does not add an offset. An originally undriven
+ancestor can become driven by the carried rotation. The unbound-bone
+diagnostic still names the missing bone and adds its receiver in the detail.
+Eligibility, composition order and subtree effects are defined by
+[RETARGETING_POLICY.md §4.2](../../docs/design/RETARGETING_POLICY.md#42-opt-in-folding-of-unbound-intermediate-rotations).
+
 ## Building
 
 It builds as part of the workspace root `CMakeLists.txt`. Standalone:

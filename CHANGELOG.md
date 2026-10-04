@@ -9,6 +9,27 @@ separate from the package version
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-04
+
+### Added
+
+- **Opt-in folding of unbound intermediate rotations (issue #35).** Set
+  `RetargetOptions::foldUnboundIntermediateRotations = true` to carry the
+  rest-relative rotation of a missing source intermediate into its nearest
+  bound ancestor before rest correction. A target binding `chest` and `neck`
+  but no `upperChest` can now retain the upper chest's rotation in the neck
+  and both arm chains. The source supplies its hierarchy through
+  `SourceRestPose::parents`; qualifying target descendants must be below the
+  ancestor's binding. Consecutive missing joints compose child first, with
+  each local source rest removed, so non-identity rests introduce no offset.
+  An undriven ancestor starts from source rest when it receives motion;
+  otherwise it keeps its UsdSkel rest. `UnboundDrivenBone` still reports the
+  missing bone, adding the receiver to its detail. The option defaults to
+  false, preserving every existing bake. Root motion and translations are
+  unchanged. The same option works through both pose and clip overloads,
+  including callers that hold a `PoseRetargeter` in an OpenExec computation
+  ([RETARGETING_POLICY.md §4.2](docs/design/RETARGETING_POLICY.md#42-opt-in-folding-of-unbound-intermediate-rotations)).
+
 ## [0.5.2] - 2026-09-30
 
 An API release for the format repositories. A retarget target can state a

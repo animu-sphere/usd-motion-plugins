@@ -135,6 +135,12 @@ struct RetargetOptions
     // RootMotionMode::Hips the root lands on the hips, so a rig without them is
     // reported whether or not this list names them.
     std::vector<openstrata::motion::HumanJoint> requiredBones;
+
+    // Opt in to carrying an unbound intermediate's rest-relative rotation
+    // into its nearest bound source ancestor before rest correction. Requires
+    // explicit SourceRestPose::parents and bound descendants below that
+    // ancestor on the target. The default preserves existing bakes (§4.2).
+    bool foldUnboundIntermediateRotations = false;
 };
 
 // What a rig and its map say about every retarget onto them, before any clip
@@ -194,12 +200,21 @@ class MOTIONRETARGET_API PoseRetargeter
 
   private:
     RetargetedPose _RestPose() const;
+    void _BuildFoldPlan();
+
+    struct Fold {
+        std::size_t bone;
+        std::size_t parent;
+        std::size_t ancestor;
+        std::size_t depth;
+    };
 
     SkeletonDescriptor _skeleton;
     RetargetMap _map;
     SourceRestPose _sourceRest;
     RetargetOptions _options;
     RestPoseCorrection _correction;
+    std::vector<Fold> _folds;
 };
 
 } // namespace openstrata::motion
