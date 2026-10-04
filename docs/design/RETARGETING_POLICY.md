@@ -87,12 +87,12 @@ Those tests arrive with `motionRetarget`.
 
 | # | Case | What the retarget does | Reported |
 | --- | --- | --- | --- |
-| 1 | a joint the clip drives and the rig does not bind | its motion reaches nothing | unbound driven joint, once per clip, including a joint first driven after the first sample |
+| 1 | a joint the clip drives and the rig does not bind | by default its motion reaches nothing; an opted-in intermediate can carry its rotation into an ancestor (§4.2) | unbound driven joint, once per clip, including a joint first driven after the first sample; a folded rotation names its receiver in the detail |
 | 2 | a joint the rig has and the clip does not drive | it stays at its **rest**, with rotation, translation and rest scale; never identity | nothing |
 | 3 | a joint the map requires that the rig does not bind, or binds to an index the rig lacks | the retarget proceeds without it. For `hips` under `Hips` root motion, root motion is dropped | missing required joint, from `DiagnoseRig` before any clip; for `hips` the detail says the root was dropped |
 | 4 | an optional joint missing (eyes, jaw, toes, shoulders, `upperChest`, fingers) | a rig binding every required joint and none of these is complete | nothing, unless a clip drives one, which is case 1 |
 | 5 | two joints bound to one target | offline, joints are written in vocabulary order, so of the joints a sample drives the **later** one wins; the OpenExec map node **refuses** the map | duplicate target, on the target |
-| 6 | the chains disagree: an intermediate joint exists on one side only, or the rig is out of parent-before-child order | each bound joint carries its motion **relative to its own parent** on each side. A missing intermediate's motion is dropped (case 1), **not folded into its child** | the dropped joint as unbound; an out-of-order rig as an invalid hierarchy |
+| 6 | the chains disagree: an intermediate joint exists on one side only, or the rig is out of parent-before-child order | by default each bound joint carries its motion **relative to its own parent** on each side and a missing intermediate's motion is dropped (case 1); §4.2 opts into folding its rotation into its nearest bound ancestor | the unbound joint, including when folded; an out-of-order rig as an invalid hierarchy |
 | 7 | a parent whose rest is not identity, on either side | the correction reads each side's **accumulated** parent rest, every ancestor included, so the world delta survives | nothing |
 
 **Where the two implementations part.** Rows 5 and 3 (for a binding to a
@@ -100,9 +100,9 @@ joint the rig lacks) are decided when the map is built, and there the OpenExec
 node is stricter: a computation cannot bake a warning beside a value, so it
 refuses a map the offline tool would warn about and use.
 
-**Not promised.** Folding an unbound intermediate joint's rotation into its
-child would change every bake of a clip with `upperChest` onto a rig without
-one. That would be a contract change with its own parity evidence, not a fix.
+**Compatibility.** The default keeps all seven cases unchanged. The opt-in
+in §4.2 is the contract addition at v0.5.3, with world-rotation parity tests;
+it does not change existing bakes.
 
 Which joints are *required* is the caller's statement (§3, §4). In
 `usd-vrm-plugins` it is VRM 1.0's required-bone set. Since the import the
@@ -110,6 +110,66 @@ retargeter takes the set from its caller, as `RetargetOptions::requiredBones`,
 empty by default (that repository's WORKSPACE.md §9.5, finding 1). One bone
 is required by the options themselves: under `Hips` root motion the root
 lands on the hips, so a rig without them is reported whatever the set says.
+
+### 4.2 Opt-in folding of unbound intermediate rotations
+
+`RetargetOptions::foldUnboundIntermediateRotations` is `false` by default.
+When true, an unbound source intermediate's rotation away from its local rest
+is carried into its nearest bound source ancestor, **before** §5 correction.
+The source hierarchy is `SourceRestPose::parents`; no hierarchy is guessed
+from vocabulary order or joint names. The default all-root source rest thus
+folds nothing. A producer can use `BuildSourceRestPose` (§10) or state its
+parents explicitly.
+
+For a source `chest → upperChest → neck`, with the target binding chest and
+neck but no upper chest, one sample becomes:
+
+```text
+Qchest' = Qchest * QupperChest * S_upperChest^-1
+QupperChest' = S_upperChest
+```
+
+`S_upperChest` is its local source rest. Removing that rest term is wrong for
+a rolled rest. A consecutive run of missing intermediates composes from the
+deepest child up towards the bound ancestor, independent of vocabulary order.
+Separate branches compose in descending source depth, with vocabulary order
+breaking ties. The plan depends on the map and the two hierarchies and is
+computed once when the retargeter is built.
+
+A fold requires a bound source ancestor and at least one first bound source
+descendant. Every such descendant must be below the ancestor's binding on the
+target, including through target-only joints. Every unbound joint between
+the intermediate and that ancestor must itself qualify. An unbound leaf or
+root, an incompatible branch, a cyclic or invalid source chain, a colliding
+map, a binding outside the target, or a target not in parent-before-child
+order retains the default behaviour. A bound joint is never folded.
+
+An absent rotation contributes its source rest. If an intermediate moves but
+its receiver was undriven, the receiver starts from its source rest and
+becomes driven by the carried rotation. An intermediate at rest does not
+activate an undriven receiver, which still takes its UsdSkel rest. The input
+pose is unchanged. Root motion, translations and rest scales are unchanged.
+
+The ancestor's rotation affects its **whole target subtree**. This recovers
+the neck and both arm chains together when an upper chest is missing. It
+does not promise to preserve segment positions, or independently moving
+branches compressed into the same ancestor. A caller that needs those
+degrees of freedom must retain the intermediate joints.
+
+`UnboundDrivenBone` is still reported for each originally driven missing
+bone, once per clip. Its detail names the bound ancestor when the rotation
+was carried there. Both the single-pose and clip overload use the same plan;
+an OpenExec caller opts in through the same `RetargetOptions` on its
+`PoseRetargeter`. The scene attribute or format-specific switch that supplies
+the option belongs to that caller.
+
+Evidence: [issue #35](https://github.com/animu-sphere/usd-motion-plugins/issues/35)
+measured the loss on PMX targets from VRMA and mocopi clips.
+`TestFoldingPreservesDescendantWorldRotationWithNonIdentityRests` checks each
+descendant's posed world rotation relative to its accumulated rest against
+the original source, with a 35° upper-chest rest, a 47° neck rest, target-only
+collar and target reference rest. The missing-chain, partial-pose and
+malformed-hierarchy tests keep the eligibility and compatibility boundaries.
 
 ## 5. Rest-pose correction
 

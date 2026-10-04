@@ -1374,6 +1374,247 @@ TestASourceRestIsReadOffASemanticSkeleton()
     assert(notSemantic.error == Error::NoHumanBone && !notSemantic.rest);
 }
 
+void
+TestFoldingPreservesDescendantWorldRotationWithNonIdentityRests()
+{
+    using namespace openstrata::motion;
+    using J = HumanJoint;
+    const auto slot = [](J bone) { return static_cast<std::size_t>(bone); };
+    SkeletonDescriptor skeleton;
+    for (const auto& token :
+         {"Chest", "Chest/Collar", "Chest/Collar/Neck", "Chest/LeftArm", "Chest/RightArm", "Leg"}) {
+        SkeletonJoint joint;
+        joint.token = token;
+        joint.restRotation = Rotation(kAxisY, 12.0f);
+        joint.restTranslation = pxr::GfVec3f(0.0f, 0.2f, 0.0f);
+        skeleton.AddJoint(joint);
+    }
+    skeleton.ResolveParentsFromTokens();
+    RetargetMap map;
+    assert(map.SetJointIndex(J::Chest, 0, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::Neck, 2, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::LeftUpperArm, 3, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::RightUpperArm, 4, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::LeftUpperLeg, 5, skeleton.GetSize()));
+    SourceRestPose rest;
+    rest.localRotations[slot(J::Chest)] = Rotation(kAxisY, 19.0f);
+    rest.localRotations[slot(J::UpperChest)] = Rotation(kAxisZ, 35.0f);
+    rest.localRotations[slot(J::Neck)] = Rotation(kAxisX, 47.0f);
+    rest.SetParent(J::UpperChest, J::Chest);
+    for (J child : {J::Neck, J::LeftUpperArm, J::RightUpperArm}) {
+        rest.SetParent(child, J::UpperChest);
+    }
+    RetargetOptions options;
+    options.rootMotion.mode = RootMotionMode::Ignore;
+    options.foldUnboundIntermediateRotations = true;
+    options.targetRest.localRotations.resize(skeleton.GetSize());
+    options.targetRest.localRotations[0] = Rotation(kAxisX, -23.0f);
+    options.targetRest.localRotations[3] = Rotation(kAxisZ, 41.0f);
+    const PoseRetargeter folded(skeleton, map, rest, options);
+    RetargetOptions legacyOptions = options;
+    legacyOptions.foldUnboundIntermediateRotations = false;
+    const PoseRetargeter legacy(skeleton, map, rest, legacyOptions);
+    for (float angle : {-31.0f, 0.0f, 26.0f}) {
+        MotionPose pose;
+        pose.timestamp = angle + 40.0;
+        for (J bone : {J::Chest,
+                       J::UpperChest,
+                       J::Neck,
+                       J::LeftUpperArm,
+                       J::RightUpperArm,
+                       J::LeftUpperLeg}) {
+            pose.validRotations.set(slot(bone));
+            pose.localRotations[slot(bone)] = rest.localRotations[slot(bone)];
+        }
+        pose.localRotations[slot(J::Chest)] =
+            Rotation(kAxisX, 17.0f) * rest.localRotations[slot(J::Chest)];
+        pose.localRotations[slot(J::UpperChest)] =
+            Rotation(kAxisY, angle) * rest.localRotations[slot(J::UpperChest)];
+        pose.localRotations[slot(J::Neck)] =
+            Rotation(kAxisZ, -13.0f) * rest.localRotations[slot(J::Neck)];
+        const MotionPose original = pose;
+        RetargetDiagnostics diagnostics;
+        const auto result = folded.Retarget(pose, &diagnostics);
+        assert(pose == original);
+        assert(result.timestamp == pose.timestamp);
+        assert(result.translations == legacy.Retarget(pose).translations);
+        assert(result.rotations[1] == skeleton.GetJoints()[1].restRotation);
+        assert(result.rotations[5] == legacy.Retarget(pose).rotations[5]);
+        assert((diagnostics.Subjects(RetargetDiagnosticCode::UnboundDrivenBone) ==
+                std::vector<std::string>{"upperChest"}));
+        for (J child : {J::Neck, J::LeftUpperArm, J::RightUpperArm}) {
+            pxr::GfQuatf targetWorld;
+            assert(GetJointWorldTransform(
+                skeleton, result, map.GetJointIndex(child), &targetWorld, nullptr));
+            const pxr::GfQuatf sourceWorld = pose.localRotations[slot(J::Chest)] *
+                                             pose.localRotations[slot(J::UpperChest)] *
+                                             pose.localRotations[slot(child)];
+            const pxr::GfQuatf sourceDelta =
+                sourceWorld * rest.GetWorldRestRotation(child).GetInverse();
+            const pxr::GfQuatf targetDelta =
+                targetWorld *
+                options.targetRest.GetWorldRestRotation(skeleton, map.GetJointIndex(child))
+                    .GetInverse();
+            assert(SameOrientation(sourceDelta, targetDelta));
+        }
+        if (angle == 0.0f) {
+            assert(result == legacy.Retarget(pose));
+        }
+    }
+}
+
+void
+TestFoldingComposesMissingChainsAndPromotesAnUndrivenAncestor()
+{
+    using namespace openstrata::motion;
+    using J = HumanJoint;
+    const auto slot = [](J bone) { return static_cast<std::size_t>(bone); };
+    SkeletonDescriptor skeleton;
+    SkeletonJoint chest;
+    chest.token = "Chest";
+    chest.restRotation = Rotation(kAxisZ, 11.0f);
+    skeleton.AddJoint(chest);
+    SkeletonJoint head;
+    head.token = "Chest/Head";
+    skeleton.AddJoint(head);
+    skeleton.ResolveParentsFromTokens();
+    RetargetMap map;
+    assert(map.SetJointIndex(J::Chest, 0, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::Head, 1, skeleton.GetSize()));
+    SourceRestPose rest;
+    // Deliberately not vocabulary order: chest -> neck -> upperChest -> head.
+    rest.SetParent(J::Neck, J::Chest);
+    rest.SetParent(J::UpperChest, J::Neck);
+    rest.SetParent(J::Head, J::UpperChest);
+    rest.localRotations[slot(J::Chest)] = Rotation(kAxisX, 21.0f);
+    rest.localRotations[slot(J::Neck)] = Rotation(kAxisZ, 35.0f);
+    rest.localRotations[slot(J::UpperChest)] = Rotation(kAxisY, -16.0f);
+    RetargetOptions options;
+    options.rootMotion.mode = RootMotionMode::Ignore;
+    options.foldUnboundIntermediateRotations = true;
+    options.targetRest.localRotations = {Rotation(kAxisY, -33.0f)};
+    const PoseRetargeter retargeter(skeleton, map, rest, options);
+    MotionPose pose;
+    pose.timestamp = 0.25;
+    pose.validRotations.set(slot(J::Head));
+    pose.localRotations[slot(J::Head)] = Rotation(kAxisX, -19.0f);
+    // An absent missing joint contributes its rest, not MotionPose's identity.
+    const auto withoutMotion = retargeter.Retarget(pose);
+    assert(withoutMotion.rotations[0] == chest.restRotation);
+    pose.validRotations.set(slot(J::UpperChest));
+    pose.localRotations[slot(J::UpperChest)] = rest.localRotations[slot(J::UpperChest)];
+    assert(retargeter.Retarget(pose) == withoutMotion);
+    pose.localRotations[slot(J::UpperChest)] =
+        Rotation(kAxisX, 29.0f) * rest.localRotations[slot(J::UpperChest)];
+    for (bool driveNeck : {false, true}) {
+        if (driveNeck) {
+            pose.validRotations.set(slot(J::Neck));
+            pose.localRotations[slot(J::Neck)] =
+                Rotation(kAxisY, 14.0f) * rest.localRotations[slot(J::Neck)];
+        }
+        const auto result = retargeter.Retarget(pose);
+        pxr::GfQuatf targetWorld;
+        assert(GetJointWorldTransform(skeleton, result, 1, &targetWorld, nullptr));
+        const pxr::GfQuatf sourceWorld =
+            rest.localRotations[slot(J::Chest)] *
+            (driveNeck ? pose.localRotations[slot(J::Neck)] : rest.localRotations[slot(J::Neck)]) *
+            pose.localRotations[slot(J::UpperChest)] * pose.localRotations[slot(J::Head)];
+        assert(SameOrientation(
+            sourceWorld * rest.GetWorldRestRotation(J::Head).GetInverse(),
+            targetWorld * options.targetRest.GetWorldRestRotation(skeleton, 1).GetInverse()));
+    }
+    MotionClip clip;
+    clip.samples = {MotionPose(), pose, pose};
+    clip.samples[2].timestamp = 0.5;
+    RetargetDiagnostics diagnostics;
+    const auto animation = retargeter.Retarget(clip, &diagnostics);
+    assert(animation.samples.size() == 3);
+    assert(animation.samples[1] == retargeter.Retarget(pose));
+    assert((diagnostics.Subjects(RetargetDiagnosticCode::UnboundDrivenBone) ==
+            std::vector<std::string>{"upperChest", "neck"}));
+    assert(FormatRetargetDiagnostic(diagnostics.reported[0]).find("folded into chest") !=
+           std::string::npos);
+}
+
+void
+TestFoldingRequiresAnUnambiguousIntermediateAndCompatibleHierarchy()
+{
+    using namespace openstrata::motion;
+    using J = HumanJoint;
+    const auto slot = [](J bone) { return static_cast<std::size_t>(bone); };
+    SkeletonDescriptor skeleton;
+    for (const auto& token : {"Chest", "Chest/Neck", "Other"}) {
+        SkeletonJoint joint;
+        joint.token = token;
+        skeleton.AddJoint(joint);
+    }
+    skeleton.ResolveParentsFromTokens();
+    RetargetMap map;
+    assert(map.SetJointIndex(J::Chest, 0, skeleton.GetSize()));
+    assert(map.SetJointIndex(J::Neck, 1, skeleton.GetSize()));
+    SourceRestPose rest;
+    rest.SetParent(J::UpperChest, J::Chest);
+    rest.SetParent(J::Neck, J::UpperChest);
+    MotionPose pose;
+    for (J bone : {J::Chest, J::UpperChest, J::Neck}) {
+        pose.validRotations.set(slot(bone));
+        pose.localRotations[slot(bone)] = Rotation(kAxisX, 20.0f);
+    }
+    const auto unchanged = [&](const SkeletonDescriptor& rig,
+                               const RetargetMap& bindings,
+                               const SourceRestPose& source) {
+        RetargetOptions options;
+        options.rootMotion.mode = RootMotionMode::Ignore;
+        const auto legacy = PoseRetargeter(rig, bindings, source, options).Retarget(pose);
+        options.foldUnboundIntermediateRotations = true;
+        assert(PoseRetargeter(rig, bindings, source, options).Retarget(pose) == legacy);
+    };
+    unchanged(skeleton, map, SourceRestPose()); // No hierarchy inferred.
+    SourceRestPose leaf = rest;
+    leaf.parents[slot(J::Neck)] = slot(J::Chest);
+    unchanged(skeleton, map, leaf); // Missing leaf.
+    SourceRestPose root = rest;
+    root.parents[slot(J::UpperChest)] = SourceRestPose::kNoParent;
+    unchanged(skeleton, map, root); // No bound ancestor.
+    SourceRestPose cycle = rest;
+    cycle.SetParent(J::Chest, J::UpperChest);
+    unchanged(skeleton, map, cycle);
+    SourceRestPose invalid = rest;
+    invalid.parents[slot(J::Chest)] = HumanJointCount + 1;
+    unchanged(skeleton, map, invalid);
+    RetargetMap unrelated = map;
+    assert(unrelated.SetJointIndex(J::Neck, 2, skeleton.GetSize()));
+    unchanged(skeleton, unrelated, rest);
+    // A deeper candidate cannot stop in a missing parent disqualified by a
+    // different target branch. Here neck qualifies alone, upperChest does not.
+    SourceRestPose branched = rest;
+    branched.SetParent(J::Head, J::Neck);
+    branched.SetParent(J::LeftUpperArm, J::UpperChest);
+    RetargetMap branchMap;
+    assert(branchMap.SetJointIndex(J::Chest, 0, skeleton.GetSize()));
+    assert(branchMap.SetJointIndex(J::Head, 1, skeleton.GetSize()));
+    assert(branchMap.SetJointIndex(J::LeftUpperArm, 2, skeleton.GetSize()));
+    unchanged(skeleton, branchMap, branched);
+    RetargetMap duplicate = map;
+    assert(duplicate.SetJointIndex(J::Head, 0, skeleton.GetSize()));
+    unchanged(skeleton, duplicate, rest);
+    RetargetMap foreign = map;
+    assert(foreign.SetJointIndex(J::Head, 99, 100));
+    unchanged(skeleton, foreign, rest);
+    SkeletonDescriptor malformed;
+    SkeletonJoint bad;
+    bad.token = "Chest";
+    bad.parent = 1;
+    malformed.AddJoint(bad);
+    bad.token = "Neck";
+    bad.parent = -1;
+    malformed.AddJoint(bad);
+    unchanged(malformed, map, rest);
+    RetargetMap complete = map;
+    assert(complete.SetJointIndex(J::UpperChest, 2, skeleton.GetSize()));
+    unchanged(skeleton, complete, rest); // A mapped joint is never folded.
+}
+
 } // namespace
 
 int
@@ -1407,6 +1648,9 @@ main()
     TestAJointsWorldTransformComposesItsWholeChain();
     TestASkeletonIsBuiltFromTokensAndRestMatrices();
     TestASourceRestIsReadOffASemanticSkeleton();
+    TestFoldingPreservesDescendantWorldRotationWithNonIdentityRests();
+    TestFoldingComposesMissingChainsAndPromotesAnUndrivenAncestor();
+    TestFoldingRequiresAnUnambiguousIntermediateAndCompatibleHierarchy();
     std::puts("motionRetarget unit tests passed");
     return 0;
 }

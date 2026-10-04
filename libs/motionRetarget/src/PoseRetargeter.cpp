@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -138,6 +139,110 @@ PoseRetargeter::PoseRetargeter(SkeletonDescriptor skeleton, RetargetMap map, Sou
       _options(std::move(options)),
       _correction(ComputeRestPoseCorrection(_sourceRest, _skeleton, _map, _options.targetRest))
 {
+    if (_options.foldUnboundIntermediateRotations) {
+        _BuildFoldPlan();
+    }
+}
+
+void
+PoseRetargeter::_BuildFoldPlan()
+{
+    constexpr std::size_t count = HumanJointCount;
+    const auto& joints = _skeleton.GetJoints();
+    const auto bound = [&](std::size_t slot) {
+        const int index = _map.GetJointIndex(static_cast<HumanJoint>(slot));
+        return index >= 0 && static_cast<std::size_t>(index) < joints.size();
+    };
+    // A malformed chain or a colliding map cannot identify a receiver safely.
+    if (!_map.FindDuplicateJointIndices().empty()) {
+        return;
+    }
+    for (std::size_t index = 0; index < joints.size(); ++index) {
+        if (joints[index].parent < SkeletonDescriptor::kNoParent ||
+            joints[index].parent >= static_cast<int>(index)) {
+            return;
+        }
+    }
+    for (std::size_t slot = 0; slot < count; ++slot) {
+        if (_map.IsMapped(static_cast<HumanJoint>(slot)) && !bound(slot)) {
+            return;
+        }
+    }
+    std::array<bool, count> valid{};
+    std::array<std::size_t, count> depths{};
+    for (std::size_t slot = 0; slot < count; ++slot) {
+        std::size_t walk = slot;
+        std::bitset<count> visited;
+        while (walk < count && !visited.test(walk)) {
+            visited.set(walk);
+            ++depths[slot];
+            walk = _sourceRest.parents[walk];
+        }
+        valid[slot] = walk == SourceRestPose::kNoParent;
+    }
+    for (std::size_t slot = 0; slot < count; ++slot) {
+        if (bound(slot) || !valid[slot]) {
+            continue;
+        }
+        std::size_t ancestor = _sourceRest.parents[slot];
+        while (ancestor < count && !bound(ancestor)) {
+            ancestor = _sourceRest.parents[ancestor];
+        }
+        if (ancestor == SourceRestPose::kNoParent) {
+            continue;
+        }
+        const int receiver = _map.GetJointIndex(static_cast<HumanJoint>(ancestor));
+        bool haveDescendant = false;
+        bool compatible = true;
+        for (std::size_t child = 0; child < count; ++child) {
+            if (!bound(child) || !valid[child]) {
+                continue;
+            }
+            std::size_t walk = _sourceRest.parents[child];
+            while (walk < count && walk != slot && !bound(walk)) {
+                walk = _sourceRest.parents[walk];
+            }
+            if (walk != slot) {
+                continue;
+            }
+            haveDescendant = true;
+            int targetWalk =
+                joints[static_cast<std::size_t>(_map.GetJointIndex(static_cast<HumanJoint>(child)))]
+                    .parent;
+            std::size_t depth = 0;
+            while (targetWalk >= 0 && static_cast<std::size_t>(targetWalk) < joints.size() &&
+                   targetWalk != receiver && depth++ < joints.size()) {
+                targetWalk = joints[static_cast<std::size_t>(targetWalk)].parent;
+            }
+            compatible = compatible && targetWalk == receiver;
+        }
+        if (haveDescendant && compatible) {
+            _folds.push_back({slot, _sourceRest.parents[slot], ancestor, depths[slot]});
+        }
+    }
+    // Children first: a run of missing joints composes in source-chain order,
+    // independent of the vocabulary's order. Ties retain vocabulary order.
+    std::stable_sort(_folds.begin(), _folds.end(), [](const Fold& a, const Fold& b) {
+        return a.depth > b.depth;
+    });
+    // A child's motion must reach a bound ancestor, not stop in another
+    // unbound joint excluded by an incompatible target branch.
+    std::bitset<count> eligible;
+    for (const Fold& fold : _folds) {
+        eligible.set(fold.bone);
+    }
+    _folds.erase(std::remove_if(_folds.begin(),
+                                _folds.end(),
+                                [&](const Fold& fold) {
+                                    for (std::size_t walk = fold.parent; walk != fold.ancestor;
+                                         walk = _sourceRest.parents[walk]) {
+                                        if (!eligible.test(walk)) {
+                                            return true;
+                                        }
+                                    }
+                                    return false;
+                                }),
+                 _folds.end());
 }
 
 RetargetedPose
@@ -164,9 +269,35 @@ PoseRetargeter::Retarget(const openstrata::motion::MotionPose& pose, RetargetDia
     result.timestamp = pose.timestamp;
     const std::size_t jointCount = _skeleton.GetSize();
 
+    std::optional<MotionPose> folding;
+    if (!_folds.empty()) {
+        folding.emplace(pose);
+    }
+    std::array<std::size_t, HumanJointCount> receivers;
+    receivers.fill(SourceRestPose::kNoParent);
+    for (const Fold& fold : _folds) {
+        MotionPose& folded = *folding;
+        if (!folded.validRotations.test(fold.bone)) {
+            continue;
+        }
+        const pxr::GfQuatf rotation = folded.localRotations[fold.bone].GetNormalized();
+        const pxr::GfQuatf rest = _sourceRest.localRotations[fold.bone].GetNormalized();
+        receivers[fold.bone] = fold.ancestor;
+        if (rotation != rest && rotation != pxr::GfQuatf(-rest.GetReal(), -rest.GetImaginary())) {
+            const pxr::GfQuatf parent = folded.validRotations.test(fold.parent)
+                                            ? folded.localRotations[fold.parent]
+                                            : _sourceRest.localRotations[fold.parent];
+            folded.localRotations[fold.parent] =
+                (parent * rotation * rest.GetInverse()).GetNormalized();
+            folded.validRotations.set(fold.parent);
+        }
+        folded.localRotations[fold.bone] = rest;
+    }
+    const MotionPose& rotations = folding ? *folding : pose;
+
     for (std::size_t slot = 0; slot < openstrata::motion::HumanJointCount; ++slot)
     {
-        if (!pose.validRotations.test(slot))
+        if (!rotations.validRotations.test(slot))
         {
             continue;
         }
@@ -176,18 +307,22 @@ PoseRetargeter::Retarget(const openstrata::motion::MotionPose& pose, RetargetDia
         {
             // Checked before the detail is built: a clip reports the same bone
             // on every sample, and only the first report is kept.
-            if (diagnostics && !diagnostics->Has(RetargetDiagnosticCode::UnboundDrivenBone,
-                                                 openstrata::motion::HumanJointName(bone)))
+            if (pose.validRotations.test(slot) && diagnostics &&
+                !diagnostics->Has(RetargetDiagnosticCode::UnboundDrivenBone,
+                                  openstrata::motion::HumanJointName(bone)))
             {
                 diagnostics->Report(MakeRetargetDiagnostic(
                     RetargetDiagnosticCode::UnboundDrivenBone, Describe(bone),
                     "the clip drives it and the target rig binds no joint for "
-                    "it"));
+                    "it" + (receivers[slot] < HumanJointCount
+                        ? "; its rest-relative rotation was folded into " +
+                          Describe(static_cast<HumanJoint>(receivers[slot]))
+                        : std::string())));
             }
             continue;
         }
         result.rotations[static_cast<std::size_t>(jointIndex)] =
-            _correction.Apply(bone, pose.localRotations[slot]);
+            _correction.Apply(bone, rotations.localRotations[slot]);
     }
 
     // Root motion. The clip carries body translation on the hips (motion
