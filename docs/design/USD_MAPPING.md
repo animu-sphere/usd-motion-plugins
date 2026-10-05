@@ -1,7 +1,8 @@
 # USD mapping
 
 > Status: **binding for §2–§5 and §7**, implemented by `motionUsd` since
-> 2026-09-20. §6 remains proposed here. `usd-vrm-plugins` authors two stages
+> 2026-09-20. §6's target-local animation authoring is binding; its scene-side
+> `Bindings` prim remains proposed. `usd-vrm-plugins` authors two stages
 > of this family:
 > the `.vrma` importer's and the capture recorder's semantic clip. It also
 > bakes retargeted animation onto avatars. `motionUsd`'s writer arrived from
@@ -201,11 +202,43 @@ never authored.
   the other (design policy §18).
 - A **baked** retarget is a `UsdSkelAnimation` in the target skeleton's joint
   order, bound with `skel:animationSource` on an **override** of the
-  referenced skeleton, so the avatar keeps owning its rig; it authors identity
-  `scales` for §4.2's reason. It is a derivative, never written into the
+  referenced skeleton, so the avatar keeps owning its rig; it authors constant
+  **rest scales** for §4.2's reason. A target's scaled rest must be preserved:
+  an animated joint takes its whole transform from the animation, so identity
+  would replace that scale. It is a derivative, never written into the
   source motion asset.
 - The shape of a `Bindings` prim — typeless with namespaced relationships, or
   a schema — is USD-O5.
+
+### 6.1 Authoring evaluated target-local samples
+
+`AuthorSkeletonAnimation` takes a stage the caller has already composed,
+absolute skeleton and new animation paths, joint tokens matching the
+skeleton's exact order, and `SkeletonAnimationSample` values. Each sample
+carries a timestamp in seconds and full local rotation/translation arrays.
+These are already evaluated values: the caller retargets and converts them
+into the target stage's units and basis first. This boundary adds no edge
+from `motionUsd` to `motionRetarget`.
+
+The writer reads the skeleton's rest scales and authors them as one constant
+array. It requires the §4.1 rate of 30 and encodes the sample timestamps with
+the same frame snap as the standalone writer. It preserves stage metadata,
+including units, basis and playback interval; the caller owns those in a
+composed scene. The evaluation shim on a standalone `Body` (§4.1) is not added
+to this target-specific animation.
+
+All writes go to the derivative stage's root layer. Referenced avatar and
+motion layers, the rig's joints/rest/bind attributes and the current edit
+target remain unchanged. Empty samples, non-finite values, non-unit
+quaternions, time codes that do not increase, mismatched joint arrays,
+malformed rest transforms, existing animation paths and authoring through
+instances/prototypes are refused. An authoring failure, including a stronger
+binding opinion that prevents the new animation from being used, restores
+the root layer's content. The writer does not save a file or replace a prior
+animation; a caller chooses a new derivative or a new animation path.
+
+This is the baked-animation step of §6. The writer does not construct a
+`Bindings` prim, discover an avatar's semantic roles, or resolve retarget policy.
 
 ## 7. Reading USD back
 

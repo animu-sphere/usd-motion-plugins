@@ -5,7 +5,12 @@ target_link_libraries(motionUsd_tests PRIVATE motionUsd::motionUsd)
 usdmotion_keep_assertions(motionUsd_tests)
 add_test(NAME motionUsd_unit COMMAND motionUsd_tests)
 
-usdmotion_test_windows_path(TESTS motionUsd_unit
+add_executable(motionUsd_skeleton_animation_tests test_skeleton_animation_writer.cpp)
+target_link_libraries(motionUsd_skeleton_animation_tests PRIVATE motionUsd::motionUsd)
+usdmotion_keep_assertions(motionUsd_skeleton_animation_tests)
+add_test(NAME motionUsd_skeletonAnimation COMMAND motionUsd_skeleton_animation_tests)
+
+usdmotion_test_windows_path(TESTS motionUsd_unit motionUsd_skeletonAnimation
     TARGETS motionUsd OPENUSD usdSkel)
 
 if(USDMOTION_TEST_PYTHON)

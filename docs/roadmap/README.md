@@ -9,12 +9,12 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 | Document | Contents |
 | --- | --- |
-| [current.md](current.md) | What is left after the imports: the first consumer that has never heard of VRM, and the work beyond the imports. |
+| [current.md](current.md) | What is left after the imports: scene-side motion bindings, and the work beyond the imports. |
 
 ## Status at a glance
 
-`v0.5.0` is published. Its release scope is recorded in the
-[release record](../releases/v0.5.0.md), and current implementation facts are
+`v0.5.3` is published. Its release scope is recorded in the
+[release record](../releases/v0.5.3.md), and current implementation facts are
 in the [capability matrix](../reference/CAPABILITY_MATRIX.md). This directory
 contains no completed release inventory.
 

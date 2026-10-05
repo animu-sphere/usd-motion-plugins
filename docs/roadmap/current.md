@@ -9,17 +9,13 @@ This directory holds only incomplete work.
 
 ## What remains
 
-### The first consumer that has never heard of VRM ⬜
+### A composed motion binding ⬜
 
-- ⬜ **`usd-mmd-plugins`' `mmdMotionAdapter` configures against the installed
-  `motionCore`** — the only test of whether the vocabulary is actually
-  format-neutral rather than VRM's with the names changed.
-
-The rest of the move is done: `usd-vrm-plugins` consumes every package it
-used and holds no copy, `motion-connectors` consumes `motionCore`,
-`motionSampling` and `motionRecording` as installed packages, and the parity
-evidence named before the move was reproduced against the published packages
-with no divergence (in `usd-vrm-plugins`, 2026-09-24).
+- ⬜ **USD-O5: the scene-side `Bindings` prim** — decide and implement the
+  properties that relate a composed source motion asset, target avatar and
+  retarget policy, with `usd-avatar-runtime`'s first scene consumer.
+- ⬜ **EX-O3: scene-side evaluation attributes** — settle their placement
+  before or with that binding, as scheduled in the roadmap index.
 
 ### Beyond the imports ⬜
 
@@ -40,5 +36,6 @@ the public stream shape.
 
 ## Completion criteria
 
-This milestone is done when a consumer that is not an avatar format this
-ecosystem started from builds against the shared core unchanged.
+The next composition milestone is done when a consumer can state and read
+the source/target/policy relationship without redefining the generic motion
+contract or modifying either referenced asset.
