@@ -79,7 +79,9 @@ roadmap and the changelog instead.
 
 - The shared names are the design policy's (§42.2); a sibling's old name
   appears only where the text is about the sibling or the import.
-- Migration phases are always **Migration Phase A–F** (§42.3).
+- Historical import phases are **Migration Phase A–F** (§42.3); the runtime
+  consolidation track is **Runtime Boundary Phase 1–5** (§43). Always qualify
+  the phase name so these tracks and sibling phases cannot be confused.
 
 ## Language and form
 

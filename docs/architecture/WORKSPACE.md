@@ -65,12 +65,12 @@ workspace discipline (WS-O1, decided 2026-09-19;
 
 | Not here | Where it lives | Why |
 | --- | --- | --- |
-| VMC, mocopi, VRChat OSC, `osc`, `liveTransport`, tracker assignment and solve | `motion-connectors` | device and protocol connectivity (design policy §3.1) |
+| VMC, mocopi, VRChat OSC, `osc`, `liveTransport`, tracker assignment/solve, actor/source clock normalization | `motion-connectors` | device and protocol connectivity (design policy §3.1) |
 | VRMA reading, the VRM humanoid binding, expressions, look-at, `execVrm` | `usd-vrm-plugins` | VRM semantics (design policy §3.2, §26) |
 | VMD reading, MMD IK and append evaluation, the MMD role table | `usd-mmd-plugins` | MMD semantics (design policy §3.2, §42.4) |
 | physical simulation | `usd-physics-plugins` | simulation (design policy §3.3) |
 | scheduling, application execution and OpenExec driving policy | `usd-stage-runner` | execution (design policy §3.3) |
-| runtime composition | `usd-avatar-runtime` | composition (design policy §3.3) |
+| avatar lifecycle, evaluator phases/ordering, discovery, capabilities, transactional state and renderer/Hydra publication | `usd-avatar-runtime` | avatar orchestration (design policy §3.3, §43) |
 | a generator's model, training or inference | never in this ecosystem's core | design policy §3, §24 |
 
 ## 2. Dependency directions
@@ -82,7 +82,7 @@ motionCore ──────→ OpenUSD foundation types only (gf, tf, vt)
 motionSampling ──→ motionCore
 motionRecording ─→ motionCore, motionSampling
 motionRetarget ──→ motionCore
-motionUsd ───────→ motionCore, motionSampling, OpenUSD (usd, sdf, usdSkel)
+motionUsd ───────→ motionCore, OpenUSD (usd, sdf, usdGeom, usdSkel)
 motionSource ────→ motionCore
 motionBvh ───────→ motionSource
 execMotion ──────→ motionCore, motionSampling, motionRecording, motionUsd,
@@ -144,6 +144,35 @@ edge declared in the component's manifest and validated by
 `ost plugin test --workspace --graph-only`; a link-line check per library
 (`motionCore` links no OpenUSD beyond its foundation types); and an include
 scan refusing forbidden headers and product names.
+
+### 2.5 Runtime boundary target
+
+The accepted [motion/runtime ownership policy](../design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary)
+requires `motionUsd` to return motion-domain skeleton/rest values as well as
+clips. The current §2.1 graph and §1 identities remain the implemented graph;
+the new reader contract is
+[USD_MAPPING.md §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results).
+
+`SkeletonDescriptor` and `SourceRestPose` currently live in `motionRetarget`.
+Before the reader extension lands, resolve WS-O4: either add a declared
+`motionUsd` → `motionRetarget` edge to reuse the builders, or move the reusable
+value/construction surface to a lower motion layer. Neither choice permits a
+reverse edge, a dependency on runtime source, or duplicate builders. Update
+this structural contract, manifests and boundary gates with that decision
+before changing code.
+
+OpenUSD stage/schema APIs stay in `motionUsd`. Full OpenUSD dependency
+isolation is the target, but `motionCore` and the processing APIs currently
+expose foundation types (`gf`/`tf`/`vt`); this documentation change does not
+replace those types. WS-O5 must settle neutral math/value types and the migration
+of existing public APIs before ABI stabilization can claim full isolation.
+
+The runtime consumes installed owner APIs through adapters that marshal,
+invoke and publish. It retains its state ABI, layout IDs and avatar
+orchestration; it does not create canonical motion structs or a joint
+vocabulary. Tests of that consumption belong to the runtime; correctness
+tests of motion algorithms and USD conversion belong here. The ordered
+acceptance gates are in [runtime-boundary.md](../roadmap/runtime-boundary.md).
 
 ## 3. Moving code in
 
@@ -213,3 +242,5 @@ WS-O1, the names, was decided on 2026-09-19 (§1.2).
 | --- | --- | --- |
 | ~~WS-O2~~ | **Decided 2026-09-19: `motionCore` alone**, as design policy §24 draws it (§2.1). Was: whether `motionRetarget` depends on `motionSampling`, as `vrmRetarget` depended on its runtime library for one resample option | the import of `vrmRetarget`'s generic half |
 | WS-O3 | Design policy §26 sketches `plugins/motion-bvh/`; the imported BVH reader is a plain library and registers nothing. A BVH `SdfFileFormat` would be a separate, thin bundle, created only if opening `.bvh` directly is wanted | a consumer that wants it |
+| WS-O4 | Returning descriptor/rest values from `motionUsd`: add a declared `motionRetarget` edge or move the reusable value/building surface to a lower motion layer (§2.5) | Runtime Boundary Phase 2, before reader implementation |
+| WS-O5 | Neutral math/value types and migration of the public foundation-type APIs to achieve full OpenUSD isolation (§2.5) | Runtime Boundary Phase 5, before ABI freeze |

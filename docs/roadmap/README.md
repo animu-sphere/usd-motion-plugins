@@ -9,7 +9,8 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 | Document | Contents |
 | --- | --- |
-| [current.md](current.md) | What is left after the imports: scene-side motion bindings, and the work beyond the imports. |
+| [current.md](current.md) | Incomplete work after the imports: runtime boundaries, scene-side motion bindings and later features. |
+| [runtime-boundary.md](runtime-boundary.md) | Runtime Boundary Phase 1-5: validation ownership, USD skeleton/rest readers, StageClip absorption, recording and API/ABI stabilization. |
 
 ## Status at a glance
 
@@ -25,6 +26,7 @@ The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
+| WS-O4 | How `motionUsd` obtains descriptor/rest types and builders | [WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target) | Runtime Boundary Phase 2 |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |
 | MC-O6 | Tracking state | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a live producer |
@@ -36,3 +38,4 @@ The owning document holds the question; this list only schedules it.
 | USD-O5 | The `Bindings` prim | [USD §9](../design/USD_MAPPING.md#9-open-questions) | `usd-avatar-runtime` |
 | USD-O6 | A directly opened `.vmd` | [USD §9](../design/USD_MAPPING.md#9-open-questions) | `usd-mmd-plugins` |
 | WS-O3 | A BVH file-format bundle | [WORKSPACE §6](../architecture/WORKSPACE.md#6-open-questions) | a consumer |
+| WS-O5 | Neutral public value types for full OpenUSD isolation | [WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target) | Runtime Boundary Phase 5, before ABI freeze |

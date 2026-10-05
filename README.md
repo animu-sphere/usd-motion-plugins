@@ -9,22 +9,24 @@ representing, transforming, retargeting, recording, and bridging motion data.
 
 ## Scope
 
-**`usd-motion-plugins` is the canonical owner of generic motion semantics.**
+**`usd-motion-plugins` is the canonical owner of generic motion semantics,
+motion mathematics, and motion interchange.**
 It defines `MotionPose`, `MotionClip`, `MotionStream` and the `HumanJoint`
 vocabulary, root motion, sampling, filtering, recording, generic retargeting,
-generic motion files, the OpenUSD motion mapping, and OpenExec motion
-evaluation. Sibling repositories consume these contracts and do not redefine
+generic validation, skeleton/rest handling, generic motion files, the OpenUSD
+motion mapping, and OpenExec motion evaluation. Sibling repositories consume
+these contracts and do not redefine
 them.
 
 It does not own:
 
 | Responsibility | Owner |
 | --- | --- |
-| Device and protocol acquisition | [`motion-connectors`](https://github.com/animu-sphere/motion-connectors) |
+| Device/protocol acquisition and actor/source clock normalization | [`motion-connectors`](https://github.com/animu-sphere/motion-connectors) |
 | VRM or MMD avatar semantics | [`usd-vrm-plugins`](https://github.com/animu-sphere/usd-vrm-plugins), `usd-mmd-plugins` |
 | Physical simulation | `usd-physics-plugins` |
 | Execution and update loops | `usd-stage-runner` |
-| Runtime composition | `usd-avatar-runtime` |
+| Avatar lifecycle, evaluator scheduling, runtime state and renderer publication | `usd-avatar-runtime` |
 
 ## Architecture
 
@@ -67,6 +69,7 @@ Identities and dependency directions:
 | --- | --- |
 | [What is implemented](docs/reference/CAPABILITY_MATRIX.md) | The capability matrix, the only source for implementation status |
 | [Incomplete work](docs/roadmap/current.md) | What remains, and the open decisions |
+| [Runtime boundary consolidation](docs/roadmap/runtime-boundary.md) | Validation, skeleton/stage reading, recording and API migration |
 | [Release history](CHANGELOG.md) | The changelog, and the per-version [release records](docs/releases/) |
 | [docs/](docs/README.md) | Which document owns which subject |
 

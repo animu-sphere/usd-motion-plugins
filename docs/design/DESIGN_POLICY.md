@@ -26,9 +26,10 @@
 
 ## 1. Project overview
 
-`usd-motion-plugins` is the motion interoperability and processing layer for
-OpenUSD-oriented workflows. It represents, canonicalizes, transforms,
-retargets, records, evaluates, and bridges reusable motion data.
+`usd-motion-plugins` is the canonical owner of format-independent motion
+semantics, mathematics and interchange for OpenUSD-oriented workflows. It
+represents, canonicalizes, transforms, retargets, records, evaluates, and
+bridges reusable motion data.
 
 ```text
 external or canonical motion
@@ -80,6 +81,10 @@ SDKs, network transports, discovery, and reconnect logic belong to
 `motion-connectors` or an integration package. This repository consumes an
 already decoded `MotionPose` or `MotionStream`.
 
+Actor/source clock normalization and sensor protocol handling belong to
+`motion-connectors`; motion libraries operate on explicit timestamps and
+caller-supplied timing policies.
+
 ### 3.2 Avatar-format semantics
 
 VRM humanoid metadata, expressions, look-at, spring bones, VRMA semantics, PMX
@@ -92,6 +97,11 @@ descriptors, maps, and processing primitives for them to consume.
 Application update loops, scheduling, scene lifecycle, network sessions,
 OpenExec driving policy, and application state belong to `usd-stage-runner` or
 another runtime layer. Runtime composition belongs to `usd-avatar-runtime`.
+
+`usd-avatar-runtime` owns avatar instance lifecycle, evaluator phases and
+ordering, provider discovery, capability negotiation, per-avatar transactions,
+`EvaluatedAvatarState`, and renderer/Hydra publication. Its motion adapter
+marshals inputs, invokes owner APIs and publishes results (§43).
 
 Physical response, including spring bones, rigid-body dynamics, collision
 response, cloth-like behavior, and physical constraints, belongs to
@@ -590,3 +600,108 @@ Codes use the `MOTION_<AREA>_<EVENT>` form. An imported code takes this
 repository's prefix while retaining its event name; consumer-owned codes pass
 through unchanged. The catalog is
 [reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md).
+
+## 43. Motion and avatar runtime boundary
+
+**Accepted ownership policy, 2026-10-06.** The API extensions described here
+are intended contracts; their implementation status remains in the capability
+matrix. The ordered migration and completion gates are in
+[runtime-boundary.md](../roadmap/runtime-boundary.md). This extends the original
+Migration Phase A-F with a separate **Runtime Boundary Phase 1-5** track.
+
+### 43.1 Canonical ownership
+
+| Area | Owner and boundary |
+| --- | --- |
+| Motion values | This repository: `MotionPose`, `MotionClip`, stream semantics, scalar/named channels, generic gaze/look-at observations, root motion, confidence, timestamps, source rest, skeleton descriptors and canonical humanoid vocabulary. |
+| Motion mathematics | This repository: sampling, interpolation, extrapolation/hold, filtering, blending, resampling, retargeting, rig diagnostics, root conversion, source/target rest handling, validation, recording and replay primitives. |
+| USD motion interchange | `motionUsd`: clip/pose/sample read and write, UsdSkel animation, stage metadata, source skeleton/rest extraction, USD-to-motion skeleton conversion and generic units/axis/time-code/placement interpretation. |
+| Avatar orchestration | `usd-avatar-runtime`: when, for which avatar and in which order to invoke algorithms, adapt values to runtime state, and publish the evaluated result. |
+| Avatar-format meaning | `usd-vrm-plugins` / `usd-mmd-plugins`: VRM expressions, LookAt and humanoid rules; MMD morphs, IK/control rules and PMX/VMD interpretation. |
+| External intake | `motion-connectors`: WebXR/OpenXR, MediaPipe, controllers, devices, network streams, actor/source clock normalization and sensor protocols. |
+
+A generic look-at observation does not interpret VRM LookAt. Generic validation
+of a caller-supplied required-bone set does not define a format's required set.
+Opaque namespaced channels remain generic values; runtime-specific channel
+names must not become fixed semantics in `motionCore`.
+
+### 43.2 Absorbing motion-domain work from the runtime
+
+`motionUsd` is the owner of the generic work currently exposed through the
+runtime's `adapters/motion-usd/StageClip`: stage time-code validation, stage
+reading, source skeleton extraction, source-rest construction, a coherent
+clip-plus-rest result, and generic motion placement checks. The runtime should
+consume that result rather than rebuild a motion-domain convenience object.
+The planned reader contract is
+[USD_MAPPING.md §7.2](USD_MAPPING.md#72-motion-domain-reader-results).
+
+The generic part of `adapters/usd/SkeletonBinding` also belongs here: reading
+UsdSkel joints and rests, decomposition, topology checks, building a
+`SkeletonDescriptor`, source/target rest construction, generic mapping helpers
+and skeleton validation. Pure value algorithms remain in their motion library;
+`motionUsd` invokes them at the USD boundary. Avatar IDs, layout versions,
+format-provided bindings, per-avatar state and publication remain runtime
+adapter concerns.
+
+Generic validation must have owner APIs, rather than copies in runtime
+adapters. The value-validation contract is
+[MOTION_CONTRACT.md §14](MOTION_CONTRACT.md#14-generic-validation-ownership);
+skeleton/rest/retarget validation is owned by `motionRetarget`. Runtime checks
+of its own state/input ABI remain runtime-owned.
+
+### 43.3 Adapter-friendly C++ APIs and ABI mapping
+
+Canonical algorithm APIs are C++17 or later. Prefer value types, immutable
+views and reusable configuration. Sampling returns pose plus status;
+retargeting reuses its descriptor/map/rest configuration and exposes owner
+diagnostics; recording returns a generic clip. Preserve existing public APIs
+where they already serve these needs instead of adding equivalent wrappers.
+
+Algorithm APIs must not require avatar lifecycle, scheduling, runtime state,
+renderer handles, or format-specific types. OpenUSD stage/schema dependencies
+belong in `motionUsd`. Full OpenUSD dependency isolation is the target;
+existing `gf`/`tf`/`vt` foundation types remain a current API constraint recorded
+in [WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target).
+Resolve that constraint explicitly before the ABI freeze.
+
+When a runtime ABI needs a different shape, use only the necessary mapping:
+
+```text
+motion-domain value -> adapter mapping -> avatar-runtime input/state contract
+```
+
+The mapping may marshal or reorder values for the runtime's layout. It must
+not create a second canonical joint vocabulary or motion representation, copy
+one package's struct layout as the other's canonical contract, or make
+`EvaluatedAvatarState` the canonical motion value. C++ object layout is not a
+stable cross-package ABI (§33); freeze candidates require another consumer's
+evidence.
+
+### 43.4 Diagnostics and acceptance evidence
+
+Motion owners generate motion diagnostics: invalid timestamps/quaternions,
+missing required bones, retarget mismatches, unsupported root policy and bad
+source-rest hierarchy. The runtime forwards code, severity, subject and detail
+to its structured diagnostic channel without redefining motion error codes.
+New codes enter the diagnostic catalog only when implemented.
+
+Algorithm correctness is tested here: sampling/interpolation/boundary hold,
+retarget/root behavior, skeleton conversion, rest construction, malformed-input
+rejection and recording/replay parity. USD tests cover resolved UsdSkel
+read/write, `metersPerUnit`, `timeCodesPerSecond`, non-trivial hierarchies,
+source rest, placement policy and round trips, including explicit rejection
+where a policy cannot support the input.
+
+The runtime owns cross-repository acceptance of:
+
+```text
+motionUsd -> MotionClip + source rest -> SampleClip -> Retarget
+          -> runtime adapter -> EvaluatedAvatarState
+```
+
+The migration is complete when runtime adapters contain no sampling, retarget,
+generic validation, USD-to-motion skeleton conversion, source-rest extraction
+or recording semantics; they only marshal, invoke and publish. VRM/MMD must be
+able to use the same owner APIs, and API/ABI stabilization requires evidence
+from a second consumer, such as a format adapter or external runtime. No motion
+component may acquire an avatar scheduler or renderer/Hydra API to achieve it.
