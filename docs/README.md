@@ -24,6 +24,7 @@ its tag.
 | Question | Owner |
 | --- | --- |
 | Repository boundary and placement rules | [design/DESIGN_POLICY.md](design/DESIGN_POLICY.md) |
+| Motion algorithms versus avatar orchestration | [design/DESIGN_POLICY.md §43](design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary) |
 | In-memory motion values and recording | [design/MOTION_CONTRACT.md](design/MOTION_CONTRACT.md) |
 | Generic retargeting | [design/RETARGETING_POLICY.md](design/RETARGETING_POLICY.md) |
 | OpenUSD representation and reading | [design/USD_MAPPING.md](design/USD_MAPPING.md) |
@@ -32,6 +33,7 @@ its tag.
 | External toolchain dependencies | [architecture/DEPENDENCIES.md](architecture/DEPENDENCIES.md) |
 | Implemented capabilities and diagnostics | [reference/](reference/) |
 | Incomplete work and open decisions | [roadmap/](roadmap/) |
+| Runtime boundary migration and acceptance criteria | [roadmap/runtime-boundary.md](roadmap/runtime-boundary.md) |
 | Released history | [releases/](releases/) and [CHANGELOG.md](../CHANGELOG.md) |
 
 Maintenance rules are in [contributing/documentation.md](contributing/documentation.md).

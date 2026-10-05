@@ -8,6 +8,8 @@
 > bakes retargeted animation onto avatars. `motionUsd`'s writer arrived from
 > that capture recorder and its reader from `motion_retarget`'s `StageIo`
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
+> §7.2's richer motion-domain reader result is accepted direction, not an
+> implemented extension to the current reader.
 >
 > This document owns how motion becomes OpenUSD and back: the standalone
 > motion stage, joint tokens, time codes, metadata, and how a motion meets an
@@ -255,8 +257,10 @@ than guessed at.
   joint tokens and rest transforms are what `BuildSkeletonDescriptor` takes,
   and the descriptor it answers is what `BuildSourceRestPose` takes after it
   ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)). So reading a stage
-  does not link a retargeter and `motionUsd` keeps its one edge
+  does not link a retargeter and `motionUsd` keeps its current library edge
   ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository)).
+  This is the current API; §7.2 defines the accepted direction that removes
+  the consumer's descriptor/rest assembly step.
 - **The producer's rate is not the stage's.** `timeCodesPerSecond` is where
   the samples were written and is always 30 (§4.1); the rate they were taken
   at is `customData.motion.nominalFrameRate`, and a read puts it back on
@@ -322,6 +326,56 @@ hips turn, whether or not the producer stated a root orientation — which is
 must keep which joints were observed keeps its trace
 ([MOTION_CONTRACT.md §10](MOTION_CONTRACT.md#10-recording-and-the-trace-format)),
 not its stage.
+
+### 7.2 Motion-domain reader results
+
+**Accepted direction, 2026-10-06; API shape proposed.** `motionUsd` owns generic
+USD interpretation through motion-domain values. Runtime consumers should
+receive a coherent clip, skeleton, source rest and metadata, rather than
+reconstructing them from raw USD arrays in their own `StageClip` wrapper.
+The existing §7 reader remains available until an extension lands with tests.
+
+Illustrative result shapes, not installed API declarations:
+
+```cpp
+struct MotionSkeletonRead {
+    SkeletonDescriptor skeleton;
+    SourceRestPose rest;
+    MotionSkeletonMetadata metadata;
+};
+
+// Extend the existing MotionStageRead, preserving compatible fields:
+// clip, skeleton, metadata, warnings, plus an owner-built sourceRest.
+```
+
+A skeleton reader accepts an explicitly selected `UsdSkelSkeleton`; a stage
+reader accepts the selected source path and returns the clip and its rest
+together. Exact signatures, failure/report types and compatibility with the
+existing `MotionStageRead::skeleton` arrays are settled during
+[Runtime Boundary Phases 2-3](../roadmap/runtime-boundary.md). Candidate headers
+are `SkeletonReader.h`, `RestPoseReader.h` and `Validation.h`, alongside the
+existing `MotionStage.h`, `ClipReader.h` and `ClipWriter.h`; they are not present
+APIs.
+
+The reader owns joints/rest extraction, topology checks, decomposition via
+owner value algorithms, motion-domain descriptor/rest construction, generic
+joint mapping helpers and stage metadata. An arbitrary skeleton can become a
+generic descriptor without being a semantic motion clip; §7's clip reader must
+still refuse to infer humanoid semantics from non-semantic joint names.
+Format-provided maps and required-bone sets stay explicit caller inputs.
+
+Generic motion import/export policy must state how `metersPerUnit`, axes,
+time codes and skeleton placement are converted or rejected. Time-code and
+placement validation belongs here, including checks now carried by runtime
+wrappers. This does not move scene scheduling, avatar placement/state or
+renderer publication into `motionUsd`, or change §6.1's target-unit input
+contract without a separate contract change.
+
+The dependency change required to return `SkeletonDescriptor` and
+`SourceRestPose` is resolved in
+[WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target)
+before implementation. Pure builders and validators remain reusable without a
+USD stage; callers should not have to reproduce them to avoid linking a reader.
 
 ## 8. Versioning
 

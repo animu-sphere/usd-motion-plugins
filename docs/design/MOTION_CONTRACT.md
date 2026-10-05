@@ -118,6 +118,10 @@ uses double precision so valid subnormal source components remain usable.
 - Shared code reads no wall clock. A caller maps a producer's clock onto its
   own with an explicit offset.
 
+Actor/source clock normalization and protocol epochs belong to
+`motion-connectors`. The motion intake's explicit source-to-evaluation offset
+is a generic sampling primitive, not ownership of an external clock (§9).
+
 ## 5. `MotionPose`
 
 ### 5.1 Fields
@@ -348,8 +352,10 @@ recorded session replayable byte for byte. Intake decisions are explicit and
 **MC-O5 is resolved:** `LiveCaptureSource` is the public live-stream intake.
 The producer calls `Push(MotionPose)` for each actor's canonical pose in
 timestamp order. The consumer reads through `IMotionSource::Sample` at its
-evaluation time; `LiveCaptureSource` owns clock alignment, conditioning and
-the bounded pose history. `motion-connectors`' public read remains
+evaluation time; `LiveCaptureSource` provides explicit offset/alignment
+primitives, conditioning and the bounded pose history. The caller supplies
+evaluation time and alignment policy; actor/source clock normalization stays
+with `motion-connectors`. `motion-connectors`' public read remains
 `IMotionConnector::Poll(MotionFrame&)`, with the consumer routing each actor's
 pose to its own intake. `SetSourceMetadata` establishes stream provenance;
 each pushed pose keeps its own source timestamp and sequence number. The
@@ -371,6 +377,16 @@ round-trip** for traces the current writer produced. It stores capture order,
 not arrival order; delivery timing is reproduced by a replay schedule. Anything
 added to the value types is added to the trace format in the same change, or a
 replay stops reproducing the session it recorded.
+
+### 10.1 Recording versus runtime publication
+
+The motion owner defines recording format, resampling, compression and
+timestamp policy when those features are introduced, as well as generic
+recorder/replay primitives. A runtime chooses when and for which avatar to
+record, passes canonical samples to the recorder and publishes its result.
+It must not implement a second recording algorithm or trace contract. The
+remaining API and adapter work is
+[Runtime Boundary Phase 4](../roadmap/runtime-boundary.md#runtime-boundary-phase-4--recording).
 
 ## 11. Producers, and where each one stops
 
@@ -421,3 +437,38 @@ narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 | MC-O3 | Root motion for producers with two translation channels (VMC root position vs hips offset) | one recorded session from each of two VMC senders — operator work in `motion-connectors` |
 | MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |
+
+## 14. Generic validation ownership
+
+**Accepted direction, 2026-10-06.** Generic validation belongs to the motion
+owner. Consolidate the existing checks into reusable owner APIs so runtime
+adapters do not reimplement the motion invariants. This section describes the
+intended surface; it does not claim new validators are installed.
+
+| Validation area | Motion owner |
+| --- | --- |
+| Finite pose/clip values, quaternion validity and normalization policy, timestamp ordering, channel uniqueness/order, confidence range | `motionCore` value contract, reused by sampling/recording readers and processors |
+| Source-rest hierarchy cycles, skeleton topology, caller-required bones, retarget options and root-motion modes | `motionRetarget` value/configuration contract |
+| Stage time codes, USD skeleton extraction, units/axes and generic placement constraints | `motionUsd`, invoking the value validators |
+
+Candidate entry points include `ValidateMotionClip`, `ValidateSourceRestPose`,
+`ValidateSkeletonDescriptor` and `ValidateRetargetConfiguration`, returning
+owner validation reports. Exact signatures/report types and their component
+placement are settled in
+[Runtime Boundary Phase 1](../roadmap/runtime-boundary.md#runtime-boundary-phase-1--validation).
+Report codes and subjects come from the owner; the runtime forwards them to
+its diagnostic channel without translating them into new motion error codes.
+
+Construction should establish invariants where possible. An immutable valid
+value or configuration should not require every consumer to repeat the same
+checks; mutable inputs still need a documented validation boundary. Checks
+must follow the owning operation's contract: stream intake requires strictly
+increasing timestamps, while the current sampler accepts finite,
+non-decreasing clip times (sections 8-9). Do not silently strengthen existing
+accepted input or change normalization policy while extracting a validator.
+
+Sparse observations, absent confidence and legal partial rigs remain valid
+motion. Generic validation checks a caller's required-bone set without
+inventing a VRM/MMD required set. Runtime state/input ABI invariants remain
+runtime-owned. Malformed-input tests, supported partial-input tests and
+consumer diagnostic-forwarding evidence accompany each migrated check.

@@ -49,6 +49,22 @@ A realtime caller builds the descriptor, the map and the rest correction
   decomposition (its OpenExec humanoid finding).
 - Equality is exact and defined: a cached descriptor is compared, not trusted.
 
+### 2.1 USD conversion and validation ownership
+
+The value builders, rest handling, topology validation, required-bone
+validation, retarget-option and root-mode checks belong to `motionRetarget`.
+`motionUsd` owns reading a USD skeleton through those algorithms into the
+motion domain; the planned reader result is
+[USD_MAPPING.md §7.2](USD_MAPPING.md#72-motion-domain-reader-results).
+Runtime `SkeletonBinding` adapters retain runtime layout/state mapping and
+format-supplied bindings, and invoke the owners for generic conversion.
+
+Named validation-report APIs are planned alongside the value contract's
+[validation ownership](MOTION_CONTRACT.md#14-generic-validation-ownership).
+Prefer validating reusable configuration at construction. A caller's required
+set remains explicit; validation must retain §4.1's supported partial-rig
+diagnostics rather than turning every missing joint into fatal malformed data.
+
 ## 3. `RetargetMap`
 
 - A `HumanJoint` drives a target joint **only through an explicit entry**.
