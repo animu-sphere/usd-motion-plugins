@@ -9,6 +9,20 @@ separate from the package version
 
 ## [Unreleased]
 
+### Added
+
+- `motionUsd`'s `AuthorSkeletonAnimation` authors evaluated target-local samples
+  onto a composed skeleton as a new `UsdSkelAnimation` and a root-layer
+  binding override. It preserves the target's rest scales, referenced assets,
+  rig attributes, stage metadata and the caller's edit target. Invalid input
+  or an ineffective binding is refused without leaving root-layer changes
+  ([USD mapping §6.1](docs/design/USD_MAPPING.md#61-authoring-evaluated-target-local-samples)).
+
+### Changed
+
+- The roadmap moves past the installed MMD core consumer, already implemented
+  in `usd-mmd-plugins`, to the unresolved scene-side motion binding.
+
 ## [0.5.3] - 2026-10-04
 
 ### Added

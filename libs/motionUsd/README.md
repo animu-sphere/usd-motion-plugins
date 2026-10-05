@@ -5,7 +5,8 @@ the **standalone motion stage**
 ([USD_MAPPING.md §2–§5](../../docs/design/USD_MAPPING.md#2-the-standalone-motion-stage)),
 standard `UsdSkel` with nothing that names a target rig, and a stage becomes a
 `MotionClip` again ([§7](../../docs/design/USD_MAPPING.md#7-reading-usd-back)).
-Baking a retargeted clip onto a target rig (§6) is not here.
+Already evaluated joint-local samples can also be baked onto a composed
+target rig ([§6](../../docs/design/USD_MAPPING.md#6-motion-on-an-avatar)).
 
 It is a **plain static CMake library**, not a plugin: it has no
 `plugInfo.json`, no file format and no OpenExec. A format plugin that authors
@@ -21,6 +22,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 | `motionUsd/MotionStage.h` | `MotionStageContractVersion`, `MotionStageTimeCodesPerSecond` — what both halves state about the stage |
 | `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions` (with a producer's `MotionStageRest` and provenance), `MotionStageReport` |
 | `motionUsd/ClipReader.h` | `ReadMotionStage` (from a stage a caller holds), `OpenMotionStage` (from a file), `PoseFromStageSample` (values only, no stage), `MotionStageRead` with its `MotionStageSkeleton` and `MotionStageMetadata` |
+| `motionUsd/SkeletonAnimationWriter.h` | `AuthorSkeletonAnimation`, `SkeletonAnimationSample`: target-local arrays into a new animation and a skeleton binding override |
 
 ```text
 /Animation            Scope, the default prim; customData.motion, customData.source
@@ -79,6 +81,27 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 - **A warning is not a refusal.** A stage that states no rest transforms, two
   rates that disagree, a contract version from the future or a channel twice
   is read, and says so.
+
+## Rules the target animation writer keeps
+
+- The caller composes the avatar by reference, supplies evaluated rotations
+  and translations in its skeleton's exact joint order, and saves the
+  derivative afterwards. `motionUsd` does not retarget or interpret a format.
+- Translations are in the target stage's units and basis. The caller converts
+  canonical metre values before calling when the target uses another unit.
+- The root layer receives a new `UsdSkelAnimation` and a
+  `skel:animationSource` override. Referenced layers, rig attributes, stage
+  metadata and the caller's edit target are preserved.
+- Every joint receives its constant rest scale. Identity would replace a
+  scaled rest; omitting scales would make UsdSkel resolve no animation.
+- The stage uses 30 time codes per second, and sample times are encoded with
+  the same frame snap as the standalone writer. This writer leaves scene
+  metadata, including the playback interval, to the caller.
+- Invalid samples, a mismatched joint order, malformed rests, an existing
+  animation path, and instance/prototype authoring are refused before mutation.
+  An authoring failure or a stronger binding opinion restores root content.
+  `motionUsd_skeletonAnimation` checks serialized reference composition,
+  resolved local transforms, scale preservation, refusal and rollback.
 
 ## Building
 
