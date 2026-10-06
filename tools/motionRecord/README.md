@@ -76,9 +76,9 @@ per second. `customData.motion.sourceFormat` is `capture`. The rules are
   from one that was never captured.
 
 Channels (including face expression weights) are authored through `motionUsd`
-under the `Channels` prim described by USD §4.3. Look-at targets still have no
-place in the mapping, so the tool reports them on stderr rather than dropping
-them without a word.
+under the `Channels` prim described by USD §4.3. Look-at targets are authored
+as clip-space `Body.motion:lookAtTarget` points, preserving exact reported keys
+and origin targets (USD §4.4).
 
 ## Tests
 

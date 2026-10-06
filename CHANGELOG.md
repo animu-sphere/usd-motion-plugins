@@ -11,6 +11,13 @@ separate from the package version
 
 ### Added
 
+- Common USD gaze round trip via `Body.motion:lookAtTarget`, preserving origin,
+  sparse keys, defaults and source timing. Explicit `MotionStageReadOptions`
+  overloads hand owner-selected scalar/gaze attributes to the generic reader
+  without format dependencies or automatic native discovery. Nonfinite inputs
+  and ambiguous projected identities are refused; placement remains an explicit
+  host conversion ([USD mapping §4.4–§4.5](docs/design/USD_MAPPING.md#44-gaze-points)).
+
 - Read-only owner validation reports in `motionCore/Validation.h` and
   `motionRetarget/Validation.h` for poses, clips, skeletons, source rests and
   retarget configuration. Explicit quaternion/timestamp policies preserve
