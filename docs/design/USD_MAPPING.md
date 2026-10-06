@@ -469,11 +469,13 @@ wrappers. This does not move scene scheduling, avatar placement/state or
 renderer publication into `motionUsd`, or change §6.1's target-unit input
 contract without a separate contract change.
 
-The dependency change required to return `SkeletonDescriptor` and
-`SourceRestPose` is resolved in
-[WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target)
-before implementation. Pure builders and validators remain reusable without a
-USD stage; callers should not have to reproduce them to avoid linking a reader.
+WS-O4 selects a public `motionUsd` → `motionRetarget` dependency for this
+extension, as accepted on 2026-10-07 in
+[WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target).
+The descriptor/rest types, builders and validators stay with their existing
+owner and remain reusable without a USD stage. Dependency wiring and the
+typed reader API are still unimplemented; callers should not have to reproduce
+builders to avoid linking a reader.
 
 ### 7.2.1 Scoped strict array readers
 
@@ -481,7 +483,7 @@ Implemented locally, unreleased, 2026-10-06: `SkeletonReader.h` adds
 `ReadSkeleton(stage, path, read, diagnostic)` and
 `ReadCanonicalMotionStage(stage, path, read, diagnostic)`. This slice keeps
 the existing dependency graph and raw `MotionStageSkeleton` representation;
-it does not settle WS-O4 or claim the typed descriptor/source-rest result.
+it does not implement the WS-O4 edge or the typed descriptor/source-rest result.
 Consumers invoke existing motionRetarget builders rather than duplicate them.
 
 `ReadSkeleton` returns owned default-time parent-local rest matrices in metres,

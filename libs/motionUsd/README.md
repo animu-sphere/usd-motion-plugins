@@ -110,8 +110,11 @@ preserved. Refusals leave
 the destination unchanged and retain a motion-owned code/subject/detail.
 
 Callers invoke the existing `motionRetarget` descriptor/source-rest builders on
-the returned arrays. Returning those typed results directly still needs WS-O4;
-the current extension keeps the declared `motionUsd` → `motionCore` dependency.
+the returned arrays. WS-O4 selects a public `motionUsd` → `motionRetarget`
+dependency for typed results
+([WORKSPACE §2.5](../../docs/architecture/WORKSPACE.md#25-runtime-boundary-target));
+that dependency and the typed API are not yet implemented. The current
+extension keeps the declared `motionUsd` → `motionCore` dependency.
 `motionUsd_skeletonReader` covers numeric/profile/ownership/refusal behavior,
 and `motionUsd_boundaries` keeps the library graph unchanged. Installed runtime
 adapters supply separate invocation/mapping/lifetime evidence.

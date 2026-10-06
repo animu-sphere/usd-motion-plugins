@@ -56,6 +56,10 @@ validation, retarget-option and root-mode checks belong to `motionRetarget`.
 `motionUsd` owns reading a USD skeleton through those algorithms into the
 motion domain; the planned reader result is
 [USD_MAPPING.md §7.2](USD_MAPPING.md#72-motion-domain-reader-results).
+WS-O4 keeps these types/builders here and selects a public dependency from
+`motionUsd` for the typed reader extension
+([WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target)).
+`motionRetarget` retains no dependency on stage APIs or on `motionUsd`.
 Runtime `SkeletonBinding` adapters retain runtime layout/state mapping and
 format-supplied bindings, and invoke the owners for generic conversion.
 
