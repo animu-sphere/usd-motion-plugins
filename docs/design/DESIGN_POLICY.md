@@ -85,6 +85,11 @@ Actor/source clock normalization and sensor protocol handling belong to
 `motion-connectors`; motion libraries operate on explicit timestamps and
 caller-supplied timing policies.
 
+This includes VMC, mocopi, VRChat OSC, OpenXR, WebXR and MediaPipe acquisition,
+UDP/WebSocket/OSC transport, device SDKs, browser APIs, raw packet capture,
+connection/session management, endpoints and protocol diagnostics. The
+canonical intake and composition boundary is fixed in §44.
+
 ### 3.2 Avatar-format semantics
 
 VRM humanoid metadata, expressions, look-at, spring bones, VRMA semantics, PMX
@@ -338,9 +343,12 @@ This repository never depends on an outer avatar or connector repository.
 
 ## 20. motion-connectors integration
 
-`motion-connectors` owns the external-world boundary and ends its work at an
-already normalized `MotionPose` or `MotionStream`. The motion libraries do not
-own device discovery, transport, reconnect logic, or a wall clock.
+`motion-connectors` owns the external-world boundary and reports what it
+observed in its acquisition envelope. A consumer adapter routes canonical
+motion values into this repository's intake; the envelope remains
+connector-owned. The motion libraries do not own device discovery, transport,
+reconnect logic, or a wall clock. See §44 and
+[MOTION_CONTRACT.md §9.1](MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
 
 ## 21. OpenExec boundary
 
@@ -499,7 +507,11 @@ transforms, retargets, records, evaluates, or bridges motion independently of
 an avatar format or transport.
 
 Put it in `motion-connectors` when it acquires motion or owns a device,
-protocol, network, or reconnect lifecycle.
+protocol, network, source-native coordinate interpretation, or reconnect
+lifecycle. A device/protocol name required to explain the behavior is an
+acquisition concern; generic processing of `MotionPose` / `MotionClip` is a
+motion concern. Filtering, interpolation, semantic recording and target
+skeleton adaptation belong here.
 
 Put it in `usd-vrm-plugins` or `usd-mmd-plugins` when it requires the
 corresponding avatar format's semantics, bindings, control rig, or metadata.
@@ -510,7 +522,8 @@ Put it in `usd-stage-runner` when it schedules, executes, or owns scene updates,
 OpenExec driving, or application state.
 
 Put it in `usd-avatar-runtime` when it composes motion, avatar semantics,
-physics, and application state.
+physics, and application state, including the bridge from a connector's
+acquisition envelope to motion-owned intake (§44.3).
 
 ## 39. Architectural invariants
 
@@ -525,6 +538,11 @@ physics, and application state.
 8. Recording produces generic motion before any avatar-format export.
 9. Source names survive derived USD-safe identifiers.
 10. Offline clips and realtime streams share pose semantics.
+11. Filtering, retargeting and semantic recording have one canonical
+    implementation here; consumers invoke those APIs instead of duplicating them.
+12. Device, protocol and network dependencies never enter this repository.
+13. `motionCore` is usable without a `UsdStage`, renderer, network or device;
+    source-specific coordinate interpretation stays outside generic processing.
 
 ## 40. Definition of success
 
@@ -705,3 +723,96 @@ or recording semantics; they only marshal, invoke and publish. VRM/MMD must be
 able to use the same owner APIs, and API/ABI stabilization requires evidence
 from a second consumer, such as a format adapter or external runtime. No motion
 component may acquire an avatar scheduler or renderer/Hydra API to achieve it.
+
+## 44. Motion and connector boundary
+
+**Accepted ownership policy, 2026-10-06.** `usd-motion-plugins` is the canonical
+owner of generic motion semantics. `motion-connectors` reports what was
+observed; this repository interprets, processes, records and converts canonical
+motion. The implementation work is **Connector Boundary Phase A-D** in
+[connector-boundary.md](../roadmap/connector-boundary.md), separate from
+Migration Phase A-F and Runtime Boundary Phase 1-5. Candidate APIs below are
+design directions, not claims that new interfaces are installed.
+
+### 44.1 Component responsibilities
+
+| Component | Owns | Excludes |
+| --- | --- | --- |
+| `motionCore` | Lowest canonical value contract: `HumanJoint`, `MotionPose`, `MotionClip`, `RootMotion`, channels, source metadata, skeleton-neutral shared values and basis arithmetic. | Network/protocol/device APIs, stage APIs, OpenExec, filtering, recording and retarget implementations. |
+| `motionSampling` | Temporal semantics: sampling/status, interpolation, resampling, filtering/smoothing, blending and canonical pose buffering. | Connector-specific clock interpretation and acquisition queues. |
+| `motionRecording` | `LiveCaptureSource`, semantic stream intake, canonical recording, `MotionRecorder`, `motion-capture-trace`, semantic replay and clip construction. | Raw UDP/OSC/WebSocket capture and connector sessions. |
+| `motionRetarget` | Source-independent skeleton adaptation: `SkeletonDescriptor`, `RetargetMap`, rest correction, target mapping, root policy and diagnostics. | Branches on VMC, mocopi, OpenXR or other source/device names. |
+| `motionUsd` | `MotionClip` ↔ `UsdSkelAnimation`, skeleton/value extraction, time-code mapping, USD authoring and target-local array authoring. | Connectors, networks, devices and source SDKs. |
+| `motionSource`, `motionBvh` and profiles | Format-neutral recorded sources, BVH, declarative producer profiles and generic motion conversion. | Source-native acquisition interpretation and avatar-format semantics. |
+| `execMotion` | Optional generic OpenExec motion evaluation over owner library calls. | Runtime scheduling and duplicated motion algorithms. |
+
+These are ownership rules. The implemented library graph remains
+[WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository);
+future API additions remain in the roadmap.
+
+### 44.2 Canonical intake, not acquisition envelopes
+
+`MotionFrame` remains in `motion-connectors`. It is an acquisition envelope
+that can carry timestamps, sequence/source state, tracker observations,
+protocol evidence and connection/session state; it is not `MotionPose`.
+No motion API accepts, includes or links `MotionFrame`, `IMotionConnector` or
+connector transport libraries. No reverse dependency on `motion-connectors`
+is permitted.
+
+The existing intake is `LiveCaptureSource::Push(const MotionPose&)`. Any
+additional timestamp/status/value metadata must use motion-owned types. A
+`MotionSampleInfo` paired with a pose, or a `MotionSample`, `MotionStreamInput`
+or `MotionInputFrame`, is a candidate, not an adoption of the connector frame.
+The detailed intake contract and open decision are
+[MOTION_CONTRACT.md §9.1](MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
+
+Source restart and receive timestamps are observed by the connector. The
+runtime selects intake policy, and motion APIs implement generic effects on
+history, missing/stale data and discontinuities. `motionSampling` never infers
+protocol epochs or reconnect behavior. Raw packet capture stays with the
+connector; semantic recording and replay stay with `motionRecording`.
+
+### 44.3 Runtime composition
+
+The bridge between connector and motion runtime belongs outside this
+repository; `usd-avatar-runtime` is the preferred composition owner:
+
+```text
+motion-connectors: MotionFrame
+    -> usd-avatar-runtime: adapter / actor routing / intake policy
+    -> usd-motion-plugins: MotionPose + motion-owned input metadata
+    -> LiveCaptureSource -> motionSampling
+```
+
+Preparing generic intake APIs here enables external composition of
+`VmcLiveSource` / `MocopiLiveSource`; it does not move those source-specific
+bridges into a motion library. A runtime may depend on both packages; this
+repository must remain unaware of the connector package.
+
+### 44.4 Conditional generic tracker solve
+
+`TrackerObservation` and the existing assignment/solve remain connector-owned
+for now. Reassess tracker assignment, body solve, pose reconstruction and
+confidence fusion only when the API can be explained without device/source
+names, reused across OpenXR, VRChat OSC and optical mocap, and justified as
+generic motion processing. Any accepted migration uses motion-owned input
+values and preserves the one-way dependency; it never imports the connector
+observation type. The contract and evaluation decision are
+[MOTION_CONTRACT.md §11.1](MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here).
+
+### 44.5 Dependency invariants and enforcement
+
+The mandatory invariants are:
+
+1. This repository never depends on `motion-connectors`.
+2. Device, protocol, browser and network dependencies never enter motion libraries.
+3. Filtering, retargeting and semantic recording exist exactly once, here.
+4. `motionCore` remains usable without a stage, renderer, network or device.
+5. Source-specific coordinate interpretation never enters generic motion processing.
+
+Library graph, include and link checks must guard these rules, including
+OpenXR, MediaPipe, OSC, WebSocket implementations, device SDKs and socket APIs.
+The enforcement surface is owned by
+[WORKSPACE.md §2.6](../architecture/WORKSPACE.md#26-connector-boundary-target);
+remaining coverage is Connector Boundary Phase D. Source/protocol strings
+stored as provenance do not authorize behavior branches or dependencies.

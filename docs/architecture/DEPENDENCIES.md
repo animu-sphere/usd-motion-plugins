@@ -35,7 +35,8 @@ current components. Every value is taken from the sibling repositories so that
 
 | Dependency | Refused because |
 | --- | --- |
-| a network stack, device SDK or protocol library | connectivity is `motion-connectors`' (design policy §3.1) |
+| network/socket APIs, UDP/WebSocket/OSC implementations, device SDKs, OpenXR, WebXR/browser APIs or MediaPipe | acquisition is `motion-connectors`' (design policy §3.1, §44); no such include or link dependency enters a motion component |
+| connector-owned `MotionFrame`, `IMotionConnector` or `TrackerObservation` | intake accepts motion-owned canonical values ([WORKSPACE §2.6](WORKSPACE.md#26-connector-boundary-target)) |
 | an ML framework or model runtime | design policy §24 |
 | a physics engine, Hydra, a renderer, a UI toolkit | design policy §3.3, §3.4, §24 |
 | `usd-vrm-plugins`, `usd-mmd-plugins`, `motion-connectors`, `usd-avatar-runtime` | the dependency direction is one way ([WORKSPACE.md §2.3](WORKSPACE.md#23-the-ecosystem)) |
