@@ -50,9 +50,11 @@ consumer.
 ## Open decisions
 
 They are listed, in the order they block work, in
-[the roadmap README](README.md#open-decisions). Runtime Boundary Phase 2 needs
-**WS-O4** (the reader's descriptor/rest dependency); the next composition
-decision remains **USD-O5** (the `Bindings` prim).
+[the roadmap README](README.md#open-decisions). Runtime Boundary Phase 2 now
+needs implementation of the accepted public `motionUsd` → `motionRetarget`
+dependency and typed reader API
+([WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target));
+the next composition decision remains **USD-O5** (the `Bindings` prim).
 Connector Boundary Phases A-B need **MC-O7** (intake metadata/state), and
 Phase C decides **MC-O8** (conditional generic tracker solve ownership).
 MC-O5 was resolved with `motion-connectors`' first shared connector-to-intake

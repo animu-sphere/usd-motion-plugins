@@ -27,7 +27,6 @@ The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| WS-O4 | How `motionUsd` obtains descriptor/rest types and builders | [WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target) | Runtime Boundary Phase 2 |
 | MC-O7 | Motion-owned intake metadata and generic restart/discontinuity/missing/stale input state | [MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes) | Connector Boundary Phases A-B |
 | MC-O8 | Conditional generic tracker solve ownership and motion-owned input/component | [MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here) | Connector Boundary Phase C |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |

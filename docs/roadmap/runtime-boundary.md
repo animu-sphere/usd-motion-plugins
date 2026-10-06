@@ -29,11 +29,14 @@ graph: `motionUsd::ReadSkeleton` owns default-time rest/token/topology/matrix
 validation, metre conversion and separate rigid placement values. Runtime
 `SkeletonBinding` now invokes it and the existing owner descriptor builder.
 `motionUsd_skeletonReader` and runtime installed consumers cover the slice.
-The coherent typed descriptor/source-rest result below remains gated by WS-O4;
-this evidence does not close Phase 2.
+WS-O4 selects the public `motionUsd` → `motionRetarget` edge in
+[WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target).
+Dependency wiring and the coherent typed descriptor/source-rest result below
+remain unimplemented; the scoped reader evidence does not close Phase 2.
 
-- ⬜ Resolve [WS-O4](../architecture/WORKSPACE.md#6-open-questions) before
-  implementation and update dependency declarations and gates.
+- ⬜ Implement the accepted WS-O4 edge in the manifest, public CMake links,
+  installed package config and boundary gates before adding typed reader code;
+  verify graph, standalone and clean installed-package consumption.
 - ⬜ Add an explicitly selected USD skeleton reader returning descriptor,
   source rest and metadata; reuse value builders for joints, decomposition,
   topology, source/target rest and generic mapping.
