@@ -28,8 +28,7 @@
 #include <string>
 #include <vector>
 
-namespace openstrata::motion
-{
+namespace openstrata::motion {
 
 // A producer's rest pose, joint by joint, for a clip whose rest is not
 // identity (USD_MAPPING.md §3): a recorded file states one, and a profile says
@@ -39,8 +38,7 @@ namespace openstrata::motion
 // It is the rest a retargeter corrects from. Authoring identity for a file
 // that stated otherwise would tell the retargeter that the source rig stands
 // exactly as the target does, and skip the correction without a word.
-struct MotionStageRest
-{
+struct MotionStageRest {
     MotionStageRest()
     {
         localRotations.fill(pxr::GfQuatf(1.0f));
@@ -53,8 +51,7 @@ struct MotionStageRest
 };
 
 // What the caller knows about the clip that the clip does not carry.
-struct MotionStageOptions
-{
+struct MotionStageOptions {
     // Authored into `customData.motion` under the key of the same name
     // (USD_MAPPING.md §5), and left out when empty. How the motion arrived:
     // `bvh`, `capture`, ...
@@ -75,8 +72,7 @@ struct MotionStageOptions
 };
 
 // What the stage holds, and what the clip carried that it does not.
-struct MotionStageReport
-{
+struct MotionStageReport {
     std::size_t jointCount = 0;
     std::size_t sampleCount = 0;
 
@@ -84,8 +80,8 @@ struct MotionStageReport
     // under `/Animation/Channels` (USD_MAPPING.md §4.3).
     std::vector<std::string> channels;
 
-    // Samples whose look-at target was not authored. A target is a point in
-    // the root's space, and the mapping gives it no place yet.
+    // Compatibility field: zero on successful writes since gaze is authored
+    // as motion:lookAtTarget on Body (USD_MAPPING.md §4.4).
     std::size_t unauthoredLookAtTargets = 0;
 };
 
@@ -123,11 +119,15 @@ struct MotionStageReport
 //   namespaced semantic verbatim, and a time-sampled `float
 //   motion:channelValue`. A sample that reported no value for a channel
 //   authors none at that time code, because an unreported name is not a zero.
+// - `Body.motion:lookAtTarget` is a point3f in canonical clip space (the same
+//   space as root.worldPosition), keyed only where a sample reports a target.
+//   An origin target is present; an absent target authors no key.
 //
 // Refused, with nothing authored, when:
 // - the stage already holds `/Animation`;
 // - the clip has no sample, or observes no joint and no root;
 // - a timestamp is not finite or does not increase;
+// - a present look-at target is not finite;
 // - a producer rest carries no hips, or a sample observes a joint the rest does
 //   not carry;
 // - two channel names sanitize to one prim name. The name attribute is the key
@@ -137,14 +137,14 @@ struct MotionStageReport
 //
 // `report` may be null.
 MOTIONUSD_API bool AuthorMotionStage(const pxr::UsdStagePtr& stage, const MotionClip& clip,
-                                     const MotionStageOptions& options,
-                                     MotionStageReport* report, std::string* error);
+                                     const MotionStageOptions& options, MotionStageReport* report,
+                                     std::string* error);
 
 // `AuthorMotionStage` into the layer at `path`, which it creates or replaces,
 // then saves. A refused clip leaves `path` as it was: no file is created and
 // an existing one is not touched.
 MOTIONUSD_API bool WriteMotionStage(const std::string& path, const MotionClip& clip,
-                                    const MotionStageOptions& options,
-                                    MotionStageReport* report, std::string* error);
+                                    const MotionStageOptions& options, MotionStageReport* report,
+                                    std::string* error);
 
 } // namespace openstrata::motion

@@ -11,22 +11,23 @@
 #include "pxr/base/vt/types.h"
 #include "pxr/base/vt/value.h"
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/primRange.h"
 #include "pxr/usd/usd/timeCode.h"
+#include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdSkel/animation.h"
 #include "pxr/usd/usdSkel/bindingAPI.h"
 #include "pxr/usd/usdSkel/skeleton.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <cmath>
 #include <set>
 
-namespace openstrata::motion
-{
-namespace
-{
+namespace openstrata::motion {
+namespace {
 
 const pxr::TfToken kChannelName("motion:channelName");
 const pxr::TfToken kChannelValue("motion:channelValue");
@@ -41,32 +42,26 @@ bool
 FindSkeleton(const pxr::UsdStagePtr& stage, const std::string& named,
              pxr::UsdSkelSkeleton* skeleton, std::string* error)
 {
-    if (!named.empty())
-    {
-        if (!pxr::SdfPath::IsValidPathString(named))
-        {
+    if (!named.empty()) {
+        if (!pxr::SdfPath::IsValidPathString(named)) {
             *error = "not a valid prim path: " + named;
             return false;
         }
         const pxr::UsdPrim prim = stage->GetPrimAtPath(pxr::SdfPath(named));
-        if (!prim)
-        {
+        if (!prim) {
             *error = "no prim at " + named;
             return false;
         }
         *skeleton = pxr::UsdSkelSkeleton(prim);
-        if (!*skeleton)
-        {
+        if (!*skeleton) {
             *error = named + " is not a UsdSkelSkeleton";
             return false;
         }
         return true;
     }
 
-    for (const pxr::UsdPrim& prim : stage->Traverse())
-    {
-        if (prim.IsA<pxr::UsdSkelSkeleton>())
-        {
+    for (const pxr::UsdPrim& prim : stage->Traverse()) {
+        if (prim.IsA<pxr::UsdSkelSkeleton>()) {
             *skeleton = pxr::UsdSkelSkeleton(prim);
             return true;
         }
@@ -87,25 +82,20 @@ ReadSkeletonValues(const pxr::UsdSkelSkeleton& skeleton, MotionStageSkeleton* ou
     out->path = skeleton.GetPath().GetString();
 
     pxr::VtTokenArray joints;
-    if (!skeleton.GetJointsAttr().Get(&joints) || joints.empty())
-    {
+    if (!skeleton.GetJointsAttr().Get(&joints) || joints.empty()) {
         return false;
     }
     out->jointTokens.reserve(joints.size());
-    for (const pxr::TfToken& joint : joints)
-    {
+    for (const pxr::TfToken& joint : joints) {
         out->jointTokens.push_back(joint.GetString());
     }
 
     pxr::VtMatrix4dArray restTransforms;
     if (skeleton.GetRestTransformsAttr().Get(&restTransforms) &&
-        restTransforms.size() == joints.size())
-    {
+        restTransforms.size() == joints.size()) {
         out->restTransforms.assign(restTransforms.begin(), restTransforms.end());
         out->restTransformsAuthored = true;
-    }
-    else
-    {
+    } else {
         warnings->push_back("skeleton <" + out->path +
                             "> has no usable restTransforms; assuming an identity rest pose");
         out->restTransforms.assign(joints.size(), pxr::GfMatrix4d(1.0));
@@ -118,38 +108,30 @@ ReadSkeletonValues(const pxr::UsdSkelSkeleton& skeleton, MotionStageSkeleton* ou
 void
 ReadMetadata(const pxr::UsdPrim& prim, MotionStageMetadata* metadata)
 {
-    if (!prim)
-    {
+    if (!prim) {
         return;
     }
 
     const pxr::VtValue motion = prim.GetCustomDataByKey(kMotion);
-    if (motion.IsHolding<pxr::VtDictionary>())
-    {
+    if (motion.IsHolding<pxr::VtDictionary>()) {
         const pxr::VtDictionary& dictionary = motion.UncheckedGet<pxr::VtDictionary>();
-        const auto readInt = [&dictionary](const char* key) -> std::optional<int>
-        {
+        const auto readInt = [&dictionary](const char* key) -> std::optional<int> {
             const auto entry = dictionary.find(key);
-            if (entry == dictionary.end() || !entry->second.IsHolding<int>())
-            {
+            if (entry == dictionary.end() || !entry->second.IsHolding<int>()) {
                 return std::nullopt;
             }
             return entry->second.UncheckedGet<int>();
         };
-        const auto readDouble = [&dictionary](const char* key) -> std::optional<double>
-        {
+        const auto readDouble = [&dictionary](const char* key) -> std::optional<double> {
             const auto entry = dictionary.find(key);
-            if (entry == dictionary.end() || !entry->second.IsHolding<double>())
-            {
+            if (entry == dictionary.end() || !entry->second.IsHolding<double>()) {
                 return std::nullopt;
             }
             return entry->second.UncheckedGet<double>();
         };
-        const auto readString = [&dictionary](const char* key) -> std::string
-        {
+        const auto readString = [&dictionary](const char* key) -> std::string {
             const auto entry = dictionary.find(key);
-            if (entry == dictionary.end() || !entry->second.IsHolding<std::string>())
-            {
+            if (entry == dictionary.end() || !entry->second.IsHolding<std::string>()) {
                 return std::string();
             }
             return entry->second.UncheckedGet<std::string>();
@@ -163,12 +145,9 @@ ReadMetadata(const pxr::UsdPrim& prim, MotionStageMetadata* metadata)
     }
 
     const pxr::VtValue source = prim.GetCustomDataByKey(kSource);
-    if (source.IsHolding<pxr::VtDictionary>())
-    {
-        for (const auto& [key, value] : source.UncheckedGet<pxr::VtDictionary>())
-        {
-            if (value.IsHolding<std::string>())
-            {
+    if (source.IsHolding<pxr::VtDictionary>()) {
+        for (const auto& [key, value] : source.UncheckedGet<pxr::VtDictionary>()) {
+            if (value.IsHolding<std::string>()) {
                 metadata->provenance[key] = value.UncheckedGet<std::string>();
             }
         }
@@ -184,8 +163,7 @@ ReadMetadata(const pxr::UsdPrim& prim, MotionStageMetadata* metadata)
 // forward, so every later sample would carry a value the producer never
 // reported, and "an unreported name is not a value" (MOTION_CONTRACT.md §6)
 // would be lost the first time a clip went through a stage.
-struct StageChannel
-{
+struct StageChannel {
     std::string name;
     pxr::UsdAttribute value;
     std::set<double> keys;
@@ -200,16 +178,13 @@ ReadChannels(const pxr::UsdStagePtr& stage, std::vector<std::string>* warnings)
 {
     std::vector<StageChannel> channels;
     std::set<std::string> seen;
-    for (const pxr::UsdPrim& prim : stage->Traverse())
-    {
+    for (const pxr::UsdPrim& prim : stage->Traverse()) {
         const pxr::UsdAttribute nameAttr = prim.GetAttribute(kChannelName);
-        if (!nameAttr)
-        {
+        if (!nameAttr) {
             continue;
         }
         std::string name;
-        if (!nameAttr.Get(&name) || name.empty())
-        {
+        if (!nameAttr.Get(&name) || name.empty()) {
             warnings->push_back("channel <" + prim.GetPath().GetString() +
                                 "> authors no motion:channelName, so nothing can bind it");
             continue;
@@ -218,21 +193,88 @@ ReadChannels(const pxr::UsdStagePtr& stage, std::vector<std::string>* warnings)
         // Declared and never driven is *not* a value of zero. An unreported
         // channel means the producer said nothing about it, and inventing a
         // zero here would author a statement the stage never made.
-        if (!valueAttr || !valueAttr.HasValue())
-        {
+        if (!valueAttr || !valueAttr.HasValue()) {
             continue;
         }
-        if (!seen.insert(name).second)
-        {
+        if (!seen.insert(name).second) {
             warnings->push_back("the stage carries channel '" + name + "' more than once; <" +
                                 prim.GetPath().GetString() + "> is ignored");
             continue;
         }
         std::vector<double> keys;
         valueAttr.GetTimeSamples(&keys);
-        channels.push_back(StageChannel{name, valueAttr, std::set<double>(keys.begin(), keys.end())});
+        channels.push_back(
+            StageChannel{name, valueAttr, std::set<double>(keys.begin(), keys.end())});
     }
     return channels;
+}
+
+bool
+SelectAttribute(const pxr::UsdStagePtr& stage, const std::string& path,
+                pxr::UsdAttribute* attribute, std::string* error)
+{
+    if (!pxr::SdfPath::IsValidPathString(path)) {
+        *error = "not a valid attribute path: " + path;
+        return false;
+    }
+    const pxr::SdfPath selected(path);
+    if (!selected.IsAbsolutePath() || !selected.IsPropertyPath()) {
+        *error = "not an absolute attribute path: " + path;
+        return false;
+    }
+    *attribute = stage->GetAttributeAtPath(selected);
+    return true;
+}
+
+bool
+ReadProjectedChannels(const pxr::UsdStagePtr& stage, const MotionStageReadOptions& options,
+                      std::vector<StageChannel>* channels, std::string* error)
+{
+    std::set<std::string> seen;
+    for (const StageChannel& channel : *channels) {
+        seen.insert(channel.name);
+    }
+    for (const MotionStageChannelInput& input : options.channels) {
+        pxr::UsdAttribute nameAttr, valueAttr;
+        if (!SelectAttribute(stage, input.nameAttributePath, &nameAttr, error) ||
+            !SelectAttribute(stage, input.valueAttributePath, &valueAttr, error)) {
+            return false;
+        }
+        if (!valueAttr || !valueAttr.HasAuthoredValueOpinion()) {
+            continue;
+        }
+        if (valueAttr.GetTypeName() != pxr::SdfValueTypeNames->Float) {
+            *error = "projected channel is not float: " + input.valueAttributePath;
+            return false;
+        }
+        std::string name;
+        std::vector<double> nameKeys;
+        if (nameAttr && nameAttr.HasAuthoredValueOpinion()) {
+            nameAttr.GetTimeSamples(&nameKeys);
+            if (nameAttr.GetTypeName() == pxr::SdfValueTypeNames->String) {
+                nameAttr.Get(&name);
+            } else if (nameAttr.GetTypeName() == pxr::SdfValueTypeNames->Token) {
+                pxr::TfToken token;
+                if (nameAttr.Get(&token)) {
+                    name = token.GetString();
+                }
+            }
+        }
+        if (name.empty() || !nameKeys.empty()) {
+            *error = "projected channel has no constant authored string/token name: " +
+                     input.nameAttributePath;
+            return false;
+        }
+        name = input.channelPrefix + name;
+        if (!seen.insert(name).second) {
+            *error = "projected channel identity is duplicated: " + name;
+            return false;
+        }
+        std::vector<double> keys;
+        valueAttr.GetTimeSamples(&keys);
+        channels->push_back(StageChannel{name, valueAttr, {keys.begin(), keys.end()}});
+    }
+    return true;
 }
 
 } // namespace
@@ -240,8 +282,7 @@ ReadChannels(const pxr::UsdStagePtr& stage, std::vector<std::string>* warnings)
 std::optional<MotionPose>
 PoseFromStageSample(const MotionStageSample& sample)
 {
-    if (!(sample.timeCodesPerSecond > 0.0))
-    {
+    if (!(sample.timeCodesPerSecond > 0.0)) {
         return std::nullopt;
     }
 
@@ -251,8 +292,7 @@ PoseFromStageSample(const MotionStageSample& sample)
     // carries no second, `timestamp` has no absent state, and frame zero
     // converts to 0.0 at every rate. What differs between the two is which
     // values were resolved, and that happened before this call.
-    if (sample.hasTimeCode)
-    {
+    if (sample.hasTimeCode) {
         pose.timestamp = sample.timeCode / sample.timeCodesPerSecond;
     }
 
@@ -260,17 +300,14 @@ PoseFromStageSample(const MotionStageSample& sample)
     const bool rotationsUsable = sample.rotations.size() == jointCount;
     const bool translationsUsable = sample.translations.size() == jointCount;
 
-    for (std::size_t i = 0; i < jointCount; ++i)
-    {
+    for (std::size_t i = 0; i < jointCount; ++i) {
         const std::optional<HumanJoint> joint = FindHumanJointByPath(sample.jointTokens[i]);
-        if (!joint)
-        {
+        if (!joint) {
             continue;
         }
         const auto slot = static_cast<std::size_t>(*joint);
 
-        if (rotationsUsable)
-        {
+        if (rotationsUsable) {
             // Normalized on the way in: a clip may author a quaternion that has
             // drifted off the unit sphere, and every consumer of a canonical
             // pose is entitled to a rotation.
@@ -278,8 +315,7 @@ PoseFromStageSample(const MotionStageSample& sample)
             pose.validRotations.set(slot);
         }
 
-        if (*joint != HumanJoint::Hips)
-        {
+        if (*joint != HumanJoint::Hips) {
             continue;
         }
         // The hips are the root, and the contract records both halves of it
@@ -289,13 +325,11 @@ PoseFromStageSample(const MotionStageSample& sample)
         // orientation *and* stays the local rotation authored above. Keeping
         // only the local rotation, as both of `usd-vrm-plugins`' readers did,
         // loses the body's facing for every consumer that reads root motion.
-        if (rotationsUsable)
-        {
+        if (rotationsUsable) {
             pose.root.worldOrientation = pose.localRotations[slot];
             pose.root.hasOrientation = true;
         }
-        if (translationsUsable)
-        {
+        if (translationsUsable) {
             pose.root.worldPosition = sample.translations[i];
             pose.root.hasPosition = true;
         }
@@ -308,16 +342,21 @@ bool
 ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
                 MotionStageRead* read, std::string* error)
 {
-    if (!stage)
-    {
+    return ReadMotionStage(stage, skeletonPath, MotionStageReadOptions{}, read, error);
+}
+
+bool
+ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
+                const MotionStageReadOptions& options, MotionStageRead* read, std::string* error)
+{
+    if (!stage) {
         *error = "no stage to read";
         return false;
     }
 
     *read = MotionStageRead();
     read->timeCodesPerSecond = stage->GetTimeCodesPerSecond();
-    if (!(read->timeCodesPerSecond > 0.0))
-    {
+    if (!(read->timeCodesPerSecond > 0.0)) {
         read->warnings.push_back("the stage states no usable timeCodesPerSecond; reading its "
                                  "samples at " +
                                  pxr::TfStringify(MotionStageTimeCodesPerSecond));
@@ -325,33 +364,27 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     }
 
     pxr::UsdSkelSkeleton skeleton;
-    if (!FindSkeleton(stage, skeletonPath, &skeleton, error))
-    {
+    if (!FindSkeleton(stage, skeletonPath, &skeleton, error)) {
         return false;
     }
-    if (!ReadSkeletonValues(skeleton, &read->skeleton, &read->warnings))
-    {
+    if (!ReadSkeletonValues(skeleton, &read->skeleton, &read->warnings)) {
         *error = "skeleton <" + skeleton.GetPath().GetString() + "> authors no joints";
         return false;
     }
 
     pxr::UsdPrim animationPrim;
     if (!pxr::UsdSkelBindingAPI(skeleton.GetPrim()).GetAnimationSource(&animationPrim) ||
-        !animationPrim)
-    {
+        !animationPrim) {
         // A stage whose skeleton carries no binding is still usable when it
         // holds exactly one animation; two, and which one is the clip is a
         // question only the caller can answer.
         std::vector<pxr::UsdPrim> animations;
-        for (const pxr::UsdPrim& prim : stage->Traverse())
-        {
-            if (prim.IsA<pxr::UsdSkelAnimation>())
-            {
+        for (const pxr::UsdPrim& prim : stage->Traverse()) {
+            if (prim.IsA<pxr::UsdSkelAnimation>()) {
                 animations.push_back(prim);
             }
         }
-        if (animations.size() != 1)
-        {
+        if (animations.size() != 1) {
             *error = "skeleton <" + read->skeleton.path +
                      "> has no skel:animationSource and the stage does not hold exactly one "
                      "UsdSkelAnimation";
@@ -364,8 +397,7 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     read->animationPath = animationPrim.GetPath().GetString();
 
     pxr::VtTokenArray animationJoints;
-    if (!animation.GetJointsAttr().Get(&animationJoints) || animationJoints.empty())
-    {
+    if (!animation.GetJointsAttr().Get(&animationJoints) || animationJoints.empty()) {
         *error = "animation <" + read->animationPath + "> has no joints";
         return false;
     }
@@ -373,21 +405,16 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     std::vector<std::string> jointTokens;
     jointTokens.reserve(animationJoints.size());
     std::size_t recognized = 0;
-    for (const pxr::TfToken& joint : animationJoints)
-    {
+    for (const pxr::TfToken& joint : animationJoints) {
         jointTokens.push_back(joint.GetString());
-        if (FindHumanJointByPath(jointTokens.back()))
-        {
+        if (FindHumanJointByPath(jointTokens.back())) {
             ++recognized;
-        }
-        else
-        {
+        } else {
             read->warnings.push_back("joint '" + jointTokens.back() +
                                      "' is not a joint of the vocabulary and was ignored");
         }
     }
-    if (recognized == 0)
-    {
+    if (recognized == 0) {
         // §7's line: a skeleton whose tokens are not semantic paths needs a
         // RetargetMap in reverse, which is a retarget and not a read.
         *error = "no joint of animation <" + read->animationPath +
@@ -403,19 +430,16 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     // metadata, so the two would sample the same clip at two rates.
     double authoredRate = 0.0;
     if (const pxr::UsdAttribute rate = animationPrim.GetAttribute(kRate);
-        rate && rate.Get(&authoredRate) && authoredRate != read->timeCodesPerSecond)
-    {
-        read->warnings.push_back("animation <" + read->animationPath + "> states motion:" +
-                                 "timeCodesPerSecond = " + pxr::TfStringify(authoredRate) +
-                                 " while the stage states " +
-                                 pxr::TfStringify(read->timeCodesPerSecond) +
-                                 "; the stage's is used");
+        rate && rate.Get(&authoredRate) && authoredRate != read->timeCodesPerSecond) {
+        read->warnings.push_back(
+            "animation <" + read->animationPath + "> states motion:" + "timeCodesPerSecond = " +
+            pxr::TfStringify(authoredRate) + " while the stage states " +
+            pxr::TfStringify(read->timeCodesPerSecond) + "; the stage's is used");
     }
 
     ReadMetadata(stage->GetDefaultPrim(), &read->metadata);
     if (read->metadata.contractVersion &&
-        *read->metadata.contractVersion > MotionStageContractVersion)
-    {
+        *read->metadata.contractVersion > MotionStageContractVersion) {
         read->warnings.push_back(
             "the stage states motion contract version " +
             pxr::TfStringify(*read->metadata.contractVersion) + ", newer than this library's " +
@@ -436,14 +460,39 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
 
     // A channel keys into the instants the poses already exist at, so a weight
     // that moves between two body keys has somewhere to say so.
-    const std::vector<StageChannel> channels = ReadChannels(stage, &read->warnings);
-    for (const StageChannel& channel : channels)
-    {
+    std::vector<StageChannel> channels = ReadChannels(stage, &read->warnings);
+    if (!ReadProjectedChannels(stage, options, &channels, error)) {
+        return false;
+    }
+    for (const StageChannel& channel : channels) {
         timeCodes.insert(channel.keys.begin(), channel.keys.end());
     }
 
-    if (timeCodes.empty())
-    {
+    pxr::UsdAttribute lookAtAttr;
+    if (options.lookAtTargetAttributePath.empty()) {
+        lookAtAttr = animationPrim.GetAttribute(pxr::TfToken("motion:lookAtTarget"));
+    } else if (!SelectAttribute(stage, options.lookAtTargetAttributePath, &lookAtAttr, error)) {
+        return false;
+    }
+    std::set<double> lookAtKeys;
+    if (lookAtAttr && lookAtAttr.HasAuthoredValueOpinion()) {
+        if (lookAtAttr.GetTypeName() != pxr::SdfValueTypeNames->Point3f ||
+            pxr::UsdGeomGetStageUpAxis(stage) != pxr::TfToken("Y") ||
+            pxr::UsdGeomGetStageMetersPerUnit(stage) != 1.0 ||
+            !std::isfinite(stage->GetTimeCodesPerSecond()) ||
+            !(stage->GetTimeCodesPerSecond() > 0.0)) {
+            *error = "look-at input requires point3f, Y-up, metre units and a finite positive "
+                     "time-code rate: " +
+                     lookAtAttr.GetPath().GetString();
+            return false;
+        }
+        std::vector<double> keys;
+        lookAtAttr.GetTimeSamples(&keys);
+        lookAtKeys.insert(keys.begin(), keys.end());
+        timeCodes.insert(keys.begin(), keys.end());
+    }
+
+    if (timeCodes.empty()) {
         // A stage with no time sample still has default values; that is one
         // pose, at an instant the stage chose rather than one the clip stated,
         // which is what the warning says.
@@ -463,18 +512,16 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
         std::vector<double> times;
         scalesAttr.GetTimeSamples(&times);
         at.insert(at.end(), times.begin(), times.end());
-        for (const pxr::UsdTimeCode when : at)
-        {
+        for (const pxr::UsdTimeCode when : at) {
             pxr::VtVec3hArray scales;
-            if (!scalesAttr.Get(&scales, when))
-            {
+            if (!scalesAttr.Get(&scales, when)) {
                 continue;
             }
-            const auto nonUnit = std::find_if(scales.begin(), scales.end(),
-                                              [](const pxr::GfVec3h& scale)
-                                              { return scale != pxr::GfVec3h(1.0f); });
-            if (nonUnit == scales.end())
-            {
+            const auto nonUnit =
+                std::find_if(scales.begin(), scales.end(), [](const pxr::GfVec3h& scale) {
+                    return scale != pxr::GfVec3h(1.0f);
+                });
+            if (nonUnit == scales.end()) {
                 continue;
             }
             const auto index = static_cast<std::size_t>(nonUnit - scales.begin());
@@ -498,26 +545,22 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     sample.jointTokens = jointTokens;
     sample.hasTimeCode = true;
     sample.timeCodesPerSecond = read->timeCodesPerSecond;
-    for (const double timeCode : timeCodes)
-    {
+    for (const double timeCode : timeCodes) {
         sample.timeCode = timeCode;
 
         pxr::VtQuatfArray rotations;
         sample.rotations.clear();
-        if (rotationsAttr.Get(&rotations, timeCode))
-        {
+        if (rotationsAttr.Get(&rotations, timeCode)) {
             sample.rotations.assign(rotations.begin(), rotations.end());
         }
         pxr::VtVec3fArray translations;
         sample.translations.clear();
-        if (translationsAttr.Get(&translations, timeCode))
-        {
+        if (translationsAttr.Get(&translations, timeCode)) {
             sample.translations.assign(translations.begin(), translations.end());
         }
 
         std::optional<MotionPose> pose = PoseFromStageSample(sample);
-        if (!pose)
-        {
+        if (!pose) {
             // Unreachable: the rate was made positive above. Stated rather
             // than assumed, because the only alternative is a pose with an
             // invented second.
@@ -525,19 +568,38 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
             return false;
         }
 
-        for (const StageChannel& channel : channels)
-        {
-            if (!channel.keys.empty() && channel.keys.count(timeCode) == 0)
-            {
+        for (const StageChannel& channel : channels) {
+            if (!channel.keys.empty() && channel.keys.count(timeCode) == 0) {
                 continue;
             }
             float value = 0.0f;
             // Carried verbatim, out-of-range values included: clamping is what
             // a consumer applying a channel to a rig does, and this is the
             // read.
-            if (channel.value.Get(&value, timeCode))
-            {
+            const pxr::UsdTimeCode at =
+                channel.keys.empty() ? pxr::UsdTimeCode::Default() : pxr::UsdTimeCode(timeCode);
+            if (channel.value.Get(&value, at)) {
+                if (!std::isfinite(value)) {
+                    *error = "channel value is not finite: " + channel.value.GetPath().GetString();
+                    return false;
+                }
                 pose->channels.Set(channel.name, value);
+            }
+        }
+
+        if (lookAtAttr && (lookAtKeys.empty() || lookAtKeys.count(timeCode) != 0)) {
+            pxr::GfVec3f target;
+            const pxr::UsdTimeCode at =
+                lookAtKeys.empty() ? pxr::UsdTimeCode::Default() : pxr::UsdTimeCode(timeCode);
+            if (lookAtAttr.Get(&target, at)) {
+                for (int axis = 0; axis < 3; ++axis) {
+                    if (!std::isfinite(target[axis])) {
+                        *error =
+                            "look-at target is not finite: " + lookAtAttr.GetPath().GetString();
+                        return false;
+                    }
+                }
+                pose->lookAtTarget = target;
             }
         }
 
@@ -557,8 +619,8 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
             : read->timeCodesPerSecond;
     read->clip.source.kind = MotionSourceKind::Clip;
     read->clip.source.provider = read->metadata.sourceProvider;
-    read->clip.source.sourceId = stage->GetRootLayer() ? stage->GetRootLayer()->GetIdentifier()
-                                                       : std::string();
+    read->clip.source.sourceId =
+        stage->GetRootLayer() ? stage->GetRootLayer()->GetIdentifier() : std::string();
     return true;
 }
 
@@ -566,10 +628,16 @@ bool
 OpenMotionStage(const std::string& path, const std::string& skeletonPath, MotionStageRead* read,
                 std::string* error)
 {
+    return OpenMotionStage(path, skeletonPath, MotionStageReadOptions{}, read, error);
+}
+
+bool
+OpenMotionStage(const std::string& path, const std::string& skeletonPath,
+                const MotionStageReadOptions& options, MotionStageRead* read, std::string* error)
+{
     const pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(path);
-    if (stage)
-    {
-        return ReadMotionStage(stage, skeletonPath, read, error);
+    if (stage) {
+        return ReadMotionStage(stage, skeletonPath, options, read, error);
     }
 
     // Asked only after `Open` refused, never before it: a path the resolver
@@ -580,16 +648,11 @@ OpenMotionStage(const std::string& path, const std::string& skeletonPath, Motion
     // "There" means a regular file, not any path: a directory exists and is
     // still not a layer, and letting it through would report a missing file
     // format for a mistyped argument. Symlinks are followed.
-    if (pxr::TfIsDir(path, /* resolveSymlinks = */ true))
-    {
+    if (pxr::TfIsDir(path, /* resolveSymlinks = */ true)) {
         *error = path + " is a directory, not a motion stage";
-    }
-    else if (!pxr::TfIsFile(path, /* resolveSymlinks = */ true))
-    {
+    } else if (!pxr::TfIsFile(path, /* resolveSymlinks = */ true)) {
         *error = "no file at " + path;
-    }
-    else
-    {
+    } else {
         // The file is there and OpenUSD would not open it, which splits two
         // ways this library cannot tell apart: it is not a layer, or its
         // format needs a plugin that is not registered. Asking the format

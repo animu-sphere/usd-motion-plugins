@@ -291,8 +291,7 @@ TestAbsenceIsAuthoredAsAbsence()
 }
 
 // A channel is a prim under /Animation/Channels, keyed by its name attribute
-// and not by its path (USD_MAPPING.md §4.3). What the mapping still cannot
-// hold -- a look-at target -- is reported rather than dropped in silence.
+// and not by its path (USD_MAPPING.md §4.3). Gaze is a separate point input.
 void
 TestChannelsAreAuthoredUnderTheirSemantics()
 {
@@ -304,7 +303,7 @@ TestChannelsAreAuthoredUnderTheirSemantics()
     MotionStageReport report;
     const pxr::UsdStageRefPtr stage = WriteAndOpen(clip, {}, "motionUsd_channels.usda", &report);
     assert(report.channels == std::vector<std::string>({"vrm:blink", "vrm:smile"}));
-    assert(report.unauthoredLookAtTargets == 1);
+    assert(report.unauthoredLookAtTargets == 0);
 
     // The prim name is sanitized; the semantic on the attribute is verbatim.
     const pxr::UsdPrim smile = stage->GetPrimAtPath(pxr::SdfPath("/Animation/Channels/vrm_smile"));

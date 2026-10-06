@@ -30,8 +30,7 @@
 #include <string>
 #include <vector>
 
-namespace openstrata::motion
-{
+namespace openstrata::motion {
 
 // What a skeleton prim states, as plain values.
 //
@@ -42,8 +41,7 @@ namespace openstrata::motion
 // `BuildSourceRestPose` takes after it, so a caller that wants either hands
 // this over unchanged and a caller that wants neither does not link a
 // retargeter to read a stage.
-struct MotionStageSkeleton
-{
+struct MotionStageSkeleton {
     // The skeleton prim the clip was read against.
     std::string path;
 
@@ -66,8 +64,7 @@ struct MotionStageSkeleton
 // `UsdSkel` over the same joint tokens and carries none of this. An absent
 // `contractVersion` says the stage did not claim this mapping, which is a fact
 // about the stage and not a defect in it.
-struct MotionStageMetadata
-{
+struct MotionStageMetadata {
     std::optional<int> contractVersion;
     std::optional<int> jointVocabularyVersion;
     std::string sourceFormat;
@@ -86,8 +83,7 @@ struct MotionStageMetadata
 };
 
 // What a read produced.
-struct MotionStageRead
-{
+struct MotionStageRead {
     MotionClip clip;
     MotionStageSkeleton skeleton;
 
@@ -113,8 +109,7 @@ struct MotionStageRead
 // `rotations` and `translations` are already resolved **at** `timeCode`. This
 // converts and interpolates nothing: a stage reader resolves a time sample and
 // an OpenExec node is handed one, and both then apply the same rule.
-struct MotionStageSample
-{
+struct MotionStageSample {
     // `UsdSkelAnimation`'s `joints`, in the order the clip authored them.
     std::vector<std::string> jointTokens;
 
@@ -133,6 +128,28 @@ struct MotionStageSample
     // The rate that turns `timeCode` into the seconds `MotionPose::timestamp`
     // is expressed in.
     double timeCodesPerSecond = 0.0;
+};
+
+// Explicit format-owner projection. Both paths are absolute attribute paths;
+// identity is read from the authored default string/token name, never a prim
+// path. The owner chooses the namespace prefix (for example "vrm:").
+struct MotionStageChannelInput {
+    std::string nameAttributePath;
+    std::string valueAttributePath;
+    std::string channelPrefix;
+};
+
+struct MotionStageReadOptions {
+    // Additional scalar inputs selected by their owner. Defaults apply to
+    // every pose; keyed values contribute only at their exact authored keys.
+    // Missing/blocked values remain absent; finite weights are not clamped.
+    std::vector<MotionStageChannelInput> channels;
+
+    // An optional owner-selected point3f, in the same canonical clip space as
+    // root.worldPosition. Empty selects motion:lookAtTarget on the bound
+    // animation. Selecting another attribute explicitly replaces that input.
+    // No placement or source-rig look-at offset is applied by the reader.
+    std::string lookAtTargetAttributePath;
 };
 
 // The pose `sample` states, or nullopt when it cannot be stamped.
@@ -170,9 +187,9 @@ MOTIONUSD_API std::optional<MotionPose> PoseFromStageSample(const MotionStageSam
 // animation is the skeleton's `skel:animationSource`, or the stage's one
 // `UsdSkelAnimation` when the skeleton binds none.
 //
-// The samples are the union of the key times of `rotations`, `translations`
-// and every channel — a channel keys into the instants the poses already exist
-// at, so a weight that moves between two body keys has somewhere to say so. A
+// The samples are the union of the key times of `rotations`, `translations`,
+// every channel and `motion:lookAtTarget`. An input between two body keys
+// contributes its own pose instant, preserving the source's key timing. A
 // clip that states no time sample at all is one pose at the stage's start time
 // code, and says so in `warnings`.
 //
@@ -183,6 +200,15 @@ MOTIONUSD_API std::optional<MotionPose> PoseFromStageSample(const MotionStageSam
 MOTIONUSD_API bool ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
                                    MotionStageRead* read, std::string* error);
 
+// As above, with explicit format-owner inputs. The union also includes gaze
+// and projected scalar keys. Malformed selected inputs (types, names,
+// duplicates, nonfinite values) are refused. Authored gaze requires Y-up,
+// metre units and a finite positive time-code rate. Placement remains in the
+// scene: the host must explicitly convert clip points to runtime-world points.
+MOTIONUSD_API bool ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
+                                   const MotionStageReadOptions& options, MotionStageRead* read,
+                                   std::string* error);
+
 // `ReadMotionStage` over the layer at `path`, opened through OpenUSD.
 //
 // A path that did not open is reported as what is wrong with it — not a file,
@@ -191,5 +217,9 @@ MOTIONUSD_API bool ReadMotionStage(const pxr::UsdStagePtr& stage, const std::str
 // typing.
 MOTIONUSD_API bool OpenMotionStage(const std::string& path, const std::string& skeletonPath,
                                    MotionStageRead* read, std::string* error);
+
+MOTIONUSD_API bool OpenMotionStage(const std::string& path, const std::string& skeletonPath,
+                                   const MotionStageReadOptions& options, MotionStageRead* read,
+                                   std::string* error);
 
 } // namespace openstrata::motion

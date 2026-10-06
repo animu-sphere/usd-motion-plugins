@@ -21,7 +21,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 | --- | --- |
 | `motionUsd/MotionStage.h` | `MotionStageContractVersion`, `MotionStageTimeCodesPerSecond` — what both halves state about the stage |
 | `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions` (with a producer's `MotionStageRest` and provenance), `MotionStageReport` |
-| `motionUsd/ClipReader.h` | `ReadMotionStage` (from a stage a caller holds), `OpenMotionStage` (from a file), `PoseFromStageSample` (values only, no stage), `MotionStageRead` with its `MotionStageSkeleton` and `MotionStageMetadata` |
+| `motionUsd/ClipReader.h` | `ReadMotionStage` (from a stage a caller holds), `OpenMotionStage` (from a file), `MotionStageReadOptions` (explicit owner-selected scalar/gaze inputs), `PoseFromStageSample` (joint values only, no stage), `MotionStageRead` with its `MotionStageSkeleton` and `MotionStageMetadata` |
 | `motionUsd/SkeletonAnimationWriter.h` | `AuthorSkeletonAnimation`, `SkeletonAnimationSample`: target-local arrays into a new animation and a skeleton binding override |
 | `motionUsd/SkeletonReader.h` | `ReadSkeleton`: strict default-time owned metre rest/parent/rigid-placement values; `ReadCanonicalMotionStage`: the existing clip read with authored rest and canonical source-space checks; owner code/subject/detail refusals |
 
@@ -59,11 +59,20 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
   reader keys on `motion:channelName` and never on the path (USD §4.3). A
   channel is read back only where the stage keyed it, because USD holds the
   last key forward and a held value is not one the producer reported.
-- **What the mapping still cannot hold is reported.** A look-at target has no
-  place in it, so `MotionStageReport` counts the samples that carried one
-  rather than dropping them in silence.
+- **Gaze preserves presence.** `Body.motion:lookAtTarget` carries canonical
+  clip-space points only at reported keys, including origin targets.
+  `MotionStageReport::unauthoredLookAtTargets` is zero on successful writes.
 
 ## Rules the reader keeps
+
+- **Supplementary input is explicit.** Common gaze joins the body/channel
+  time union, with exact-key presence or a default applying to every pose.
+  `MotionStageReadOptions` lets a format owner select scalar name/value and
+  gaze attribute paths. Names come from authored string/token values, weights
+  remain unclamped, and the host explicitly places gaze in runtime-world space.
+  Native format fields are not automatically discovered. See
+  [USD §4.4–§4.5](../../docs/design/USD_MAPPING.md#44-gaze-points) for space,
+  unsupported intake, error and owner boundaries.
 
 - **A semantic skeleton reads; any other is a retarget.** A skeleton no joint
   token of which names the vocabulary is refused, not guessed at (USD §7).

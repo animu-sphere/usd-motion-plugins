@@ -168,6 +168,101 @@ not a value" (MOTION_CONTRACT.md §6) would not survive one trip through a
 stage. A channel stated once, without time samples, applies to every sample:
 that is what stating it once means.
 
+### 4.4 Gaze points
+
+Implemented locally, unreleased, 2026-10-07 (issue #37): the bound body
+animation may carry a custom `point3f motion:lookAtTarget`. It is a target
+**point**, in the same canonical clip space as `MotionPose::root.worldPosition`:
+right-handed, Y-up, forward +Z, metres. It is not head-local, a direction, or
+an already placed runtime-world point. A nonidentity skeleton/scene placement
+does not change the values returned by `ReadMotionStage`.
+
+`AuthorMotionStage` keys the attribute only where a sample reports a target;
+an origin target is present, and a missing target authors no key. With no
+targets the attribute is absent. Present nonfinite points are refused before
+any authoring. `MotionStageReport::unauthoredLookAtTargets` remains for source
+compatibility and is zero on successful writes. This optional property does
+not bump the mapping's contract version (§8).
+
+Reading uses the union of body, channel and gaze key times. As with channels,
+a keyed point appears only at its exact authored keys; USD interpolation or
+holding must not turn an unreported point into an observation. An authored
+default with no keys applies at every resulting pose. If both a default and
+keys exist, numeric-time input uses only the keys. Declared-only, missing and
+blocked values remain absent; none becomes an origin point. A stage with only
+defaults yields one pose at its start time code. Sample seconds are the source
+time code divided by its stage rate, never forced to the writer's rate of 30.
+Writing the resulting clip encodes those observed poses as keys; the clip does
+not retain whether a constant originally came from a USD default.
+
+Authored gaze is refused unless it is `point3f` on a Y-up metre stage with a
+finite positive rate. The reader does not infer a forward basis or convert a
+noncanonical input: the format owner must supply canonical clip coordinates.
+Finite scalar weights are carried without clamping; nonfinite scalar or point
+values are refused rather than reported as an absent field.
+
+The host selects the source clip placement and time explicitly and transforms
+the point with that placement into runtime-world space **once**, alongside the
+body's placement. In a Y-up metre USD scene whose skeleton xform expresses that
+placement, `UsdGeomXformCache(timeCode).GetLocalToWorldTransform(skeletonPrim)
+.Transform(GfVec3d(target))` provides that scene-space point. A host using a
+different runtime-world basis/units converts that scene result explicitly. It
+must not apply the animated hips transform again: the point and root position
+already share clip space. Retarget body scaling does not imply scaling gaze;
+the host must choose that policy. The source LookAt offset and the avatar's
+LookAt configuration remain with the format owner.
+
+### 4.5 Explicit format-owner input projection
+
+The overloads of `ReadMotionStage` and `OpenMotionStage` accepting
+`MotionStageReadOptions` are the callable handoff. The format owner selects
+each scalar's absolute name/value attribute paths and a semantic prefix,
+and optionally selects a gaze attribute path. The generic reader handles
+the common time union and absence rules; it discovers no format-specific
+prim or attribute and links no avatar schemas or evaluators. No source stage
+is rewritten. A selected gaze path explicitly replaces the common animation
+gaze input, avoiding implicit precedence between two sources.
+
+For the existing `usd-vrm-plugins` native VRMA layout, an owner adapter
+enumerates **only the selected clip's** expression prims and supplies:
+
+```cpp
+MotionStageReadOptions inputs;
+// Repeat for each expression prim selected by the VRMA owner.
+inputs.channels.push_back({
+    "/Animation/Expressions/<selected>.vrm:expressionName",
+    "/Animation/Expressions/<selected>.vrm:expressionWeight", "vrm:"});
+inputs.lookAtTargetAttributePath = "/Animation/LookAt.vrm:lookAtTarget";
+ReadMotionStage(stage, selectedSkeletonPath, inputs, &read, &error);
+```
+
+`<selected>` means an actual owner-selected prim name, not an expression
+identity. Identity comes from the authored constant string/token name,
+verbatim, with the explicitly chosen prefix. For example `custom.face` becomes
+`vrm:custom.face`, regardless of the sanitized prim path. Explicit zero,
+unclamped finite weights and keyed/default/absent inputs keep their meanings.
+Missing name for an authored value, animated/empty names, wrong value types,
+invalid paths and duplicate projected identities (including collision with a
+common channel) are errors. Avatar aliases, channel arbitration, preset/custom
+classification and source LookAt offsets are not projected by this API.
+
+**Supported intake is explicit.** Without these options, the common reader
+reads only common scalar/gaze properties and body data. An absent common
+field says nothing about native VRMA expression/gaze availability. Missing or
+unreported **selected** native fields are absent input; unselected native
+fields are unavailable to that read, not evidence that the file omits them.
+The owner adapter must expose its selected/supported fields to the host.
+Automated VRMA discovery and runtime adapter adoption remain in their owners;
+this extension supplies the tested handoff, not their deployment. Splines and
+noncanonical point encodings require an owner conversion. `PoseFromStageSample`
+and existing OpenExec body-sampling nodes still accept only joint arrays;
+hosts using them must route supplementary inputs separately.
+
+Constructed-stage coverage is `motionUsd_inputs`; the installed-consumer lane
+also exercises the common round trip and the explicit VRMA-style handoff.
+These tests use no native/private asset and claim no native importer or runtime
+conformance from a synthetic probe.
+
 ## 5. Metadata
 
 `/Animation.customData.motion` (a dictionary; USD expands colon-separated keys

@@ -9,12 +9,15 @@
 #include "motionUsd/SkeletonReader.h"
 #include "motionCore/Validation.h"
 #include "motionRetarget/Validation.h"
+#include "motion_inputs.h"
 
 #include <cstdio>
 
 int
 main()
 {
+    if (!CheckMotionInputs())
+        return 6;
     // Exercise the new installed header and symbol, including its null-stage
     // refusal, so merely adding a header without shipping the implementation
     // cannot pass the installed-consumer gate.
