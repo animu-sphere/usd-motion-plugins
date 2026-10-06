@@ -26,7 +26,8 @@ add_library(motionRetarget STATIC
     src/RestPose.cpp
     src/RetargetMap.cpp
     src/RootMotionPolicy.cpp
-    src/SkeletonDescriptor.cpp)
+    src/SkeletonDescriptor.cpp
+    src/Validation.cpp)
 add_library(motionRetarget::motionRetarget ALIAS motionRetarget)
 set_target_properties(motionRetarget PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

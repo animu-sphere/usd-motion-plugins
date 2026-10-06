@@ -1,9 +1,8 @@
 # Diagnostics
 
-The catalog of diagnostic codes this repository raises. Status (2026-09-19):
-the eleven `MOTION_BVH_*` codes, which arrived with `motionBvh`, and the eight
-`MOTION_RETARGET_*` codes, which arrived with `motionRetarget`. A code is added
-here in the change that first raises it.
+The catalog of diagnostic codes this repository raises. Status (2026-10-06):
+eleven `MOTION_BVH_*`, eight `MOTION_RETARGET_*`, and sixteen
+`MOTION_VALIDATION_*` codes. A code is added here in the change that first raises it.
 
 ## 1. The record
 
@@ -68,6 +67,40 @@ partial rig is legal and useful.
 | `MOTION_RETARGET_NON_UNIT_SCALE` | warning | yes | a caller reading the clip's `scales` | the clip animates scale, which the retarget does not carry |
 | `MOTION_RETARGET_TIME_RANGE_DERIVED` | info | yes | a caller holding a stage | the clip states no time samples, so the stage chose the time |
 | `MOTION_RETARGET_OUTPUT_COLLIDES_WITH_INPUT` | error | no | a caller writing a file | the output names a layer the retarget read |
+
+### 2.3 Validation
+
+`motionCore/Validation.h` owns `ValidationCode`, `ValidationReport` and the
+stable string table exposed by `ValidationCodeString`. All sixteen codes have
+severity **error** and are **not recoverable**; severity/recoverability are
+fixed by this contract rather than stored per record. `ValidationDiagnostic`
+carries code, subject and detail. Each code/subject appears once in first-raised
+order. Composite reports prefix field subjects; prose is not a stable API.
+
+`motionCore` raises pose/clip errors; `motionRetarget` reuses the primitive
+checks for rest values and raises skeleton/configuration errors. Retarget
+warnings remain in the existing §2.2 catalog and `RetargetValidationReport`'s
+separate `diagnostics` list. A missing required bone or unavailable root joint
+does not become a malformed-input error.
+
+| Code | Meaning |
+| --- | --- |
+| `MOTION_VALIDATION_NON_FINITE_VALUE` | a present scalar/vector, clip metadata or adjacent timestamp difference is not finite |
+| `MOTION_VALIDATION_INVALID_QUATERNION` | a present quaternion is zero or has a non-finite component |
+| `MOTION_VALIDATION_NON_UNIT_QUATERNION` | a quaternion violates the explicitly selected unit policy |
+| `MOTION_VALIDATION_TIMESTAMP_ORDER` | clip sample times violate the selected non-decreasing or strictly increasing policy |
+| `MOTION_VALIDATION_EMPTY_CHANNEL_NAME` | a channel names nothing |
+| `MOTION_VALIDATION_CHANNEL_ORDER` | channel names are not sorted |
+| `MOTION_VALIDATION_DUPLICATE_CHANNEL` | a channel name is repeated |
+| `MOTION_VALIDATION_CONFIDENCE_RANGE` | a confidence value is not finite or outside `[0,1]` |
+| `MOTION_VALIDATION_INVALID_ENUM` | a value or validation option is outside its vocabulary |
+| `MOTION_VALIDATION_INVALID_PARENT` | a parent is outside its hierarchy and is not its no-parent sentinel |
+| `MOTION_VALIDATION_HIERARCHY_CYCLE` | a joint participates in a parent cycle |
+| `MOTION_VALIDATION_HIERARCHY_ORDER` | a skeleton's parent does not precede its child |
+| `MOTION_VALIDATION_EMPTY_JOINT_TOKEN` | a skeleton joint names nothing |
+| `MOTION_VALIDATION_DUPLICATE_JOINT_TOKEN` | a skeleton joint token is repeated |
+| `MOTION_VALIDATION_INVALID_JOINT_INDEX` | a map's target index is outside the supplied skeleton |
+| `MOTION_VALIDATION_TARGET_REST_SIZE` | a target reference rest has more slots than the skeleton |
 
 ## 3. Open questions
 

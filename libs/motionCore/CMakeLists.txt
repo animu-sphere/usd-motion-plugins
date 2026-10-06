@@ -19,7 +19,8 @@ usdmotion_require_openusd()
 add_library(motionCore STATIC
     src/BasisConversion.cpp
     src/Compare.cpp
-    src/MotionPose.cpp)
+    src/MotionPose.cpp
+    src/Validation.cpp)
 add_library(motionCore::motionCore ALIAS motionCore)
 set_target_properties(motionCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

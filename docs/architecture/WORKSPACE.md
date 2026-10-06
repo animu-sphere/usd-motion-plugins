@@ -156,6 +156,13 @@ CI checks have landed.
 
 ### 2.5 Runtime boundary target
 
+`motionCore/Validation.h` now owns read-only pose/clip reports and primitive
+checks; `motionRetarget/Validation.h` owns rest, skeleton and configuration
+reports using those checks and the existing rig diagnostics. They add no
+library edge or stage dependency. Their installed public contract and mutable
+validation boundary are in
+[MOTION §14](../design/MOTION_CONTRACT.md#14-generic-validation-ownership).
+
 The accepted [motion/runtime ownership policy](../design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary)
 requires `motionUsd` to return motion-domain skeleton/rest values as well as
 clips. The current §2.1 graph and §1 identities remain the implemented graph;

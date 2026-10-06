@@ -4,8 +4,12 @@ add_executable(motionRetarget_tests test_motion_retarget.cpp)
 target_link_libraries(motionRetarget_tests PRIVATE motionRetarget::motionRetarget)
 usdmotion_keep_assertions(motionRetarget_tests)
 add_test(NAME motionRetarget_unit COMMAND motionRetarget_tests)
+add_executable(motionRetarget_validation_tests test_validation.cpp)
+target_link_libraries(motionRetarget_validation_tests PRIVATE motionRetarget::motionRetarget)
+usdmotion_keep_assertions(motionRetarget_validation_tests)
+add_test(NAME motionRetarget_validation COMMAND motionRetarget_validation_tests)
 
-usdmotion_test_windows_path(TESTS motionRetarget_unit
+usdmotion_test_windows_path(TESTS motionRetarget_unit motionRetarget_validation
     TARGETS motionRetarget OPENUSD gf)
 
 if(USDMOTION_TEST_PYTHON)
