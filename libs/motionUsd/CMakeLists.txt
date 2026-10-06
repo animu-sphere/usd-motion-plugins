@@ -21,6 +21,7 @@ usdmotion_require_dependency(motionCore)
 
 add_library(motionUsd STATIC
     src/ClipReader.cpp
+    src/SkeletonReader.cpp
     src/ClipWriter.cpp
     src/SkeletonAnimationWriter.cpp)
 add_library(motionUsd::motionUsd ALIAS motionUsd)

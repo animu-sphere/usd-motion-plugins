@@ -23,6 +23,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 | `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions` (with a producer's `MotionStageRest` and provenance), `MotionStageReport` |
 | `motionUsd/ClipReader.h` | `ReadMotionStage` (from a stage a caller holds), `OpenMotionStage` (from a file), `PoseFromStageSample` (values only, no stage), `MotionStageRead` with its `MotionStageSkeleton` and `MotionStageMetadata` |
 | `motionUsd/SkeletonAnimationWriter.h` | `AuthorSkeletonAnimation`, `SkeletonAnimationSample`: target-local arrays into a new animation and a skeleton binding override |
+| `motionUsd/SkeletonReader.h` | `ReadSkeleton`: strict default-time owned metre rest/parent/rigid-placement values; `ReadCanonicalMotionStage`: the existing clip read with authored rest and canonical source-space checks; owner code/subject/detail refusals |
 
 ```text
 /Animation            Scope, the default prim; customData.motion, customData.source
@@ -81,6 +82,24 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 - **A warning is not a refusal.** A stage that states no rest transforms, two
   rates that disagree, a contract version from the future or a channel twice
   is read, and says so.
+
+The additive strict readers are a scoped consolidation boundary, not a change
+to permissive `ReadMotionStage`. `ReadSkeleton` selects an absolute prim path,
+requires Y-up/authored parent-local rest and returns owned `MotionStageSkeleton`
+arrays, parent indices and separate rigid world placement. It validates unique
+relative joint paths/topology, finite positive float-representable TRS, shear,
+reflection and bounded affine residuals, converts rest/placement translations
+to metres and leaves stage content untouched. `ReadCanonicalMotionStage` adds
+metre units, identity placement and finite positive encoding rate before calling
+the existing clip reader; metadata and warnings are preserved. Refusals leave
+the destination unchanged and retain a motion-owned code/subject/detail.
+
+Callers invoke the existing `motionRetarget` descriptor/source-rest builders on
+the returned arrays. Returning those typed results directly still needs WS-O4;
+the current extension keeps the declared `motionUsd` → `motionCore` dependency.
+`motionUsd_skeletonReader` covers numeric/profile/ownership/refusal behavior,
+and `motionUsd_boundaries` keeps the library graph unchanged. Installed runtime
+adapters supply separate invocation/mapping/lifetime evidence.
 
 ## Rules the target animation writer keeps
 
