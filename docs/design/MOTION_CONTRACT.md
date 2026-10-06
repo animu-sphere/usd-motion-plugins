@@ -363,6 +363,46 @@ connector's frame buffer and this intake have separate responsibilities. The
 first VMC connector-to-intake test exercises this boundary, so no additional
 `MotionStream` class or callback interface is required.
 
+### 9.1 Canonical intake and acquisition envelopes
+
+**Accepted boundary refinement, 2026-10-06.** The installed public signature is
+`bool LiveCaptureSource::Push(const MotionPose&)`. This consumes canonical
+motion only; it must never accept a connector-owned `MotionFrame` or
+`IMotionConnector`. The connector owns those acquisition contracts
+([CONNECTOR_CONTRACT.md](https://github.com/animu-sphere/motion-connectors/blob/main/docs/design/CONNECTOR_CONTRACT.md));
+this document does not redefine their fields or states.
+
+A consumer adapter, preferably in `usd-avatar-runtime`, routes each actor's
+pose and maps selected observations to motion-owned input values. Connection
+and session state, endpoints and protocol evidence stay outside the intake.
+The connector's bounded frame queue buffers acquisition; `PoseBuffer` and
+`LiveCaptureSource` buffer canonical motion under the rules above.
+
+Additional timestamp/status/value metadata is an accepted design direction,
+with its exact shape open as MC-O7. For example, a future overload could be:
+
+```cpp
+// Candidate only; MotionSampleInfo is not an installed type.
+LiveCaptureSource::Push(MotionPose pose, MotionSampleInfo info);
+```
+
+Alternatively a motion-owned `MotionSample`, `MotionStreamInput` or
+`MotionInputFrame` could group those values. These alternatives must preserve
+the current pose's timestamps, sequence/provenance and existing intake rules;
+they must not copy the connector envelope or imply an overload exists today.
+Reuse the present API where sufficient.
+
+The connector observes source restart, receive time and source/connection
+state. Runtime policy selects alignment/reset behavior; motion APIs apply the
+generic effect to history and temporal processing. MC-O7 must distinguish
+restart/discontinuity/missing/stale input state from `PoseSampleStatus`, which
+describes a sampling result (§8), and from the existing stale-timestamp
+rejection counter (§9). `motionSampling` does not interpret a source-specific
+clock. MC-O6's joint tracking-loss question remains separate.
+
+Implementation and consumer parity gates are in
+[Connector Boundary Phases A-B](../roadmap/connector-boundary.md).
+
 ## 10. Recording and the trace format
 
 `MotionRecorder` turns a stream into a clip and carries the per-tick status
@@ -388,6 +428,15 @@ It must not implement a second recording algorithm or trace contract. The
 remaining API and adapter work is
 [Runtime Boundary Phase 4](../roadmap/runtime-boundary.md#runtime-boundary-phase-4--recording).
 
+### 10.2 Semantic recording versus raw capture
+
+`motionRecording` is the canonical owner of live semantic intake, recording,
+`motion-capture-trace`, semantic replay and `MotionClip` construction. The
+trace stores canonical motion and its value metadata, not UDP datagrams, OSC
+messages, WebSocket traffic or connection/session evidence. Packet capture
+and protocol replay belong to `motion-connectors`; any consumer turns their
+decoded output into canonical values before invoking motion recording.
+
 ## 11. Producers, and where each one stops
 
 Every producer terminates at `MotionPose` / `MotionClip`, and nothing
@@ -397,7 +446,7 @@ downstream knows which one it was.
 | --- | --- | --- |
 | a recorded file (BVH) | `MotionClip` | the **path rule**: a mapped joint's local rotation is the composition of the source rotations from just below its nearest mapped ancestor down to itself, root-first — joints in between are on the path, not dropped. The same walk builds the rest pose, from the profile's `rest-offsets`, `stated-rest-rotations` or `first-frame` (a first-frame rest is taken from the first frame entirely). |
 | a live pose sender (`motion-connectors`) | `MotionPose` pushed into a stream | decode and conversion |
-| a tracker source (`motion-connectors`) | its own observation type, then a solve that produces a sparse `MotionPose` | **a tracker observation is not a pose** and gets no type here; a hips tracker follows §5.3 |
+| a tracker source (`motion-connectors`) | its own observation type, then a solve that produces a sparse `MotionPose` | **a tracker observation is not a pose**; the current placement and conditional generic solve evaluation are in §11.1; a hips tracker follows §5.3 |
 | a generator | `MotionClip` or a pose stream, behind a generator interface | — (design policy §35, "Later") |
 | a format repository (`usd-vrm-plugins`, `usd-mmd-plugins`) | `MotionClip` of **body** motion | evaluating its own control rig first when it has one — MMD's IK and append transforms (design policy §42.4) |
 
@@ -413,11 +462,22 @@ the comparison and the OpenExec nodes. A tracker sample here would have no
 reader and three standing obligations: equality, comparison and a place in the
 trace format (§10). **`motionCore` begins at the canonical pose.**
 
-The observation type, the region vocabulary, the operator's assignment and the
-solve belong together in `motion-connectors`' tracking library, which depends
-on this repository and never the reverse. A solve inside an adapter would be a
+For now the observation type, region vocabulary, operator assignment and solve
+remain together in `motion-connectors`' tracking library, which depends on this
+repository and never the reverse. A solve inside a runtime adapter would be a
 second motion pipeline. A tracker-driven pose is an ordinary `MotionPose`,
 sparse by construction, and its hips follow §5.3, not a second rule.
+
+**Accepted evaluation direction, 2026-10-06 (MC-O8).** Tracker assignment,
+generic body solve, pose reconstruction and confidence fusion may move here
+only if they can be specified without device/source names, reused across
+OpenXR, VRChat OSC and optical mocap, and established as generic motion
+processing. `TrackerObservation` stays connector-owned. A positive decision
+must define a motion-owned input value, its component placement, validation,
+comparison and recording implications, plus parity evidence, before moving
+code. It never creates a dependency on the connector observation type.
+This is [Connector Boundary Phase C](../roadmap/connector-boundary.md#connector-boundary-phase-c--generic-tracker-solve-evaluation),
+not a claim that a generic tracker solver is implemented here.
 
 ## 12. Constraints
 
@@ -437,6 +497,8 @@ narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 | MC-O3 | Root motion for producers with two translation channels (VMC root position vs hips offset) | one recorded session from each of two VMC senders — operator work in `motion-connectors` |
 | MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |
+| MC-O7 | Motion-owned intake metadata for restart, discontinuity, missing/stale state and explicit time/status values; preserve the current pose API and distinguish input state from sampling status (§9.1) | Connector Boundary Phases A-B, before extending intake |
+| MC-O8 | Whether tracker assignment/body solve/reconstruction/confidence fusion meet the source-independent migration conditions, and which motion-owned input contract/component would host them (§11.1) | Connector Boundary Phase C; a decision to retain current placement is valid |
 
 ## 14. Generic validation ownership
 

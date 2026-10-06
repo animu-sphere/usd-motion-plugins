@@ -46,6 +46,11 @@ Inputs arrive already acquired or decoded. Format-specific adapters remain in
 their owning repositories; generic motion containers are converted to the
 canonical model before downstream processing.
 
+Live intake accepts motion-owned canonical values. An external adapter,
+preferably in `usd-avatar-runtime`, routes connector acquisition envelopes
+into that intake; motion libraries never depend on connector types or
+packages. See the [boundary policy](docs/design/DESIGN_POLICY.md#44-motion-and-connector-boundary).
+
 ## Components
 
 | Component | Responsibility |
@@ -70,6 +75,7 @@ Identities and dependency directions:
 | [What is implemented](docs/reference/CAPABILITY_MATRIX.md) | The capability matrix, the only source for implementation status |
 | [Incomplete work](docs/roadmap/current.md) | What remains, and the open decisions |
 | [Runtime boundary consolidation](docs/roadmap/runtime-boundary.md) | Validation, skeleton/stage reading, recording and API migration |
+| [Connector boundary consolidation](docs/roadmap/connector-boundary.md) | Canonical intake, live bridge consumption, tracker solve evaluation and dependency gates |
 | [Release history](CHANGELOG.md) | The changelog, and the per-version [release records](docs/releases/) |
 | [docs/](docs/README.md) | Which document owns which subject |
 

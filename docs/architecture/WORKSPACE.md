@@ -65,7 +65,9 @@ workspace discipline (WS-O1, decided 2026-09-19;
 
 | Not here | Where it lives | Why |
 | --- | --- | --- |
-| VMC, mocopi, VRChat OSC, `osc`, `liveTransport`, tracker assignment/solve, actor/source clock normalization | `motion-connectors` | device and protocol connectivity (design policy §3.1) |
+| VMC, mocopi, VRChat OSC, OpenXR, WebXR, MediaPipe, transports, SDK/browser APIs, raw capture, connector sessions/endpoints/diagnostics and actor/source clock normalization | `motion-connectors` | acquisition (design policy §3.1, §44) |
+| `MotionFrame`, `IMotionConnector`, `TrackerObservation` and the current tracker assignment/solve | `motion-connectors` | acquisition envelope; generic solve is conditionally evaluated, not moved (§44.4) |
+| connector-to-motion intake bridge, actor routing and restart/alignment policy selection | external composition, preferably `usd-avatar-runtime` | motion libraries never consume connector types (§44.3) |
 | VRMA reading, the VRM humanoid binding, expressions, look-at, `execVrm` | `usd-vrm-plugins` | VRM semantics (design policy §3.2, §26) |
 | VMD reading, MMD IK and append evaluation, the MMD role table | `usd-mmd-plugins` | MMD semantics (design policy §3.2, §42.4) |
 | physical simulation | `usd-physics-plugins` | simulation (design policy §3.3) |
@@ -111,6 +113,8 @@ uniform timeline resamples before it retargets.
 | --- | --- |
 | any component → `usd-vrm-plugins`, `usd-mmd-plugins`, `motion-connectors`, `usd-avatar-runtime` | the ecosystem's direction is fixed (design policy §19.3, §39) |
 | `motionCore` → OpenUSD stage, Sdf, plug or file-format APIs | a value contract, usable with no stage |
+| `motionCore` → filtering, recording or retarget implementations | the lowest canonical value contract, not a processing layer |
+| any motion API → `MotionFrame`, `IMotionConnector` or `TrackerObservation` | connector-owned types never enter canonical intake (§2.6) |
 | any library → OpenExec | OpenExec is an optional layer above (design policy §21) |
 | any library → a network, device, ML, UI or rendering dependency | design policy §24 |
 | `motionCore`, `motionSampling` → `motionSource`, `motionBvh` | nothing in the core knows a file format exists |
@@ -145,6 +149,11 @@ edge declared in the component's manifest and validated by
 (`motionCore` links no OpenUSD beyond its foundation types); and an include
 scan refusing forbidden headers and product names.
 
+Connector-specific graph/include/link coverage still to add or audit is
+[Connector Boundary Phase D](../roadmap/connector-boundary.md#connector-boundary-phase-d--ci-enforcement).
+The accepted forbidden surface is §2.6; this policy update does not claim new
+CI checks have landed.
+
 ### 2.5 Runtime boundary target
 
 The accepted [motion/runtime ownership policy](../design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary)
@@ -173,6 +182,41 @@ orchestration; it does not create canonical motion structs or a joint
 vocabulary. Tests of that consumption belong to the runtime; correctness
 tests of motion algorithms and USD conversion belong here. The ordered
 acceptance gates are in [runtime-boundary.md](../roadmap/runtime-boundary.md).
+
+### 2.6 Connector boundary target
+
+The accepted [connector boundary policy](../design/DESIGN_POLICY.md#44-motion-and-connector-boundary)
+fixes the dependency direction as `motion-connectors` → installed motion
+packages, never the reverse. `MotionFrame`, `IMotionConnector` and
+`TrackerObservation` remain connector-owned and are never included, linked or
+accepted by motion APIs. The existing intake accepts `MotionPose`; any extended
+sample/input metadata belongs to this repository
+([MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes)).
+No new component identity or library edge is adopted by this documentation
+change.
+
+The connector-to-intake bridge belongs to external composition, preferably
+`usd-avatar-runtime`. It consumes both installed packages, routes actors and
+maps observations to canonical values. Source observation and protocol-clock
+interpretation stay upstream; runtime policy chooses alignment/reset, and
+motion APIs implement generic buffering and processing effects. Neither
+source-specific live wrappers nor connector session management move here.
+
+Dependency gates must inspect component manifests/library graphs, public and
+private includes, and direct/transitive link dependencies for connector
+packages, OpenXR, MediaPipe, OSC, WebSocket implementations, device SDKs,
+browser APIs and network sockets. Provenance strings and documentation naming
+a source are not dependencies; source-name branches in generic processors
+are boundary defects. A core gate must also keep filtering, recording,
+retarget implementations, stage APIs and OpenExec above `motionCore`.
+
+The current graph remains §2.1, including its existing OpenUSD foundation
+types. MC-O7 settles intake metadata; MC-O8 evaluates a possible generic solve.
+Any future solve must consume motion-owned values and first update component
+placement, graph declarations and tests here. `TrackerObservation` is not
+moved as part of that evaluation. The ordered API, bridge-consumption, solve
+evaluation and enforcement gates are in
+[connector-boundary.md](../roadmap/connector-boundary.md).
 
 ## 3. Moving code in
 
