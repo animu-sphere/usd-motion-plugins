@@ -2,6 +2,7 @@
 #pragma once
 #include "motionUsd/ClipReader.h"
 #include "motionUsd/ClipWriter.h"
+#include "motionUsd/SkeletonReader.h"
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
@@ -53,6 +54,12 @@ CheckMotionInputs()
                                 "vrm:"});
     options.lookAtTargetAttributePath = "/Animation/LookAt.vrm:lookAtTarget";
     if (!ReadMotionStage(stage, "", options, &read, &error) || read.clip.samples.size() != 5)
+        return false;
+    MotionStageRead strict;
+    SkeletonReadDiagnostic diagnostic;
+    if (!ReadCanonicalMotionStage(
+            stage, pxr::SdfPath(read.skeleton.path), options, &strict, &diagnostic) ||
+        strict.clip != read.clip || !diagnostic.code.empty())
         return false;
     const auto& samples = read.clip.samples;
     const float* zero = samples[1].channels.Find("vrm:custom.face");

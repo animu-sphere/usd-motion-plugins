@@ -215,7 +215,9 @@ LookAt configuration remain with the format owner.
 ### 4.5 Explicit format-owner input projection
 
 The overloads of `ReadMotionStage` and `OpenMotionStage` accepting
-`MotionStageReadOptions` are the callable handoff. The format owner selects
+`MotionStageReadOptions` are the callable handoff. `ReadCanonicalMotionStage`
+accepts the same options when the strict authored-rest/identity-placement
+source profile is required. The format owner selects
 each scalar's absolute name/value attribute paths and a semantic prefix,
 and optionally selects a gaze attribute path. The generic reader handles
 the common time union and absence rules; it discovers no format-specific

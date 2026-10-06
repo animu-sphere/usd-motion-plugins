@@ -45,4 +45,11 @@ MOTIONUSD_API bool ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const
                                             MotionStageRead* read,
                                             SkeletonReadDiagnostic* diagnostic);
 
+// The same strict profile with explicit owner-selected scalar/gaze inputs.
+// Input interpretation stays in ReadMotionStage; placement remains host work.
+MOTIONUSD_API bool ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path,
+                                            const MotionStageReadOptions& options,
+                                            MotionStageRead* read,
+                                            SkeletonReadDiagnostic* diagnostic);
+
 } // namespace openstrata::motion

@@ -202,6 +202,39 @@ CanonicalClip()
     assert(!permissive.skeleton.restTransformsAuthored && !permissive.warnings.empty());
     reject(stage, "MOTION_USD_REST_COUNT");
 }
+void
+CanonicalInputs()
+{
+    auto stage = Stage();
+    auto prim = stage->DefinePrim(pxr::SdfPath("/Native"));
+    assert(prim.CreateAttribute(pxr::TfToken("name"), pxr::SdfValueTypeNames->Token)
+               .Set(pxr::TfToken("happy")));
+    auto weight = prim.CreateAttribute(pxr::TfToken("weight"), pxr::SdfValueTypeNames->Float);
+    assert(weight.Set(1.5f, 30));
+    auto target = prim.CreateAttribute(pxr::TfToken("target"), pxr::SdfValueTypeNames->Point3f);
+    assert(target.Set(pxr::GfVec3f(0), 15));
+    MotionStageReadOptions options;
+    options.channels.push_back({"/Native.name", "/Native.weight", "vrm:"});
+    options.lookAtTargetAttributePath = "/Native.target";
+    MotionStageRead expected, read;
+    SkeletonReadDiagnostic diagnostic;
+    std::string error;
+    assert(ReadMotionStage(stage, path.GetString(), options, &expected, &error));
+    assert(ReadCanonicalMotionStage(stage, path, options, &read, &diagnostic));
+    assert(read.clip == expected.clip && read.clip.samples.size() == 4);
+    assert(read.clip.samples[1].timestamp == 0.25);
+    assert(read.clip.samples[1].lookAtTarget == pxr::GfVec3f(0));
+    assert(*read.clip.samples[2].channels.Find("vrm:happy") == 1.5f);
+    assert(!read.clip.samples[2].lookAtTarget);
+    const auto retained = read.clip;
+    assert(weight.Set(std::numeric_limits<float>::infinity(), 30));
+    assert(!ReadCanonicalMotionStage(stage, path, options, &read, &diagnostic));
+    assert(diagnostic.code == "MOTION_USD_READ" && read.clip == retained);
+    assert(weight.Set(0.5f, 30));
+    assert(pxr::UsdGeomSetStageMetersPerUnit(stage, 0.01));
+    assert(!ReadCanonicalMotionStage(stage, path, options, &read, &diagnostic));
+    assert(diagnostic.code == "MOTION_USD_UNITS" && read.clip == retained);
+}
 } // namespace
 int
 main()
@@ -209,4 +242,5 @@ main()
     Invalid();
     OwnedValues();
     CanonicalClip();
+    CanonicalInputs();
 }
