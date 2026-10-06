@@ -100,7 +100,9 @@ relative joint paths/topology, finite positive float-representable TRS, shear,
 reflection and bounded affine residuals, converts rest/placement translations
 to metres and leaves stage content untouched. `ReadCanonicalMotionStage` adds
 metre units, identity placement and finite positive encoding rate before calling
-the existing clip reader; metadata and warnings are preserved. Refusals leave
+the existing clip reader; its options overload passes explicit owner-selected
+scalar/gaze inputs through that same strict profile. Metadata and warnings are
+preserved. Refusals leave
 the destination unchanged and retain a motion-owned code/subject/detail.
 
 Callers invoke the existing `motionRetarget` descriptor/source-rest builders on

@@ -166,6 +166,14 @@ bool
 ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path,
                          MotionStageRead* read, SkeletonReadDiagnostic* diagnostic)
 {
+    return ReadCanonicalMotionStage(stage, path, MotionStageReadOptions{}, read, diagnostic);
+}
+
+bool
+ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path,
+                         const MotionStageReadOptions& options, MotionStageRead* read,
+                         SkeletonReadDiagnostic* diagnostic)
+{
     const auto subject = path.GetString();
     if (!read)
         return Fail(diagnostic, "MOTION_USD_OUTPUT", subject, "null output");
@@ -189,7 +197,7 @@ ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path
             diagnostic, "MOTION_USD_PLACEMENT", subject, "clip samples require identity placement");
     MotionStageRead result;
     std::string error;
-    if (!ReadMotionStage(stage, subject, &result, &error)) {
+    if (!ReadMotionStage(stage, subject, options, &result, &error)) {
         if (diagnostic)
             *diagnostic = {"MOTION_USD_READ", subject, error};
         return false;

@@ -11,6 +11,11 @@ separate from the package version
 
 ### Added
 
+- `ReadCanonicalMotionStage` accepts `MotionStageReadOptions`, preserving the
+  strict skeleton/clip profile and owner diagnostics while delegating selected
+  scalar/gaze reading to the common reader. Installed consumers cover this
+  additive overload.
+
 - Common USD gaze round trip via `Body.motion:lookAtTarget`, preserving origin,
   sparse keys, defaults and source timing. Explicit `MotionStageReadOptions`
   overloads hand owner-selected scalar/gaze attributes to the generic reader
