@@ -343,7 +343,9 @@ recorded session replayable byte for byte. Intake decisions are explicit and
 - **Missing joints.** `HoldLast` or `LeaveUnbound`, never a fade.
 - **Root.** `Passthrough`, `Ignore`, or `DeriveVelocity` (fills a missing
   linear velocity from consecutive samples).
-- **Ordering.** Timestamps strictly increase. A sample behind the head by more
+- **Ordering.** Timestamps are finite, strictly increase and have finite
+  adjacent spans. Nonfinite timestamps or overflowing spans are refused before
+  conditioning and counted as `framesRejectedInvalidTimestamp`. A sample behind the head by more
   than a stale threshold is counted *stale*; a closer one *out-of-order*,
   which is a fault in the producer's clock. Both are refused.
 - **Bounds.** A queue has a declared capacity and reports what it dropped
@@ -402,6 +404,32 @@ clock. MC-O6's joint tracking-loss question remains separate.
 
 Implementation and consumer parity gates are in
 [Connector Boundary Phases A-B](../roadmap/connector-boundary.md).
+
+#### 9.1.1 Existing temporal primitives
+
+`Push(const MotionPose&)` preserves finite negative timestamps and per-sample
+provenance. Timestamp refusal changes only its rejection counter: no held
+joints, observed-joint coverage, smoothing or root-velocity history advances.
+`PoseBuffer` enforces the same finite timestamp/adjacent-span requirement.
+Nonfinite sample requests or extrapolation limits return no buffered pose.
+
+`AlignClock(evaluationTime)` changes the offset only when a buffered head,
+finite evaluation time and finite derived offset exist. `SetClockOffset`
+stores the caller's value; an unusable offset makes sampling unavailable until
+the caller sets or aligns it again. `Sample` refuses nonfinite evaluation time,
+converted capture time or lag as `Unavailable`, counted once without changing
+peak lag. `GetTimeRange` refuses nonfinite converted bounds without writing
+either output. Finite operands whose arithmetic overflows are also refused.
+
+`Reset()` clears buffered poses, held joints, observed-joint coverage, smoothing
+and the prior used to derive root velocity. Configuration, stream provenance,
+counters and the selected clock offset survive. A runtime that chooses a new
+epoch resets history, pushes its first canonical observation, then sets or
+aligns the offset before sampling. The first accepted pose is not smoothed
+against the old epoch and acquires no velocity from it; missing joints remain
+absent. `ResetStats()` separately clears counters and retains history/alignment.
+These primitives do not detect restart or decide input availability; MC-O7's
+input-state contract remains open.
 
 ## 10. Recording and the trace format
 

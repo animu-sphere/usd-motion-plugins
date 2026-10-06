@@ -32,14 +32,12 @@
 #include <cstdint>
 #include <optional>
 
-namespace openstrata::motion
-{
+namespace openstrata::motion {
 
 // What to do with a joint a frame does not carry — either because the capture
 // system never solves it (fingers are the usual case) or because it dropped
 // below the confidence floor for this frame.
-enum class MissingJointPolicy : std::uint8_t
-{
+enum class MissingJointPolicy : std::uint8_t {
     // Leave the joint unbound. Downstream sees `validRotations` clear and is
     // free to fall back to the target rig's rest pose.
     LeaveUnbound,
@@ -50,8 +48,7 @@ enum class MissingJointPolicy : std::uint8_t
 
 // Live systems disagree about what they report for the root: some send an
 // absolute world position, some a position and a velocity, some nothing at all.
-enum class RootMotionIntake : std::uint8_t
-{
+enum class RootMotionIntake : std::uint8_t {
     // Record exactly what the connector delivered.
     Passthrough,
     // Drop root motion entirely; only the joint hierarchy survives. Use when
@@ -82,8 +79,7 @@ enum class RootMotionIntake : std::uint8_t
 MOTIONRECORDING_API RootMotion ConditionRootMotion(const MotionPose& prior, const MotionPose& pose,
                                                    RootMotionIntake intake);
 
-struct LiveCaptureConfig
-{
+struct LiveCaptureConfig {
     std::size_t bufferCapacity = PoseBuffer::DefaultCapacity;
 
     // Joints whose reported confidence is below this floor are treated as
@@ -116,8 +112,7 @@ struct LiveCaptureConfig
 // These are the numbers a capture evaluation reports: how much arrived, how
 // much was refused and why, how much of the humanoid was actually observed,
 // and how often evaluation ran ahead of the data.
-struct LiveCaptureStats
-{
+struct LiveCaptureStats {
     std::uint64_t framesAccepted = 0;
     std::uint64_t framesRejectedOutOfOrder = 0;
     std::uint64_t framesRejectedStale = 0;
@@ -142,93 +137,70 @@ struct LiveCaptureStats
 
     // The largest positive lag any Sample() call saw, in seconds.
     double peakLagSeconds = 0.0;
+
+    // Nonfinite capture timestamps or overflowing adjacent spans. These are
+    // refused before conditioning, independently of ordering/empty counters.
+    std::uint64_t framesRejectedInvalidTimestamp = 0;
 };
 
-class MOTIONRECORDING_API LiveCaptureSource final : public IMotionSource
-{
-  public:
+class MOTIONRECORDING_API LiveCaptureSource final : public IMotionSource {
+public:
     explicit LiveCaptureSource(const LiveCaptureConfig& config = {});
 
-    const LiveCaptureConfig&
-    GetConfig() const noexcept
-    {
-        return _config;
-    }
+    const LiveCaptureConfig& GetConfig() const noexcept { return _config; }
     // Applying a config re-seats the buffer capacity and the filter. Buffered
     // history survives; the smoothing state does not, because a cutoff change
     // mid-stream would otherwise blend two different filters.
     void SetConfig(const LiveCaptureConfig& config);
 
     void SetSourceMetadata(const SourceMetadata& metadata);
-    SourceMetadata
-    GetSourceMetadata() const override
-    {
-        return _metadata;
-    }
+    SourceMetadata GetSourceMetadata() const override { return _metadata; }
 
     // Accepts one decoded frame, stamped in the capture system's own clock.
     // Returns false when the frame was refused — out of order, stale, or
-    // carrying neither a valid joint nor root data — and the stats record why.
+    // carrying neither a valid joint nor root data, or an invalid timestamp —
+    // and the stats record why. Times and adjacent spans must be finite.
     bool Push(const MotionPose& pose);
 
     // captureTime = evaluationTime + clockOffset. A connector that knows its
     // stream's epoch sets this directly; one that does not calls AlignClock().
-    void
-    SetClockOffset(double clockOffset) noexcept
-    {
-        _clockOffset = clockOffset;
-    }
-    double
-    GetClockOffset() const noexcept
-    {
-        return _clockOffset;
-    }
+    void SetClockOffset(double clockOffset) noexcept { _clockOffset = clockOffset; }
+    double GetClockOffset() const noexcept { return _clockOffset; }
 
     // Pins the newest buffered frame to `evaluationTime`, so that evaluation
     // consumes the stream from its current head. A deliberate playback delay is
     // the same operation with an earlier `evaluationTime`. No-op on an empty
-    // buffer; returns false in that case.
+    // buffer or when the time/derived offset is nonfinite; returns false and
+    // preserves the previous offset in those cases.
     bool AlignClock(double evaluationTime) noexcept;
 
+    // Nonfinite evaluation/capture time or lag returns Unavailable, counted
+    // once, without sampling history or changing the peak lag.
     PoseSampleResult Sample(double evaluationTime) override;
+    // Refuses nonfinite converted bounds without writing either output.
     bool GetTimeRange(double* startTime, double* endTime) const override;
 
-    const PoseBuffer&
-    GetBuffer() const noexcept
-    {
-        return _buffer;
-    }
-    bool
-    IsEmpty() const noexcept
-    {
-        return _buffer.IsEmpty();
-    }
+    const PoseBuffer& GetBuffer() const noexcept { return _buffer; }
+    bool IsEmpty() const noexcept { return _buffer.IsEmpty(); }
 
     // Joints this session has ever observed at or above the confidence floor.
     // A capture rig that solves no fingers reports it here rather than in a
     // per-frame diff.
-    const std::bitset<HumanJointCount>&
-    GetObservedJoints() const noexcept
+    const std::bitset<HumanJointCount>& GetObservedJoints() const noexcept
     {
         return _observedJoints;
     }
 
-    const LiveCaptureStats&
-    GetStats() const noexcept
-    {
-        return _stats;
-    }
-    void
-    ResetStats() noexcept
-    {
-        _stats = LiveCaptureStats();
-    }
+    const LiveCaptureStats& GetStats() const noexcept { return _stats; }
+    void ResetStats() noexcept { _stats = LiveCaptureStats(); }
 
     // Drops buffered history, the held-joint state, and the smoothing state.
-    // Stats and the clock offset survive; use ResetStats() for those.
+    // Observed-joint coverage also clears. Config, provenance, stats and clock
+    // offset survive. Use ResetStats() for counters; set/align the clock
+    // explicitly when the caller selects a new epoch.
     void Reset();
 
-  private:
+private:
     MotionPose _Condition(const MotionPose& pose);
 
     LiveCaptureConfig _config;

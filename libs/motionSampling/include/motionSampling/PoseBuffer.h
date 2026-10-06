@@ -12,12 +12,10 @@
 #include <deque>
 #include <optional>
 
-namespace openstrata::motion
-{
+namespace openstrata::motion {
 
-class MOTIONSAMPLING_API PoseBuffer
-{
-  public:
+class MOTIONSAMPLING_API PoseBuffer {
+public:
     // 120 samples is four seconds at 30 Hz — enough history for smoothing and
     // late-arriving samples without unbounded growth under a live source.
     static constexpr std::size_t DefaultCapacity = 120;
@@ -27,59 +25,41 @@ class MOTIONSAMPLING_API PoseBuffer
     // Dropping the capacity evicts the oldest samples immediately. A capacity
     // of zero is rejected and leaves the buffer unchanged.
     void SetCapacity(std::size_t capacity);
-    std::size_t
-    GetCapacity() const noexcept
-    {
-        return _capacity;
-    }
+    std::size_t GetCapacity() const noexcept { return _capacity; }
 
-    // Samples must arrive in strictly increasing timestamp order. An
+    // Samples must have finite timestamps and finite adjacent spans, and
+    // arrive in strictly increasing timestamp order. An
     // out-of-order or duplicate timestamp is refused (returns false) rather
     // than silently reordering the history — a live source that jitters its
     // clock is a fault the caller must see.
     bool Push(const MotionPose& pose);
 
     void Clear() noexcept;
-    bool
-    IsEmpty() const noexcept
-    {
-        return _samples.empty();
-    }
-    std::size_t
-    GetSize() const noexcept
-    {
-        return _samples.size();
-    }
+    bool IsEmpty() const noexcept { return _samples.empty(); }
+    std::size_t GetSize() const noexcept { return _samples.size(); }
 
     // False when the buffer is empty; otherwise writes the oldest and newest
     // timestamps. Either pointer may be null.
     bool GetTimeRange(double* startTime, double* endTime) const;
 
     // Preconditions: !IsEmpty().
-    const MotionPose&
-    GetOldest() const
-    {
-        return _samples.front();
-    }
-    const MotionPose&
-    GetNewest() const
-    {
-        return _samples.back();
-    }
+    const MotionPose& GetOldest() const { return _samples.front(); }
+    const MotionPose& GetNewest() const { return _samples.back(); }
 
     // Interpolates between the two bracketing samples. Outside the buffered
     // range the boundary pose is held, never extrapolated. Returns nullopt only
-    // when the buffer is empty.
+    // when the buffer is empty or the requested timestamp is nonfinite.
     std::optional<MotionPose> Sample(double timestamp) const;
 
     // As Sample, but past the newest sample the root translation continues
     // along the last observed linear velocity for at most `maxLeadSeconds`.
     // Rotations are always held: extrapolating orientation from two samples
     // amplifies capture jitter far more than it hides latency.
+    // Nonfinite timestamps or lead limits return nullopt.
     std::optional<MotionPose> SampleExtrapolated(double timestamp,
-                                                   double maxLeadSeconds = 0.1) const;
+                                                 double maxLeadSeconds = 0.1) const;
 
-  private:
+private:
     std::deque<MotionPose> _samples;
     std::size_t _capacity;
 };

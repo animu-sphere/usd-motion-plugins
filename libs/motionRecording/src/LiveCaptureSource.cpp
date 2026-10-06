@@ -3,13 +3,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <utility>
 
-namespace openstrata::motion
-{
+namespace openstrata::motion {
 
-namespace
-{
+namespace {
 
 bool
 CarriesAnything(const MotionPose& pose)
@@ -22,8 +21,7 @@ CarriesAnything(const MotionPose& pose)
 RootMotion
 ConditionRootMotion(const MotionPose& prior, const MotionPose& pose, RootMotionIntake intake)
 {
-    switch (intake)
-    {
+    switch (intake) {
     case RootMotionIntake::Ignore:
         return RootMotion();
     case RootMotionIntake::Passthrough:
@@ -33,13 +31,11 @@ ConditionRootMotion(const MotionPose& prior, const MotionPose& pose, RootMotionI
     }
 
     RootMotion root = pose.root;
-    if (!root.hasPosition || root.hasLinearVelocity || !prior.root.hasPosition)
-    {
+    if (!root.hasPosition || root.hasLinearVelocity || !prior.root.hasPosition) {
         return root;
     }
     const double delta = pose.timestamp - prior.timestamp;
-    if (delta > 0.0)
-    {
+    if (delta > 0.0) {
         root.linearVelocity =
             (root.worldPosition - prior.root.worldPosition) / static_cast<float>(delta);
         root.hasLinearVelocity = true;
@@ -87,13 +83,10 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
     // 1. Confidence gate. A frame that reports no confidence at all is trusted
     //    as given -- a connector that cannot measure confidence must not lose
     //    its joints for saying so.
-    if (conditioned.confidence && _config.confidenceFloor > 0.0f)
-    {
+    if (conditioned.confidence && _config.confidenceFloor > 0.0f) {
         const std::array<float, HumanJointCount>& scores = *conditioned.confidence;
-        for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
-        {
-            if (conditioned.validRotations.test(joint) && scores[joint] < _config.confidenceFloor)
-            {
+        for (std::size_t joint = 0; joint < HumanJointCount; ++joint) {
+            if (conditioned.validRotations.test(joint) && scores[joint] < _config.confidenceFloor) {
                 conditioned.validRotations.reset(joint);
                 ++_stats.jointsGatedByConfidence;
             }
@@ -101,10 +94,8 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
     }
 
     // 2. Whatever survived the gate is a real observation.
-    for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
-    {
-        if (conditioned.validRotations.test(joint))
-        {
+    for (std::size_t joint = 0; joint < HumanJointCount; ++joint) {
+        if (conditioned.validRotations.test(joint)) {
             _observedJoints.set(joint);
             ++_stats.jointsObserved;
         }
@@ -114,35 +105,28 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
     //    last accepted frame, so a dropout freezes one limb rather than
     //    reverting it toward rest -- the same invariant PoseBuffer keeps for a
     //    missing sample.
-    for (std::size_t joint = 0; joint < HumanJointCount; ++joint)
-    {
-        if (conditioned.validRotations.test(joint))
-        {
+    for (std::size_t joint = 0; joint < HumanJointCount; ++joint) {
+        if (conditioned.validRotations.test(joint)) {
             continue;
         }
         if (_config.missingJoints == MissingJointPolicy::HoldLast && _lastAccepted &&
-            _lastAccepted->validRotations.test(joint))
-        {
+            _lastAccepted->validRotations.test(joint)) {
             conditioned.localRotations[joint] = _lastAccepted->localRotations[joint];
             conditioned.validRotations.set(joint);
             ++_stats.jointsHeld;
-        }
-        else
-        {
+        } else {
             ++_stats.jointsUnbound;
         }
     }
 
     // 4. Root motion.
-    if (_config.rootMotion != RootMotionIntake::Ignore && conditioned.root.hasPosition)
-    {
+    if (_config.rootMotion != RootMotionIntake::Ignore && conditioned.root.hasPosition) {
         ++_stats.rootSamplesObserved;
     }
     const bool reportedVelocity = conditioned.root.hasLinearVelocity;
-    conditioned.root = ConditionRootMotion(_lastAccepted ? *_lastAccepted : conditioned,
-                                           conditioned, _config.rootMotion);
-    if (!reportedVelocity && conditioned.root.hasLinearVelocity)
-    {
+    conditioned.root = ConditionRootMotion(
+        _lastAccepted ? *_lastAccepted : conditioned, conditioned, _config.rootMotion);
+    if (!reportedVelocity && conditioned.root.hasLinearVelocity) {
         ++_stats.rootVelocitiesDerived;
     }
 
@@ -159,8 +143,7 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
 
     // 6. Smoothing runs last, on the fully resolved frame, so a held joint is
     //    smoothed on the same terms as an observed one.
-    if (_config.smoothingCutoffHz > 0.0f)
-    {
+    if (_config.smoothingCutoffHz > 0.0f) {
         conditioned = _filter.Apply(conditioned);
     }
     return conditioned;
@@ -169,23 +152,22 @@ LiveCaptureSource::_Condition(const MotionPose& pose)
 bool
 LiveCaptureSource::Push(const MotionPose& pose)
 {
-    if (!CarriesAnything(pose))
-    {
+    if (!std::isfinite(pose.timestamp) ||
+        (_lastAccepted && !std::isfinite(pose.timestamp - _lastAccepted->timestamp))) {
+        ++_stats.framesRejectedInvalidTimestamp;
+        return false;
+    }
+    if (!CarriesAnything(pose)) {
         ++_stats.framesRejectedEmpty;
         return false;
     }
 
-    if (_lastAccepted)
-    {
+    if (_lastAccepted) {
         const double delta = pose.timestamp - _lastAccepted->timestamp;
-        if (delta <= 0.0)
-        {
-            if (_config.staleFrameSeconds > 0.0 && -delta > _config.staleFrameSeconds)
-            {
+        if (delta <= 0.0) {
+            if (_config.staleFrameSeconds > 0.0 && -delta > _config.staleFrameSeconds) {
                 ++_stats.framesRejectedStale;
-            }
-            else
-            {
+            } else {
                 ++_stats.framesRejectedOutOfOrder;
             }
             return false;
@@ -193,8 +175,7 @@ LiveCaptureSource::Push(const MotionPose& pose)
     }
 
     const MotionPose conditioned = _Condition(pose);
-    if (!_buffer.Push(conditioned))
-    {
+    if (!_buffer.Push(conditioned)) {
         // Unreachable while _lastAccepted tracks the buffer head, but the
         // buffer -- not this class -- owns the ordering rule, so defer to it.
         ++_stats.framesRejectedOutOfOrder;
@@ -210,11 +191,14 @@ bool
 LiveCaptureSource::AlignClock(double evaluationTime) noexcept
 {
     double newest = 0.0;
-    if (!_buffer.GetTimeRange(nullptr, &newest))
-    {
+    if (!std::isfinite(evaluationTime) || !_buffer.GetTimeRange(nullptr, &newest)) {
         return false;
     }
-    _clockOffset = newest - evaluationTime;
+    const double offset = newest - evaluationTime;
+    if (!std::isfinite(offset)) {
+        return false;
+    }
+    _clockOffset = offset;
     return true;
 }
 
@@ -225,22 +209,25 @@ LiveCaptureSource::Sample(double evaluationTime)
 
     double oldest = 0.0;
     double newest = 0.0;
-    if (!_buffer.GetTimeRange(&oldest, &newest))
-    {
+    if (!_buffer.GetTimeRange(&oldest, &newest)) {
         ++_stats.samplesUnavailable;
         return result;
     }
 
     const double captureTime = evaluationTime + _clockOffset;
-    result.lag = captureTime - newest;
+    const double lag = captureTime - newest;
+    if (!std::isfinite(evaluationTime) || !std::isfinite(captureTime) || !std::isfinite(lag)) {
+        ++_stats.samplesUnavailable;
+        return result;
+    }
+    result.lag = lag;
     _stats.peakLagSeconds = std::max(_stats.peakLagSeconds, result.lag);
 
     std::optional<MotionPose> pose =
         _config.maxExtrapolationSeconds > 0.0
             ? _buffer.SampleExtrapolated(captureTime, _config.maxExtrapolationSeconds)
             : _buffer.Sample(captureTime);
-    if (!pose)
-    {
+    if (!pose) {
         ++_stats.samplesUnavailable;
         return result;
     }
@@ -250,8 +237,7 @@ LiveCaptureSource::Sample(double evaluationTime)
     // and reporting it as extrapolated would make a clean session look like a
     // failing one.
     if (captureTime < oldest - PoseSampleTimeTolerance ||
-        captureTime > newest + PoseSampleTimeTolerance)
-    {
+        captureTime > newest + PoseSampleTimeTolerance) {
         // Extrapolation only ever moves the root; when the newest frame had no
         // usable velocity nothing advanced and this is an ordinary hold. Report
         // what happened, not what was requested.
@@ -259,17 +245,12 @@ LiveCaptureSource::Sample(double evaluationTime)
                               pose->root.hasPosition &&
                               pose->root.worldPosition != _buffer.GetNewest().root.worldPosition;
         result.status = advanced ? PoseSampleStatus::Extrapolated : PoseSampleStatus::Held;
-        if (advanced)
-        {
+        if (advanced) {
             ++_stats.samplesExtrapolated;
-        }
-        else
-        {
+        } else {
             ++_stats.samplesHeld;
         }
-    }
-    else
-    {
+    } else {
         result.status = PoseSampleStatus::Sampled;
         ++_stats.samplesSampled;
     }
@@ -287,17 +268,19 @@ LiveCaptureSource::GetTimeRange(double* startTime, double* endTime) const
 {
     double oldest = 0.0;
     double newest = 0.0;
-    if (!_buffer.GetTimeRange(&oldest, &newest))
-    {
+    if (!_buffer.GetTimeRange(&oldest, &newest)) {
         return false;
     }
-    if (startTime)
-    {
-        *startTime = oldest - _clockOffset;
+    const double start = oldest - _clockOffset;
+    const double end = newest - _clockOffset;
+    if (!std::isfinite(start) || !std::isfinite(end)) {
+        return false;
     }
-    if (endTime)
-    {
-        *endTime = newest - _clockOffset;
+    if (startTime) {
+        *startTime = start;
+    }
+    if (endTime) {
+        *endTime = end;
     }
     return true;
 }

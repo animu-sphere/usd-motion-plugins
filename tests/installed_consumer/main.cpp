@@ -9,9 +9,11 @@
 #include "motionUsd/SkeletonReader.h"
 #include "motionCore/Validation.h"
 #include "motionRetarget/Validation.h"
+#include "motionRecording/LiveCaptureSource.h"
 #include "motion_inputs.h"
 
 #include <cstdio>
+#include <limits>
 
 int
 main()
@@ -25,6 +27,24 @@ main()
         return 1;
     }
     using namespace openstrata::motion;
+    LiveCaptureSource live;
+    MotionPose observation;
+    observation.root.hasPosition = true;
+    observation.timestamp = std::numeric_limits<double>::quiet_NaN();
+    if (live.Push(observation) || !live.IsEmpty() ||
+        live.GetStats().framesRejectedInvalidTimestamp != 1)
+        return 7;
+    observation.timestamp = 100.0;
+    if (!live.Push(observation) || !live.AlignClock(0.0))
+        return 8;
+    if (live.AlignClock(std::numeric_limits<double>::infinity()) ||
+        live.GetClockOffset() != 100.0 || live.Sample(0.0).status != PoseSampleStatus::Sampled)
+        return 9;
+    live.Reset();
+    observation.timestamp = -1.0;
+    if (!live.Push(observation) || live.GetBuffer().GetNewest().root.hasLinearVelocity ||
+        !live.AlignClock(5.0) || live.Sample(5.0).status != PoseSampleStatus::Sampled)
+        return 10;
     SkeletonStageRead skeleton;
     SkeletonReadDiagnostic readingDiagnostic;
     const pxr::SdfPath skeletonPath("/Skeleton");

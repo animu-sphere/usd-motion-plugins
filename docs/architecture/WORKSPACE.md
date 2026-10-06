@@ -223,6 +223,10 @@ a source are not dependencies; source-name branches in generic processors
 are boundary defects. A core gate must also keep filtering, recording,
 retarget implementations, stage APIs and OpenExec above `motionCore`.
 
+The existing `motionRecording` intake and `motionSampling` buffer enforce
+finite motion timelines, with explicit reset/alignment operations and no new
+dependency edge ([MOTION §9.1.1](../design/MOTION_CONTRACT.md#911-existing-temporal-primitives)).
+
 The current graph remains §2.1, including its existing OpenUSD foundation
 types. MC-O7 settles intake metadata; MC-O8 evaluates a possible generic solve.
 Any future solve must consume motion-owned values and first update component

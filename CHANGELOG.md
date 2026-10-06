@@ -9,6 +9,16 @@ separate from the package version
 
 ## [Unreleased]
 
+### Fixed
+
+- Live intake and pose buffering refuse nonfinite timestamps and overflowing
+  adjacent spans before conditioning history. Clock alignment preserves its
+  offset on invalid input; live sampling refuses nonfinite converted time/lag,
+  and time-range conversion preserves outputs on refusal. Invalid capture
+  timestamps have a separate counter. Regression and installed-consumer tests
+  cover reset/realignment without retained joint, filter or velocity history
+  ([MOTION §9.1.1](docs/design/MOTION_CONTRACT.md#911-existing-temporal-primitives)).
+
 ### Added
 
 - `ReadCanonicalMotionStage` accepts `MotionStageReadOptions`, preserving the
