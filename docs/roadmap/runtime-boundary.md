@@ -55,10 +55,17 @@ owner descriptor/source-rest builders, without creating a source avatar
 binding. The original clip reader remains compatible. Full typed clip/rest
 consolidation and wrapper absorption below remain open.
 
+Shared time-code numeric validation is implemented: complete input keys must
+convert to finite increasing seconds with finite adjacent spans, negative keys
+are accepted, and playback bounds do not crop authored samples. Rate fallback
+and strict refusals are defined in [USD §7.3](../design/USD_MAPPING.md#73-reader-time-code-policy),
+with `motionUsd_timeCodes` and installed-package coverage. This closes the
+numeric time-code policy slice, not the typed clip/rest or runtime acceptance gate.
+
 - ⬜ Extend `MotionStageRead` compatibly to return clip and owner-built source
   rest together, with skeleton and metadata.
-- ⬜ Move generic stage time-code validation, source skeleton selection,
-  extraction and placement checks into `motionUsd`.
+- ⬜ Complete source skeleton selection, extraction and placement checks for
+  the coherent typed clip/rest result in `motionUsd`.
 - ⬜ Replace runtime `adapters/motion-usd/StageClip` assembly with an owner
   result; any retained runtime wrapper only maps configuration and diagnostics.
 - ⬜ Exercise `motionUsd` → clip/rest → `SampleClip` → `Retarget` → runtime

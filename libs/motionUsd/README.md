@@ -81,8 +81,12 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
   descriptor is what `BuildSourceRestPose` takes after it, so reading a stage
   links no retargeter.
 - **The producer's rate is not the stage's.** `timeCodesPerSecond` says where
-  the samples were written, always 30; `customData.motion.nominalFrameRate`
+  the samples were written (the writer uses 30); `customData.motion.nominalFrameRate`
   says what they were taken at, and that is what the clip comes back with.
+- **Times must survive conversion.** The complete input union must produce
+  finite increasing seconds with finite adjacent spans. Negative keys are valid;
+  playback bounds do not crop keys. Unusable rates have documented fallback or
+  strict refusal policies; see [USD §7.3](../../docs/design/USD_MAPPING.md#73-reader-time-code-policy).
 - **The hips are read twice**, which is the contract's rule: their rotation is
   `root.worldOrientation` as well as the local rotation
   (MOTION_CONTRACT.md §5.3).

@@ -506,6 +506,38 @@ detail. Neither retains a stage/prim handle or authors a layer. Correctness and
 graph coverage are in `motionUsd_skeletonReader` and `motionUsd_boundaries`;
 runtime installed-consumer tests check marshaling and diagnostic/lifetime parity.
 
+### 7.3 Reader time-code policy
+
+**Binding numeric validation, unreleased, 2026-10-07.** The common stage reader
+validates the complete body/channel/gaze key union before resolving values.
+Every time code must be finite and divide by the encoding rate into finite,
+strictly increasing double seconds. Distinct keys that collapse to the same
+second, conversion overflow and nonfinite adjacent timestamp differences are
+refused; silently merging them would lose input timing. Negative time codes
+are valid. Authored keys are not cropped by the stage's playback interval.
+Only a stage without keys uses `startTimeCode` for its single default pose,
+and that start must also convert to finite seconds.
+
+`ReadMotionStage` retains its rate fallback: nonfinite or non-positive encoding
+rates use 30 with a warning. `ReadCanonicalMotionStage` refuses those rates as
+`MOTION_USD_RATE` before invoking the common reader. Common-reader temporal
+refusals are forwarded as `MOTION_USD_READ`, with the selected skeleton subject
+and reader detail; the strict destination stays untouched. Producer
+`nominalFrameRate` must be finite and positive to become the clip's rate;
+otherwise the effective encoding rate is used with a warning. Original
+producer metadata remains available verbatim, including an unusable rate.
+
+The stage-free `PoseFromStageSample` uses the same finite rate/conversion rule
+for one pose. At default time it ignores the unused numeric time code and
+returns timestamp zero; it still requires a finite positive encoding rate.
+It cannot validate neighbouring timestamps because it receives only one sample.
+
+`motionUsd_timeCodes` covers numeric extremes, defaults, negative keys, playback
+bounds, rate fallback and supplementary key timing. `workspace_installed_consumer`
+checks selected-gaze overflow, strict output preservation and the shared value
+rule through installed packages. These guards do not change authored mapping
+version 1 or add a dependency edge. Typed clip/rest assembly remains §7.2 work.
+
 ## 8. Versioning
 
 The mapping carries `contractVersion`, starting at 1 with the first release
