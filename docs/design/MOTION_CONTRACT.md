@@ -503,9 +503,9 @@ narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 ## 14. Generic validation ownership
 
 **Accepted direction, 2026-10-06.** Generic validation belongs to the motion
-owner. Consolidate the existing checks into reusable owner APIs so runtime
-adapters do not reimplement the motion invariants. This section describes the
-intended surface; it does not claim new validators are installed.
+owner. Reusable owner APIs let runtime adapters consume motion invariant
+checks. Pose/clip and retarget value reports are binding as described below;
+USD validation and consumer migration remain in the runtime boundary roadmap.
 
 | Validation area | Motion owner |
 | --- | --- |
@@ -513,17 +513,57 @@ intended surface; it does not claim new validators are installed.
 | Source-rest hierarchy cycles, skeleton topology, caller-required bones, retarget options and root-motion modes | `motionRetarget` value/configuration contract |
 | Stage time codes, USD skeleton extraction, units/axes and generic placement constraints | `motionUsd`, invoking the value validators |
 
-Candidate entry points include `ValidateMotionClip`, `ValidateSourceRestPose`,
-`ValidateSkeletonDescriptor` and `ValidateRetargetConfiguration`, returning
-owner validation reports. Exact signatures/report types and their component
-placement are settled in
-[Runtime Boundary Phase 1](../roadmap/runtime-boundary.md#runtime-boundary-phase-1--validation).
+`motionCore/Validation.h` exposes `ValidateMotionPose`, `ValidateMotionClip`,
+`ValidateQuaternion` and `ValidateVector`, returning `ValidationReport`.
+`motionRetarget/Validation.h` exposes `ValidateSourceRestPose`,
+`ValidateSkeletonDescriptor` and `ValidateRetargetConfiguration`. The last
+returns `RetargetValidationReport`: `values` holds malformed-input errors;
+`diagnostics` preserves `DiagnoseRig`'s recoverable policy warnings, including
+missing caller-required bones, duplicate targets and unavailable root joints.
+`IsValid()` answers whether the malformed-input report is empty, so a legal
+partial rig can be valid while carrying warnings.
 Report codes and subjects come from the owner; the runtime forwards them to
 its diagnostic channel without translating them into new motion error codes.
 
+`ValidationCodeString` supplies the stable `MOTION_VALIDATION_*` strings;
+all these diagnostics have severity error and are not recoverable. Each report
+keeps a code/subject once in first-raised order. Subjects identify fields,
+semantic joints and collection indices, for example
+`samples[2].localRotations.hips` or `sourceRest.parents.neck`. `Merge` can
+prefix subjects when composing reports. The catalog is in
+[DIAGNOSTICS §2.3](../reference/DIAGNOSTICS.md#23-validation).
+
+Validation is read-only. The default `QuaternionValidationPolicy::Unit`
+requires finite nonzero components and `abs(squared length - 1) <= 1e-6`,
+computed in double precision. `Normalizable` permits finite nonzero
+quaternions only for a caller whose operation explicitly normalizes them;
+neither policy repairs the input. Absent joint rotations and absent root
+fields are not checked. Present confidence checks every slot for a finite
+value in `[0,1]`; named scalar channels remain unclamped but must be finite,
+unique and sorted. Present gaze, velocities and source timestamps must be
+finite. Unknown source/contact enums are malformed; provenance strings are
+carried without source-specific interpretation.
+
+`ValidateMotionClip` defaults to `ClipTimestampOrder::NonDecreasing`; a caller
+may explicitly select `StrictlyIncreasing`. Adjacent finite timestamps must
+also have a finite difference. Clip bounds and nominal rate must be finite,
+but descriptive metadata is not used to reject an otherwise valid sample
+timeline. Empty clips are valid. Skeleton validation permits an empty
+descriptor and finite static scales, and checks distinct nonempty tokens,
+parent indices, parent-before-child order, cycles and rest values. Source-rest
+validation checks every rest slot and parent, including cycles, without
+requiring vocabulary order to be topological. Configuration validation checks
+map indices against this skeleton, reference-rest extent and rotations,
+root-mode enum and finite translation scale, and caller-required vocabulary
+values. It imposes no avatar-format required set.
+
 Construction should establish invariants where possible. An immutable valid
 value or configuration should not require every consumer to repeat the same
-checks; mutable inputs still need a documented validation boundary. Checks
+checks; mutable inputs need validation after the final edit and before a
+processor that relies on these invariants. Constructors retain their existing
+defaults and guarded mapping/channel operations; a report is not a certificate
+for a value edited later. These additive APIs do not insert stricter checks
+into existing sampling, recording, builders or retarget calls. Checks
 must follow the owning operation's contract: stream intake requires strictly
 increasing timestamps, while the current sampler accepts finite,
 non-decreasing clip times (sections 8-9). Do not silently strengthen existing

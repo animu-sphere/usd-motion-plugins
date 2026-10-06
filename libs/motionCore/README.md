@@ -10,6 +10,12 @@ It also supplies the signed-permutation basis operation used at source intake
 (`BasisConversion.h`); source adapters remain responsible for choosing their
 own basis and refusing malformed input.
 
+`Validation.h` supplies read-only pose/clip and primitive value checks with
+stable owner diagnostics. Validate mutable values after the last edit and
+before a processor requiring their invariants. Quaternion and timestamp
+policies are explicit; sparse observations remain valid. The contract is
+[MOTION §14](../../docs/design/MOTION_CONTRACT.md#14-generic-validation-ownership).
+
 It deliberately has no file parser, USD stage authoring, plugin registration,
 network protocol or vendor SDK. The sole OpenUSD dependency is the small `Gf`
 value-type library used for vectors and quaternions, and the boundary check

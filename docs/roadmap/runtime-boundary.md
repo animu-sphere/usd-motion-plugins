@@ -8,23 +8,19 @@ APIs are recorded in the [capability matrix](../reference/CAPABILITY_MATRIX.md);
 the tasks below extend or consolidate those APIs. They do not claim completed
 runtime migration. No release is assigned yet.
 
-## Runtime Boundary Phase 1 — Validation
+## Runtime Boundary Phase 1 — Validation 🚧
 
-- ⬜ Expose owner validation reports for poses/clips, source rests, skeletons
-  and retarget configuration, reusing existing checks and diagnostics.
-- ⬜ Cover finite values, quaternion validity/normalization, clip timestamp
-  ordering, channel uniqueness/order, confidence range, hierarchy cycles,
-  caller-required bones, retarget options and root-motion modes. Preserve
-  supported sparse/partial motion and each operation's timestamp contract.
-- ⬜ Establish invariants at construction where practical, with a documented
-  revalidation boundary for mutable values.
 - ⬜ Integrate owner reports into the runtime's structured diagnostic channel
   without redefining codes, and remove duplicate generic validation after
   parity is proven. Runtime state/ABI validation stays with the runtime.
 
 Gate: malformed-input tests and diagnostic forwarding parity pass through
 installed packages; consumers no longer maintain those generic checks.
-The owning contract is [MOTION §14](../design/MOTION_CONTRACT.md#14-generic-validation-ownership).
+The installed owner report surface and mutable-value validation boundary are
+defined in [MOTION §14](../design/MOTION_CONTRACT.md#14-generic-validation-ownership);
+owner tests and installed-package coverage are in the
+[capability matrix](../reference/CAPABILITY_MATRIX.md). Consumer forwarding
+and duplicate-removal evidence remain required for this phase's gate.
 
 ## Runtime Boundary Phase 2 — USD skeleton and rest readers
 

@@ -30,6 +30,7 @@ without USD composition, and usable by a live source that has no stage at all.
 | `motionRetarget/RootMotionPolicy.h` | `RootMotionMode` (`Ignore` / `Hips` / `RootJoint`), `RootMotionOptions`, `ResolveRootTranslation` |
 | `motionRetarget/PoseRetargeter.h` | `PoseRetargeter`, `RetargetedPose`, `RetargetedAnimation`, `JointLocalTransforms` (one retargeted sample in a `UsdSkelAnimation`'s shape, scales included), `GetJointWorldTransform`, `DiagnoseRig` |
 | `motionRetarget/Diagnostics.h` | the eight `MOTION_RETARGET_*` codes (`RetargetDiagnosticCode`) and their table, `RetargetDiagnostic`, `RetargetDiagnostics`. The library raises five, and only a caller holding a stage can raise the other three |
+| `motionRetarget/Validation.h` | `ValidateSkeletonDescriptor`, `ValidateSourceRestPose`, `ValidateRetargetConfiguration`: malformed-input reports and unchanged recoverable rig diagnostics, with the mutable validation boundary in [MOTION §14](../../docs/design/MOTION_CONTRACT.md#14-generic-validation-ownership) |
 
 ## Four decisions worth knowing
 

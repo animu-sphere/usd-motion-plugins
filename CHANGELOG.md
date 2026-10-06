@@ -11,6 +11,13 @@ separate from the package version
 
 ### Added
 
+- Read-only owner validation reports in `motionCore/Validation.h` and
+  `motionRetarget/Validation.h` for poses, clips, skeletons, source rests and
+  retarget configuration. Explicit quaternion/timestamp policies preserve
+  sparse values and non-decreasing clip times; recoverable rig warnings keep
+  their existing codes. Installed consumers exercise the public headers and
+  report identity ([MOTION §14](docs/design/MOTION_CONTRACT.md#14-generic-validation-ownership)).
+
 - `motionUsd`'s `AuthorSkeletonAnimation` authors evaluated target-local samples
   onto a composed skeleton as a new `UsdSkelAnimation` and a root-layer
   binding override. It preserves the target's rest scales, referenced assets,
