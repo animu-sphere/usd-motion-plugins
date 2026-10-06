@@ -11,6 +11,11 @@ connector implementation remain with their owners.
 
 ## Connector Boundary Phase A — Canonical intake
 
+Finite timestamp/adjacent-span enforcement and installed canonical intake
+coverage are implemented; see [MOTION §9.1.1](../design/MOTION_CONTRACT.md#911-existing-temporal-primitives)
+and the [capability matrix](../reference/CAPABILITY_MATRIX.md). The metadata/input-state
+decision below remains open.
+
 - ⬜ Audit the public `LiveCaptureSource` intake and its installed consumption;
   retain `Push(const MotionPose&)` wherever it suffices and document canonical
   values as the only accepted inputs.
@@ -37,9 +42,9 @@ The owning contract is
 - ⬜ Specify generic restart/discontinuity/missing/stale input handling under
   MC-O7. The connector observes restart, receive time and source state; the
   runtime selects policy; motion APIs apply its generic temporal effects.
-- ⬜ Reuse or extend reset/alignment/buffering primitives as needed without
-  source-clock or protocol-specific logic. Prove reset treatment of held
-  joints, smoothing history and root-velocity derivation across discontinuities.
+- ⬜ Extend reset/alignment/buffering primitives if consumer evidence requires
+  more than the existing explicit operations, without source-clock or
+  protocol-specific logic.
 - ⬜ Support consumer-owned acceptance from an acquisition envelope through
   actor routing to canonical intake, semantic recording and replay. Tests that
   link connector/runtime packages live with those consumers.
@@ -49,6 +54,12 @@ restart/discontinuity policy, without blending history across an intended
 reset or mistaking unavailable input for a zero pose. Motion libraries contain
 no connector bridge or raw packet/session capture. Generic motion semantics
 and replay tests stay here; acquisition and composition tests stay upstream.
+
+Owner tests now prove reset isolation of held joints, smoothing history and
+root-velocity derivation, plus finite alignment/conversion refusal. Installed
+consumption covers reset and realignment with a new epoch. This establishes the
+existing temporal primitives, not MC-O7's input-state decision or the external
+actor-routing/restart acceptance gate.
 
 ## Connector Boundary Phase C — Generic tracker solve evaluation
 

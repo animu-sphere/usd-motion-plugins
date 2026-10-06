@@ -12,8 +12,7 @@
 #include <limits>
 #include <optional>
 
-namespace
-{
+namespace {
 
 constexpr float kEpsilon = 1e-4f;
 
@@ -35,8 +34,7 @@ SameOrientation(const pxr::GfQuatf& a, const pxr::GfQuatf& b)
 {
     const pxr::GfQuatf na = a.GetNormalized();
     pxr::GfQuatf nb = b.GetNormalized();
-    if (pxr::GfDot(na, nb) < 0.0f)
-    {
+    if (pxr::GfDot(na, nb) < 0.0f) {
         nb = pxr::GfQuatf(-nb.GetReal(), -nb.GetImaginary());
     }
     return NearlyEqual(na.GetReal(), nb.GetReal()) &&
@@ -56,7 +54,8 @@ MakePose(double timestamp, float hipsDegrees, const pxr::GfVec3f& rootPosition)
 {
     openstrata::motion::MotionPose pose;
     pose.timestamp = timestamp;
-    pose.localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips)] = RotationX(hipsDegrees);
+    pose.localRotations[static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips)] =
+        RotationX(hipsDegrees);
     pose.validRotations.set(static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips));
     pose.root.worldPosition = rootPosition;
     pose.root.hasPosition = true;
@@ -71,7 +70,8 @@ TestSlerpTakesTheShortArc()
     const pxr::GfQuatf ninetyFlipped(-ninety.GetReal(), -ninety.GetImaginary());
 
     const pxr::GfQuatf direct = openstrata::motion::SlerpShortest(identity, ninety, 0.5f);
-    const pxr::GfQuatf viaFlipped = openstrata::motion::SlerpShortest(identity, ninetyFlipped, 0.5f);
+    const pxr::GfQuatf viaFlipped =
+        openstrata::motion::SlerpShortest(identity, ninetyFlipped, 0.5f);
 
     assert(SameOrientation(direct, RotationX(45.0f)));
     // The sign-flipped representative must not spin the long way round.
@@ -367,8 +367,10 @@ TestBlendWeightsAndUnitLength()
     const openstrata::motion::MotionPose b = MakePose(0.0, 90.0f, pxr::GfVec3f(0.0f, 0.0f, 1.0f));
     const auto hips = static_cast<std::size_t>(openstrata::motion::HumanJoint::Hips);
 
-    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 0.0f).localRotations[hips], RotationX(0.0f)));
-    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 1.0f).localRotations[hips], RotationX(90.0f)));
+    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 0.0f).localRotations[hips],
+                           RotationX(0.0f)));
+    assert(SameOrientation(openstrata::motion::BlendPoses(a, b, 1.0f).localRotations[hips],
+                           RotationX(90.0f)));
 
     const std::optional<openstrata::motion::MotionPose> even =
         openstrata::motion::BlendPoses({{a, 1.0f}, {b, 1.0f}});
@@ -457,8 +459,7 @@ TestSampleClipCarriesTheStatus()
     openstrata::motion::ClipSource source(clip);
     openstrata::motion::PoseBuffer buffer;
     assert(buffer.Push(clip.samples[0]) && buffer.Push(clip.samples[1]));
-    for (const double t : {-1.0, 0.0, 0.25, 0.5, 1.0, 3.0})
-    {
+    for (const double t : {-1.0, 0.0, 0.25, 0.5, 1.0, 3.0}) {
         const openstrata::motion::PoseSampleResult direct = openstrata::motion::SampleClip(clip, t);
         assert(source.Sample(t) == direct);
         openstrata::motion::MotionPose pose = openstrata::motion::SampleAnimation(clip, t);
@@ -500,8 +501,7 @@ TestFilterStepCarriesTheStateTheStreamKeeps()
     std::optional<openstrata::motion::MotionPose> state;
     openstrata::motion::MotionPose lastStreamed;
     openstrata::motion::MotionPose lastStepped;
-    for (const openstrata::motion::MotionPose& frame : frames)
-    {
+    for (const openstrata::motion::MotionPose& frame : frames) {
         lastStreamed = streamed.Apply(frame);
         PoseFilter::StepResult step = PoseFilter::Step(state ? &*state : nullptr, frame, options);
         lastStepped = step.pose;
@@ -528,6 +528,35 @@ TestFilterStepCarriesTheStateTheStreamKeeps()
     assert(reseeded.pose == frames[0] && reseeded.state == frames[0]);
 }
 
+void
+TestPoseBufferRejectsInvalidTimesWithoutPoisoningHistory()
+{
+    using namespace openstrata::motion;
+    const double maximum = std::numeric_limits<double>::max();
+    PoseBuffer buffer;
+    for (const double invalid : {std::nan(""), HUGE_VAL, -HUGE_VAL}) {
+        assert(!buffer.Push(MakePose(invalid, 0.0f, pxr::GfVec3f(0))));
+        assert(buffer.IsEmpty());
+    }
+    assert(buffer.Push(MakePose(-maximum, 0.0f, pxr::GfVec3f(0))));
+    assert(!buffer.Push(MakePose(maximum, 0.0f, pxr::GfVec3f(0))));
+    assert(buffer.GetSize() == 1);
+    assert(buffer.Push(MakePose(0.0, 0.0f, pxr::GfVec3f(0))));
+    const MotionPose head = buffer.GetNewest();
+    for (const double invalid : {std::nan(""), HUGE_VAL, -HUGE_VAL}) {
+        assert(!buffer.Push(MakePose(invalid, 90.0f, pxr::GfVec3f(1))));
+        assert(!buffer.Sample(invalid));
+        assert(!buffer.SampleExtrapolated(invalid));
+        assert(!buffer.SampleExtrapolated(0.0, invalid));
+        assert(buffer.GetNewest() == head && buffer.GetSize() == 2);
+    }
+    assert(buffer.Sample(0.0) == head);
+    buffer.Clear();
+    assert(buffer.Push(MakePose(-1.0, 0.0f, pxr::GfVec3f(0))));
+    assert(buffer.Push(MakePose(1.0, 0.0f, pxr::GfVec3f(0))));
+    assert(buffer.Sample(0.0));
+}
+
 } // namespace
 
 int
@@ -541,6 +570,7 @@ main()
     TestMetadataSnapsToTheNearerEndpoint();
     TestPoseBufferOrderingAndSampling();
     TestPoseBufferExtrapolatesPositionOnly();
+    TestPoseBufferRejectsInvalidTimesWithoutPoisoningHistory();
     TestResampleCoversTheWholeInterval();
     TestFilterIsFrameRateIndependentAndTolerantOfDropouts();
     TestBlendWeightsAndUnitLength();
