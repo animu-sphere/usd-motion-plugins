@@ -10,6 +10,11 @@ target_link_libraries(motionUsd_inputs_tests PRIVATE motionUsd::motionUsd)
 usdmotion_keep_assertions(motionUsd_inputs_tests)
 add_test(NAME motionUsd_inputs COMMAND motionUsd_inputs_tests)
 
+add_executable(motionUsd_time_codes_tests test_time_codes.cpp)
+target_link_libraries(motionUsd_time_codes_tests PRIVATE motionUsd::motionUsd)
+usdmotion_keep_assertions(motionUsd_time_codes_tests)
+add_test(NAME motionUsd_timeCodes COMMAND motionUsd_time_codes_tests)
+
 add_executable(motionUsd_skeleton_animation_tests test_skeleton_animation_writer.cpp)
 target_link_libraries(motionUsd_skeleton_animation_tests PRIVATE motionUsd::motionUsd)
 usdmotion_keep_assertions(motionUsd_skeleton_animation_tests)
@@ -20,7 +25,7 @@ target_link_libraries(motionUsd_skeleton_reader_tests PRIVATE motionUsd::motionU
 usdmotion_keep_assertions(motionUsd_skeleton_reader_tests)
 add_test(NAME motionUsd_skeletonReader COMMAND motionUsd_skeleton_reader_tests)
 
-usdmotion_test_windows_path(TESTS motionUsd_unit motionUsd_inputs motionUsd_skeletonAnimation motionUsd_skeletonReader
+usdmotion_test_windows_path(TESTS motionUsd_unit motionUsd_inputs motionUsd_timeCodes motionUsd_skeletonAnimation motionUsd_skeletonReader
     TARGETS motionUsd OPENUSD usdSkel)
 
 if(USDMOTION_TEST_PYTHON)

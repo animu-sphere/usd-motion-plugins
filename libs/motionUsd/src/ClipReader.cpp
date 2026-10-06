@@ -282,7 +282,7 @@ ReadProjectedChannels(const pxr::UsdStagePtr& stage, const MotionStageReadOption
 std::optional<MotionPose>
 PoseFromStageSample(const MotionStageSample& sample)
 {
-    if (!(sample.timeCodesPerSecond > 0.0)) {
+    if (!std::isfinite(sample.timeCodesPerSecond) || !(sample.timeCodesPerSecond > 0.0)) {
         return std::nullopt;
     }
 
@@ -293,7 +293,13 @@ PoseFromStageSample(const MotionStageSample& sample)
     // converts to 0.0 at every rate. What differs between the two is which
     // values were resolved, and that happened before this call.
     if (sample.hasTimeCode) {
+        if (!std::isfinite(sample.timeCode)) {
+            return std::nullopt;
+        }
         pose.timestamp = sample.timeCode / sample.timeCodesPerSecond;
+        if (!std::isfinite(pose.timestamp)) {
+            return std::nullopt;
+        }
     }
 
     const std::size_t jointCount = sample.jointTokens.size();
@@ -356,7 +362,7 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
 
     *read = MotionStageRead();
     read->timeCodesPerSecond = stage->GetTimeCodesPerSecond();
-    if (!(read->timeCodesPerSecond > 0.0)) {
+    if (!std::isfinite(read->timeCodesPerSecond) || !(read->timeCodesPerSecond > 0.0)) {
         read->warnings.push_back("the stage states no usable timeCodesPerSecond; reading its "
                                  "samples at " +
                                  pxr::TfStringify(MotionStageTimeCodesPerSecond));
@@ -496,10 +502,34 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
         // A stage with no time sample still has default values; that is one
         // pose, at an instant the stage chose rather than one the clip stated,
         // which is what the warning says.
-        timeCodes.insert(stage->GetStartTimeCode());
+        const double start = stage->GetStartTimeCode();
+        if (!std::isfinite(start)) {
+            *error = "start time code does not convert to finite seconds";
+            return false;
+        }
+        timeCodes.insert(start);
         read->warnings.push_back("the stage states no time sample, so its one pose is placed at "
                                  "the start time code, " +
                                  pxr::TfStringify(stage->GetStartTimeCode()));
+    }
+
+    // Validate the complete input time union before resolving values. Distinct
+    // USD keys must remain distinct instants in seconds, and downstream
+    // interpolation must be able to subtract neighbouring timestamps.
+    std::optional<double> previous;
+    for (const double timeCode : timeCodes) {
+        const double seconds = timeCode / read->timeCodesPerSecond;
+        if (!std::isfinite(timeCode) || !std::isfinite(seconds)) {
+            *error = "time code " + pxr::TfStringify(timeCode) +
+                     " does not convert to finite seconds";
+            return false;
+        }
+        if (previous && (!(seconds > *previous) || !std::isfinite(seconds - *previous))) {
+            *error = "time code " + pxr::TfStringify(timeCode) +
+                     " does not produce increasing seconds with a finite adjacent span";
+            return false;
+        }
+        previous = seconds;
     }
 
     // Scale is never animated (§4.2), and a stage that animates it is read
@@ -561,9 +591,8 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
 
         std::optional<MotionPose> pose = PoseFromStageSample(sample);
         if (!pose) {
-            // Unreachable: the rate was made positive above. Stated rather
-            // than assumed, because the only alternative is a pose with an
-            // invented second.
+            // The complete time union was validated above; keep the shared
+            // value rule's refusal explicit rather than inventing a second.
             *error = "the stage's rate does not turn its time codes into seconds";
             return false;
         }
@@ -611,10 +640,17 @@ ReadMotionStage(const pxr::UsdStagePtr& stage, const std::string& skeletonPath,
     // The producer's rate when the stage states one, and the stage's only as a
     // fallback. They differ by design: a 60 Hz capture is written at 30 time
     // codes per second (§4.1), so taking the encoding here would report a
-    // measurement the producer never made. A non-positive stated rate is no
-    // statement at all.
+    // measurement the producer never made. An unusable stated rate is no
+    // statement at all; retain it in metadata but never emit it on the clip.
+    if (read->metadata.nominalFrameRate &&
+        (!std::isfinite(*read->metadata.nominalFrameRate) ||
+         !(*read->metadata.nominalFrameRate > 0.0))) {
+        read->warnings.push_back("motion nominalFrameRate is not finite and positive; "
+                                 "using the stage's encoding rate");
+    }
     read->clip.nominalFrameRate =
-        read->metadata.nominalFrameRate && *read->metadata.nominalFrameRate > 0.0
+        read->metadata.nominalFrameRate && std::isfinite(*read->metadata.nominalFrameRate) &&
+                *read->metadata.nominalFrameRate > 0.0
             ? *read->metadata.nominalFrameRate
             : read->timeCodesPerSecond;
     read->clip.source.kind = MotionSourceKind::Clip;

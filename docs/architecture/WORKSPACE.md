@@ -163,6 +163,12 @@ library edge or stage dependency. Their installed public contract and mutable
 validation boundary are in
 [MOTION §14](../design/MOTION_CONTRACT.md#14-generic-validation-ownership).
 
+`motionUsd` owns stage time-code conversion and validation over the complete
+body/channel/gaze input union, including finite seconds and adjacent spans.
+The common reader's fallback and strict reader's refusal policies are in
+[USD §7.3](../design/USD_MAPPING.md#73-reader-time-code-policy); they reuse the
+existing graph without adding a retarget or runtime dependency.
+
 The accepted [motion/runtime ownership policy](../design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary)
 requires `motionUsd` to return motion-domain skeleton/rest values as well as
 clips. The current §2.1 graph and §1 identities remain the implemented graph;

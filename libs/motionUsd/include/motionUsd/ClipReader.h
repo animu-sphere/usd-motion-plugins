@@ -154,8 +154,10 @@ struct MotionStageReadOptions {
 
 // The pose `sample` states, or nullopt when it cannot be stamped.
 //
-// Refused for a non-positive `timeCodesPerSecond`, which covers both an absent
-// rate and a nonsense one. `MotionPose::timestamp` is a plain double with no
+// Refused for a nonfinite or non-positive `timeCodesPerSecond`, a nonfinite
+// numeric time code, or overflow converting it to seconds. At default time,
+// the unused numeric time code is ignored and the timestamp is zero.
+// `MotionPose::timestamp` is a plain double with no
 // absent state, so a pose produced without a rate would carry a second every
 // consumer downstream would take at face value.
 //
@@ -192,6 +194,11 @@ MOTIONUSD_API std::optional<MotionPose> PoseFromStageSample(const MotionStageSam
 // contributes its own pose instant, preserving the source's key timing. A
 // clip that states no time sample at all is one pose at the stage's start time
 // code, and says so in `warnings`.
+// Negative time codes are valid. The complete key union must convert to finite,
+// strictly increasing seconds with finite adjacent spans. Playback bounds do
+// not crop keys. An unusable encoding rate falls back to 30 with a warning;
+// unusable producer-rate metadata remains in metadata but the clip uses the
+// encoding rate with a warning. The strict reader refuses invalid encoding rates.
 //
 // Refused, with `read` left unspecified, when the stage holds no skeleton, the
 // named path is not one, no animation can be found, the animation authors no

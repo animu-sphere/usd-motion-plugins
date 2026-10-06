@@ -6,6 +6,7 @@
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
+#include <limits>
 
 inline bool
 CheckMotionInputs()
@@ -71,5 +72,19 @@ CheckMotionInputs()
         if (samples[i].lookAtTarget != pxr::GfVec3f(0) ||
             (i % 2 == 0 && !samples[i].channels.entries.empty()))
             return false;
+    // The installed owner applies time policy to the selected input union,
+    // preserving the strict result and diagnostic code on refusal.
+    const auto retained = strict.clip;
+    stage->SetTimeCodesPerSecond(0.5);
+    if (!gaze.Set(pxr::GfVec3f(0), std::numeric_limits<double>::max()) ||
+        ReadCanonicalMotionStage(
+            stage, pxr::SdfPath(read.skeleton.path), options, &strict, &diagnostic) ||
+        diagnostic.code != "MOTION_USD_READ" || diagnostic.subject != read.skeleton.path ||
+        diagnostic.detail.find("finite seconds") == std::string::npos || strict.clip != retained)
+        return false;
+    MotionStageSample invalid;
+    invalid.timeCodesPerSecond = std::numeric_limits<double>::infinity();
+    if (PoseFromStageSample(invalid))
+        return false;
     return true;
 }
