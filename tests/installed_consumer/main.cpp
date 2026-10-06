@@ -6,6 +6,7 @@
 // with packages.json, so a package that was silently skipped cannot pass.
 #include "includes.h"
 #include "motionUsd/SkeletonAnimationWriter.h"
+#include "motionUsd/SkeletonReader.h"
 #include "motionCore/Validation.h"
 #include "motionRetarget/Validation.h"
 
@@ -21,6 +22,17 @@ main()
         return 1;
     }
     using namespace openstrata::motion;
+    SkeletonStageRead skeleton;
+    SkeletonReadDiagnostic readingDiagnostic;
+    const pxr::SdfPath skeletonPath("/Skeleton");
+    if (ReadSkeleton({}, skeletonPath, &skeleton, &readingDiagnostic) ||
+        readingDiagnostic.code != "MOTION_USD_STAGE" ||
+        readingDiagnostic.subject != skeletonPath.GetString())
+        return 4;
+    MotionStageRead motion;
+    if (ReadCanonicalMotionStage({}, skeletonPath, &motion, &readingDiagnostic) ||
+        readingDiagnostic.code != "MOTION_USD_STAGE")
+        return 5;
     MotionClip clip;
     clip.samples.emplace_back();
     if (!ValidateMotionClip(clip).IsValid())

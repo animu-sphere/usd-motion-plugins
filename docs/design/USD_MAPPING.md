@@ -353,9 +353,10 @@ reader accepts the selected source path and returns the clip and its rest
 together. Exact signatures, failure/report types and compatibility with the
 existing `MotionStageRead::skeleton` arrays are settled during
 [Runtime Boundary Phases 2-3](../roadmap/runtime-boundary.md). Candidate headers
-are `SkeletonReader.h`, `RestPoseReader.h` and `Validation.h`, alongside the
-existing `MotionStage.h`, `ClipReader.h` and `ClipWriter.h`; they are not present
-APIs.
+are `RestPoseReader.h` and `Validation.h`, alongside the existing
+`MotionStage.h`, `ClipReader.h` and `ClipWriter.h`. The scoped
+`SkeletonReader.h` surface below is implemented; the coherent typed result
+illustrated above remains proposed.
 
 The reader owns joints/rest extraction, topology checks, decomposition via
 owner value algorithms, motion-domain descriptor/rest construction, generic
@@ -376,6 +377,37 @@ The dependency change required to return `SkeletonDescriptor` and
 [WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target)
 before implementation. Pure builders and validators remain reusable without a
 USD stage; callers should not have to reproduce them to avoid linking a reader.
+
+### 7.2.1 Scoped strict array readers
+
+Implemented locally, unreleased, 2026-10-06: `SkeletonReader.h` adds
+`ReadSkeleton(stage, path, read, diagnostic)` and
+`ReadCanonicalMotionStage(stage, path, read, diagnostic)`. This slice keeps
+the existing dependency graph and raw `MotionStageSkeleton` representation;
+it does not settle WS-O4 or claim the typed descriptor/source-rest result.
+Consumers invoke existing motionRetarget builders rather than duplicate them.
+
+`ReadSkeleton` returns owned default-time parent-local rest matrices in metres,
+joint tokens and parent indices, authored-rest presence, source unit metadata,
+and separate rigid skeleton world translation/rotation. It requires an explicit
+absolute skeleton path, Y-up and a caller-asserted canonical forward basis.
+Positive nonuniform rest scale and multiple/auxiliary roots are preserved.
+Nonpositive/nonfinite units, malformed rest/token/topology, immediate-parent mapping
+disagreement, nonfinite or float-unrepresentable rest, reflection, zero scale,
+shear beyond `1e-6`, affine deviations beyond `1e-12` and nonrigid placement are
+refused. Accepted affine roundoff is canonicalized only in the owned copy.
+
+`ReadCanonicalMotionStage` additionally requires metre units, identity world
+placement and a finite positive encoding rate because semantic sample
+translations use canonical metres. It preserves existing clip/metadata/warnings
+and replaces the raw skeleton arrays with validated authored rest. The original
+`ReadMotionStage` remains permissive, including missing-rest fallback/warnings.
+
+Both APIs leave the caller's result untouched on refusal and return a
+`SkeletonReadDiagnostic` containing unmodified `MOTION_USD_*` code, subject and
+detail. Neither retains a stage/prim handle or authors a layer. Correctness and
+graph coverage are in `motionUsd_skeletonReader` and `motionUsd_boundaries`;
+runtime installed-consumer tests check marshaling and diagnostic/lifetime parity.
 
 ## 8. Versioning
 

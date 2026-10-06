@@ -24,6 +24,14 @@ and duplicate-removal evidence remain required for this phase's gate.
 
 ## Runtime Boundary Phase 2 — USD skeleton and rest readers
 
+A scoped strict-array reader is implemented without changing the component
+graph: `motionUsd::ReadSkeleton` owns default-time rest/token/topology/matrix
+validation, metre conversion and separate rigid placement values. Runtime
+`SkeletonBinding` now invokes it and the existing owner descriptor builder.
+`motionUsd_skeletonReader` and runtime installed consumers cover the slice.
+The coherent typed descriptor/source-rest result below remains gated by WS-O4;
+this evidence does not close Phase 2.
+
 - ⬜ Resolve [WS-O4](../architecture/WORKSPACE.md#6-open-questions) before
   implementation and update dependency declarations and gates.
 - ⬜ Add an explicitly selected USD skeleton reader returning descriptor,
@@ -40,6 +48,12 @@ the runtime contains no generic USD-to-motion skeleton conversion.
 The owning contract is [USD §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results).
 
 ## Runtime Boundary Phase 3 — StageClip absorption
+
+The scoped `ReadCanonicalMotionStage` now owns source skeleton and
+unit/axis/rate/placement checks; runtime `StageClip` delegates to it and invokes
+owner descriptor/source-rest builders, without creating a source avatar
+binding. The original clip reader remains compatible. Full typed clip/rest
+consolidation and wrapper absorption below remain open.
 
 - ⬜ Extend `MotionStageRead` compatibly to return clip and owner-built source
   rest together, with skeleton and metadata.

@@ -10,7 +10,12 @@ target_link_libraries(motionUsd_skeleton_animation_tests PRIVATE motionUsd::moti
 usdmotion_keep_assertions(motionUsd_skeleton_animation_tests)
 add_test(NAME motionUsd_skeletonAnimation COMMAND motionUsd_skeleton_animation_tests)
 
-usdmotion_test_windows_path(TESTS motionUsd_unit motionUsd_skeletonAnimation
+add_executable(motionUsd_skeleton_reader_tests test_skeleton_reader.cpp)
+target_link_libraries(motionUsd_skeleton_reader_tests PRIVATE motionUsd::motionUsd)
+usdmotion_keep_assertions(motionUsd_skeleton_reader_tests)
+add_test(NAME motionUsd_skeletonReader COMMAND motionUsd_skeleton_reader_tests)
+
+usdmotion_test_windows_path(TESTS motionUsd_unit motionUsd_skeletonAnimation motionUsd_skeletonReader
     TARGETS motionUsd OPENUSD usdSkel)
 
 if(USDMOTION_TEST_PYTHON)
