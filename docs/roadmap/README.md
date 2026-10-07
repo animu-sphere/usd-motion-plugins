@@ -15,8 +15,8 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 
 ## Status at a glance
 
-`v0.5.3` is published. Its release scope is recorded in the
-[release record](../releases/v0.5.3.md), and current implementation facts are
+The `v0.5.4` release scope is recorded in the
+[release record](../releases/v0.5.4.md), and current implementation facts are
 in the [capability matrix](../reference/CAPABILITY_MATRIX.md). This directory
 contains no completed release inventory.
 

@@ -17,7 +17,7 @@ Current implementation facts live in [reference/](reference/).
 | [contributing/](contributing/) | How to maintain these documents. | [documentation.md](contributing/documentation.md) |
 
 [releases/](releases/) holds one immutable record per release, added with
-its tag.
+its tag. The latest record is [v0.5.4](releases/v0.5.4.md).
 
 ## Source of truth
 
