@@ -22,26 +22,14 @@ owner tests and installed-package coverage are in the
 [capability matrix](../reference/CAPABILITY_MATRIX.md). Consumer forwarding
 and duplicate-removal evidence remain required for this phase's gate.
 
-## Runtime Boundary Phase 2 — USD skeleton and rest readers
+## Runtime Boundary Phase 2 — USD skeleton and rest readers 🚧
 
-A scoped strict-array reader is implemented without changing the component
-graph: `motionUsd::ReadSkeleton` owns default-time rest/token/topology/matrix
-validation, metre conversion and separate rigid placement values. Runtime
-`SkeletonBinding` now invokes it and the existing owner descriptor builder.
-`motionUsd_skeletonReader` and runtime installed consumers cover the slice.
-WS-O4 selects the public `motionUsd` → `motionRetarget` edge in
-[WORKSPACE §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target).
-Dependency wiring and the coherent typed descriptor/source-rest result below
-remain unimplemented; the scoped reader evidence does not close Phase 2.
+The typed reader, public owner edge and strict units/axes/placement policy are
+implemented locally; their contract and coverage are in
+[USD §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results) and the
+[capability matrix](../reference/CAPABILITY_MATRIX.md). Consumer adoption of
+that typed result remains open.
 
-- ⬜ Implement the accepted WS-O4 edge in the manifest, public CMake links,
-  installed package config and boundary gates before adding typed reader code;
-  verify graph, standalone and clean installed-package consumption.
-- ⬜ Add an explicitly selected USD skeleton reader returning descriptor,
-  source rest and metadata; reuse value builders for joints, decomposition,
-  topology, source/target rest and generic mapping.
-- ⬜ Define generic stage metadata, placement, units and axis policies,
-  including explicit unsupported-input rejection.
 - ⬜ Replace the generic conversion part of runtime `SkeletonBinding` with
   owner calls, retaining avatar layout/state and format binding adaptation.
 
@@ -50,25 +38,13 @@ malformed rests, source-rest extraction, units, axes, placement and topology;
 the runtime contains no generic USD-to-motion skeleton conversion.
 The owning contract is [USD §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results).
 
-## Runtime Boundary Phase 3 — StageClip absorption
+## Runtime Boundary Phase 3 — StageClip absorption 🚧
 
-The scoped `ReadCanonicalMotionStage` now owns source skeleton and
-unit/axis/rate/placement checks; runtime `StageClip` delegates to it and invokes
-owner descriptor/source-rest builders, without creating a source avatar
-binding. The original clip reader remains compatible. Full typed clip/rest
-consolidation and wrapper absorption below remain open.
+Owner-built descriptor/source-rest fields and time-code validation are
+implemented locally; see [USD §7.2–§7.3](../design/USD_MAPPING.md#72-motion-domain-reader-results)
+and the [capability matrix](../reference/CAPABILITY_MATRIX.md).
+Runtime wrapper absorption and integration acceptance remain open.
 
-Shared time-code numeric validation is implemented: complete input keys must
-convert to finite increasing seconds with finite adjacent spans, negative keys
-are accepted, and playback bounds do not crop authored samples. Rate fallback
-and strict refusals are defined in [USD §7.3](../design/USD_MAPPING.md#73-reader-time-code-policy),
-with `motionUsd_timeCodes` and installed-package coverage. This closes the
-numeric time-code policy slice, not the typed clip/rest or runtime acceptance gate.
-
-- ⬜ Extend `MotionStageRead` compatibly to return clip and owner-built source
-  rest together, with skeleton and metadata.
-- ⬜ Complete source skeleton selection, extraction and placement checks for
-  the coherent typed clip/rest result in `motionUsd`.
 - ⬜ Replace runtime `adapters/motion-usd/StageClip` assembly with an owner
   result; any retained runtime wrapper only maps configuration and diagnostics.
 - ⬜ Exercise `motionUsd` → clip/rest → `SampleClip` → `Retarget` → runtime

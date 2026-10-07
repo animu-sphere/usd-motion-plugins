@@ -8,8 +8,8 @@
 > bakes retargeted animation onto avatars. `motionUsd`'s writer arrived from
 > that capture recorder and its reader from `motion_retarget`'s `StageIo`
 > ([DESIGN_POLICY.md §42.1](DESIGN_POLICY.md#421-the-core-is-imported-from-usd-vrm-plugins-not-rewritten)).
-> §7.2's richer motion-domain reader result is accepted direction, not an
-> implemented extension to the current reader.
+> §7.2's typed skeleton and strict clip/rest results are binding, locally
+> implemented and unreleased; runtime consumer adoption remains separate.
 >
 > This document owns how motion becomes OpenUSD and back: the standalone
 > motion stage, joint tokens, time codes, metadata, and how a motion meets an
@@ -350,14 +350,12 @@ than guessed at.
 - `ReadMotionStage` and `OpenMotionStage` answer a `MotionClip`, the
   skeleton's joint tokens and rest transforms, §5's metadata and a list of
   warnings. A warning is never a refusal.
-- **The skeleton comes back as values**, not as a `SkeletonDescriptor`: the
-  joint tokens and rest transforms are what `BuildSkeletonDescriptor` takes,
-  and the descriptor it answers is what `BuildSourceRestPose` takes after it
-  ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)). So reading a stage
-  does not link a retargeter and `motionUsd` keeps its current library edge
+- **The permissive reader keeps compatible skeleton arrays.** The strict
+  reader additionally invokes `BuildSkeletonDescriptor` and
+  `BuildSourceRestPose` ([RETARGETING_POLICY.md §10](RETARGETING_POLICY.md)),
+  returning both owner-built values through §7.2's additive fields.
+  `motionUsd` publicly links `motionRetarget`
   ([WORKSPACE.md §2.1](../architecture/WORKSPACE.md#21-inside-the-repository)).
-  This is the current API; §7.2 defines the accepted direction that removes
-  the consumer's descriptor/rest assembly step.
 - **The producer's rate is not the stage's.** `timeCodesPerSecond` is where
   the samples were written and is always 30 (§4.1); the rate they were taken
   at is `customData.motion.nominalFrameRate`, and a read puts it back on
@@ -426,34 +424,49 @@ not its stage.
 
 ### 7.2 Motion-domain reader results
 
-**Accepted direction, 2026-10-06; API shape proposed.** `motionUsd` owns generic
+**Binding, unreleased, 2026-10-07.** `motionUsd` owns generic
 USD interpretation through motion-domain values. Runtime consumers should
 receive a coherent clip, skeleton, source rest and metadata, rather than
 reconstructing them from raw USD arrays in their own `StageClip` wrapper.
-The existing §7 reader remains available until an extension lands with tests.
+The existing permissive §7 reader remains available with its fallback contract.
 
-Illustrative result shapes, not installed API declarations:
+Installed in `SkeletonReader.h`:
 
 ```cpp
 struct MotionSkeletonRead {
     SkeletonDescriptor skeleton;
-    SourceRestPose rest;
+    std::optional<SourceRestPose> sourceRest;
     MotionSkeletonMetadata metadata;
 };
 
-// Extend the existing MotionStageRead, preserving compatible fields:
-// clip, skeleton, metadata, warnings, plus an owner-built sourceRest.
+// MotionStageRead retains clip/skeleton arrays/metadata/warnings and adds:
+// std::optional<SkeletonDescriptor> descriptor;
+// std::optional<SourceRestPose> sourceRest;
 ```
 
-A skeleton reader accepts an explicitly selected `UsdSkelSkeleton`; a stage
-reader accepts the selected source path and returns the clip and its rest
-together. Exact signatures, failure/report types and compatibility with the
-existing `MotionStageRead::skeleton` arrays are settled during
-[Runtime Boundary Phases 2-3](../roadmap/runtime-boundary.md). Candidate headers
-are `RestPoseReader.h` and `Validation.h`, alongside the existing
-`MotionStage.h`, `ClipReader.h` and `ClipWriter.h`. The scoped
-`SkeletonReader.h` surface below is implemented; the coherent typed result
-illustrated above remains proposed.
+`ReadMotionSkeleton(stage, path, role, read, diagnostic)` selects an absolute
+skeleton path and an explicit `SkeletonReadRole`. `Generic` builds a descriptor
+without inferring human roles and leaves `sourceRest` unset. `SemanticSource`
+also calls `BuildSourceRestPose`; no vocabulary bone or duplicate bone leaves
+are refusals, not identity-rest fallbacks. Existing owner extraction rules,
+including the handling of non-bone intermediates, remain
+[RETARGET §10](RETARGETING_POLICY.md#10-api-owed-from-the-openexec-evidence).
+
+`MotionSkeletonMetadata` holds the skeleton path, original `metersPerUnit`,
+and separate rigid world translation/rotation. Rest and placement translations
+are in metres; placement is never folded into local rest. Both roles require
+§7.2.1's default-time Y-up/authored-rest profile, with canonical forward basis
+asserted by the caller. Missing or malformed rest, unsupported axes, shear,
+reflection and nonrigid placement remain explicit refusals.
+
+`ReadCanonicalMotionStage` applies the semantic-source role and returns clip,
+descriptor and source rest together with the compatible raw skeleton fields,
+metadata and warnings. Metre units and identity placement remain required.
+The permissive `ReadMotionStage`/`OpenMotionStage` leave both additive fields
+unset, including when a previously strict result is reused as the destination.
+Reader failures leave strict results unchanged and clear diagnostics on success.
+Builder output is checked by the existing descriptor/source-rest validators;
+their first code, subject and detail are forwarded without recoding.
 
 The reader owns joints/rest extraction, topology checks, decomposition via
 owner value algorithms, motion-domain descriptor/rest construction, generic
@@ -473,18 +486,20 @@ WS-O4 selects a public `motionUsd` → `motionRetarget` dependency for this
 extension, as accepted on 2026-10-07 in
 [WORKSPACE.md §2.5](../architecture/WORKSPACE.md#25-runtime-boundary-target).
 The descriptor/rest types, builders and validators stay with their existing
-owner and remain reusable without a USD stage. Dependency wiring and the
-typed reader API are still unimplemented; callers should not have to reproduce
-builders to avoid linking a reader.
+owner and remain reusable without a USD stage. Manifest, public CMake links,
+installed package discovery and boundary gates implement that edge. Constructed
+and referenced-stage coverage is in `motionUsd_skeletonReader`; clean installed
+consumption checks transitive package discovery and typed clip/rest parity.
+Runtime wrapper migration remains in
+[Runtime Boundary Phases 2-3](../roadmap/runtime-boundary.md).
 
 ### 7.2.1 Scoped strict array readers
 
 Implemented locally, unreleased, 2026-10-06: `SkeletonReader.h` adds
 `ReadSkeleton(stage, path, read, diagnostic)` and
-`ReadCanonicalMotionStage(stage, path, read, diagnostic)`. This slice keeps
-the existing dependency graph and raw `MotionStageSkeleton` representation;
-it does not implement the WS-O4 edge or the typed descriptor/source-rest result.
-Consumers invoke existing motionRetarget builders rather than duplicate them.
+`ReadCanonicalMotionStage(stage, path, read, diagnostic)`. `ReadSkeleton` keeps
+the raw `MotionStageSkeleton` representation. The typed extension in §7.2
+reuses this extraction and invokes the existing motionRetarget builders.
 
 `ReadSkeleton` returns owned default-time parent-local rest matrices in metres,
 joint tokens and parent indices, authored-rest presence, source unit metadata,
@@ -499,11 +514,12 @@ refused. Accepted affine roundoff is canonicalized only in the owned copy.
 `ReadCanonicalMotionStage` additionally requires metre units, identity world
 placement and a finite positive encoding rate because semantic sample
 translations use canonical metres. It preserves existing clip/metadata/warnings
-and replaces the raw skeleton arrays with validated authored rest. The original
+and replaces the raw skeleton arrays with validated authored rest, alongside
+§7.2's owner-built descriptor/source rest. The original
 `ReadMotionStage` remains permissive, including missing-rest fallback/warnings.
 
 Both APIs leave the caller's result untouched on refusal and return a
-`SkeletonReadDiagnostic` containing unmodified `MOTION_USD_*` code, subject and
+`SkeletonReadDiagnostic` containing unmodified owner code, subject and
 detail. Neither retains a stage/prim handle or authors a layer. Correctness and
 graph coverage are in `motionUsd_skeletonReader` and `motionUsd_boundaries`;
 runtime installed-consumer tests check marshaling and diagnostic/lifetime parity.

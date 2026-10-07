@@ -20,6 +20,12 @@ string(JSON _count LENGTH "${_packages_json}" packages)
 
 set(_targets "")
 set(_includes "")
+# Resolve the USD reader first: its public retarget types must be discovered
+# transitively, before the inventory explicitly finds the retarget package.
+find_package(motionUsd ${USDMOTION_CONSUMER_VERSION} CONFIG REQUIRED)
+if(NOT TARGET motionRetarget::motionRetarget)
+    message(FATAL_ERROR "motionUsd did not discover its public motionRetarget dependency")
+endif()
 if(_count GREATER 0)
     math(EXPR _last "${_count} - 1")
     foreach(_index RANGE ${_last})
@@ -35,6 +41,10 @@ if(_count GREATER 0)
         string(APPEND _includes "#include \"${_header}\"\n")
     endforeach()
 endif()
+
+# Retarget symbols in main.cpp must link through motionUsd's public edge.
+# The inventory above still independently verifies the package and header.
+list(REMOVE_ITEM _targets motionRetarget::motionRetarget)
 
 # One translation unit that includes every package's public header, so a
 # header that reaches for something the package does not install fails here.

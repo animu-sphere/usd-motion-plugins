@@ -19,6 +19,7 @@
 #include "motionUsd/api.h"
 
 #include "motionCore/MotionPose.h"
+#include "motionRetarget/RestPose.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/quatf.h"
@@ -34,13 +35,8 @@ namespace openstrata::motion {
 
 // What a skeleton prim states, as plain values.
 //
-// Values and not a `SkeletonDescriptor`: that type is `motionRetarget`'s, and
-// this library depends on `motionCore` alone among the retarget's neighbours
-// (WORKSPACE.md §2.1). These two arrays are exactly what
-// `BuildSkeletonDescriptor` takes, and its descriptor is what
-// `BuildSourceRestPose` takes after it, so a caller that wants either hands
-// this over unchanged and a caller that wants neither does not link a
-// retargeter to read a stage.
+// Compatible raw arrays for the permissive reader. The strict reader also
+// returns owner-built descriptor/source-rest values (USD_MAPPING.md §7.2).
 struct MotionStageSkeleton {
     // The skeleton prim the clip was read against.
     std::string path;
@@ -102,6 +98,12 @@ struct MotionStageRead {
     // What the stage said that the clip could not carry, or said oddly. A
     // warning is never a refusal: the clip beside it is usable.
     std::vector<std::string> warnings;
+
+    // Populated together only by ReadCanonicalMotionStage. The permissive
+    // reader retains its raw-array/fallback contract and leaves both unset.
+    // Owned values: neither keeps a stage or prim alive.
+    std::optional<SkeletonDescriptor> descriptor;
+    std::optional<SourceRestPose> sourceRest;
 };
 
 // What a `UsdSkelAnimation` states at one instant, as plain values.

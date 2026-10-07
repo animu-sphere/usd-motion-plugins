@@ -1,8 +1,9 @@
 # Diagnostics
 
-The catalog of diagnostic codes this repository raises. Status (2026-10-06):
+The catalog of diagnostic codes this repository raises. Status (2026-10-07):
 eleven `MOTION_BVH_*`, eight `MOTION_RETARGET_*`, and sixteen
-`MOTION_VALIDATION_*` codes. A code is added here in the change that first raises it.
+`MOTION_VALIDATION_*` codes, plus the strict USD-reader codes below.
+A code is added here in the change that first raises it.
 
 ## 1. The record
 
@@ -101,6 +102,43 @@ does not become a malformed-input error.
 | `MOTION_VALIDATION_DUPLICATE_JOINT_TOKEN` | a skeleton joint token is repeated |
 | `MOTION_VALIDATION_INVALID_JOINT_INDEX` | a map's target index is outside the supplied skeleton |
 | `MOTION_VALIDATION_TARGET_REST_SIZE` | a target reference rest has more slots than the skeleton |
+
+### 2.4 Strict USD readers
+
+`SkeletonReadDiagnostic` carries one refusal code, subject and detail. These
+codes denote errors and are not recoverable for the selected strict profile;
+the destination is unchanged. The stage is never modified. Owner value-validator
+failures forward the first §2.3 code/subject/detail without recoding.
+Permissive clip-reader warnings remain strings, separate from this surface.
+
+| Code | Subject | Meaning |
+| --- | --- | --- |
+| `MOTION_USD_OUTPUT` | selected skeleton path | null destination |
+| `MOTION_USD_STAGE` | selected skeleton path | null stage |
+| `MOTION_USD_SKELETON_PATH` | selected path | expected an absolute prim path without variant selections |
+| `MOTION_USD_SKELETON` | selected path | no skeleton at that path |
+| `MOTION_USD_UP_AXIS` | skeleton path | strict profile requires Y-up |
+| `MOTION_USD_UNITS` | skeleton path | nonpositive/nonfinite units, or canonical clip units are not metres |
+| `MOTION_USD_JOINTS` | skeleton path | missing, empty or unrepresentable joint array |
+| `MOTION_USD_REST_COUNT` | skeleton path | missing default rest or not one rest per joint |
+| `MOTION_USD_JOINT_TOKEN` | joint token | empty, duplicate or malformed relative joint path |
+| `MOTION_USD_NONFINITE` | joint token or skeleton path | rest/placement matrix is not finite |
+| `MOTION_USD_NONAFFINE` | joint token or skeleton path | perspective exceeds accepted affine roundoff |
+| `MOTION_USD_SCALE` | joint token or skeleton path | scale is not positive and float-representable |
+| `MOTION_USD_PLACEMENT_SCALE` | skeleton path | placement scale is not rigid |
+| `MOTION_USD_SHEAR` | joint token or skeleton path | rest/placement shear exceeds tolerance |
+| `MOTION_USD_REFLECTION` | joint token or skeleton path | rest/placement reflects its basis |
+| `MOTION_USD_FLOAT_RANGE` | joint token | metre rest translation is not float-representable |
+| `MOTION_USD_TOPOLOGY` | skeleton path | resolved topology is invalid |
+| `MOTION_USD_PARENT_MAPPING` | joint token | topology disagrees with the immediate-parent rest convention |
+| `MOTION_USD_PLACEMENT_RANGE` | skeleton path | metre placement translation is not finite |
+| `MOTION_USD_RATE` | skeleton path | canonical clip encoding rate is not positive and finite |
+| `MOTION_USD_PLACEMENT` | skeleton path | canonical clip requires identity placement |
+| `MOTION_USD_READ` | skeleton path | common clip reader refused; detail retains its reason |
+| `MOTION_USD_SKELETON_ROLE` | skeleton path | role is outside the generic/semantic-source vocabulary |
+| `MOTION_USD_DESCRIPTOR` | skeleton path | owner builder did not produce a descriptor from validated arrays |
+| `MOTION_USD_SOURCE_REST_NO_HUMAN_BONE` | skeleton path | explicitly semantic source names no vocabulary bone |
+| `MOTION_USD_SOURCE_REST_DUPLICATE_BONE` | first offending joint token | explicitly semantic source names a bone more than once |
 
 ## 3. Open questions
 

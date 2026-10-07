@@ -21,6 +21,14 @@ separate from the package version
 
 ### Added
 
+- Typed skeleton/rest reading through `ReadMotionSkeleton`, with explicitly
+  selected generic or semantic-source interpretation and separate metre
+  placement metadata. `ReadCanonicalMotionStage` returns owner-built descriptor
+  and source rest alongside compatible clip/arrays/metadata fields. The public
+  `motionUsd` → `motionRetarget` edge is declared in the manifest, CMake links,
+  installed package and boundary gates. Permissive reader fallbacks remain
+  available ([USD mapping §7.2](docs/design/USD_MAPPING.md#72-motion-domain-reader-results)).
+
 - `ReadCanonicalMotionStage` accepts `MotionStageReadOptions`, preserving the
   strict skeleton/clip profile and owner diagnostics while delegating selected
   scalar/gaze reading to the common reader. Installed consumers cover this
