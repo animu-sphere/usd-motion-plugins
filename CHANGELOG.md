@@ -9,7 +9,15 @@ separate from the package version
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-07
+
 ### Fixed
+
+- USD motion reading validates the complete body/channel/gaze key union before
+  converting time codes to finite, strictly increasing seconds with finite
+  adjacent spans. Strict reading refuses unusable encoding rates; permissive
+  reading keeps its documented rate fallback. Negative times and producer-rate
+  metadata remain supported ([USD mapping §7.3](docs/design/USD_MAPPING.md#73-reader-time-code-policy)).
 
 - Live intake and pose buffering refuse nonfinite timestamps and overflowing
   adjacent spans before conditioning history. Clock alignment preserves its
