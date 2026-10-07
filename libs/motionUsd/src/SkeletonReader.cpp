@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionUsd/SkeletonReader.h"
+#include "motionRetarget/Validation.h"
 
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
@@ -58,6 +59,59 @@ ValidateMatrix(pxr::GfMatrix4d& matrix, const std::string& subject, bool rigid,
     // reflection on otherwise representable scales.
     if (pxr::GfDot(pxr::GfCross(rows[0], rows[1]), rows[2]) <= 0)
         return Fail(diagnostic, "MOTION_USD_REFLECTION", subject, "reflection is unsupported");
+    return true;
+}
+
+bool
+ValidateBuiltValues(const ValidationReport& report, SkeletonReadDiagnostic* diagnostic)
+{
+    if (report.IsValid())
+        return true;
+    const auto& first = report.reported.front();
+    if (diagnostic)
+        *diagnostic = {std::string(ValidationCodeString(first.code)), first.subject, first.detail};
+    return false;
+}
+
+bool
+BuildMotionSkeleton(const SkeletonStageRead& values, SkeletonReadRole role,
+                    MotionSkeletonRead* read, SkeletonReadDiagnostic* diagnostic)
+{
+    if (role != SkeletonReadRole::Generic && role != SkeletonReadRole::SemanticSource)
+        return Fail(diagnostic,
+                    "MOTION_USD_SKELETON_ROLE",
+                    values.skeleton.path,
+                    "expected generic or semantic-source interpretation");
+    auto descriptor =
+        BuildSkeletonDescriptor(values.skeleton.jointTokens, values.skeleton.restTransforms);
+    if (!descriptor.skeleton)
+        return Fail(diagnostic,
+                    "MOTION_USD_DESCRIPTOR",
+                    values.skeleton.path,
+                    "validated rest arrays did not produce a descriptor");
+    if (!ValidateBuiltValues(ValidateSkeletonDescriptor(*descriptor.skeleton), diagnostic))
+        return false;
+    MotionSkeletonRead result;
+    result.skeleton = std::move(*descriptor.skeleton);
+    if (role == SkeletonReadRole::SemanticSource) {
+        auto source = BuildSourceRestPose(result.skeleton);
+        if (source.error == SourceRestPoseError::NoHumanBone)
+            return Fail(diagnostic,
+                        "MOTION_USD_SOURCE_REST_NO_HUMAN_BONE",
+                        values.skeleton.path,
+                        "semantic source names no human bone");
+        if (source.error == SourceRestPoseError::DuplicateBone)
+            return Fail(diagnostic,
+                        "MOTION_USD_SOURCE_REST_DUPLICATE_BONE",
+                        source.offending.front().second,
+                        "semantic source names a bone twice");
+        if (!ValidateBuiltValues(ValidateSourceRestPose(*source.rest), diagnostic))
+            return false;
+        result.sourceRest = std::move(*source.rest);
+    }
+    result.metadata = {
+        values.skeleton.path, values.metersPerUnit, values.worldTranslation, values.worldRotation};
+    *read = std::move(result);
     return true;
 }
 } // namespace
@@ -163,6 +217,21 @@ ReadSkeleton(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path, SkeletonSt
 }
 
 bool
+ReadMotionSkeleton(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path, SkeletonReadRole role,
+                   MotionSkeletonRead* read, SkeletonReadDiagnostic* diagnostic)
+{
+    if (!read)
+        return Fail(diagnostic, "MOTION_USD_OUTPUT", path.GetString(), "null output");
+    SkeletonStageRead values;
+    if (!ReadSkeleton(stage, path, &values, diagnostic) ||
+        !BuildMotionSkeleton(values, role, read, diagnostic))
+        return false;
+    if (diagnostic)
+        *diagnostic = {};
+    return true;
+}
+
+bool
 ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path,
                          MotionStageRead* read, SkeletonReadDiagnostic* diagnostic)
 {
@@ -195,6 +264,9 @@ ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path
     if (std::abs(std::abs(skeleton.worldRotation.GetReal()) - 1) > 1e-12)
         return Fail(
             diagnostic, "MOTION_USD_PLACEMENT", subject, "clip samples require identity placement");
+    MotionSkeletonRead typed;
+    if (!BuildMotionSkeleton(skeleton, SkeletonReadRole::SemanticSource, &typed, diagnostic))
+        return false;
     MotionStageRead result;
     std::string error;
     if (!ReadMotionStage(stage, subject, options, &result, &error)) {
@@ -203,6 +275,8 @@ ReadCanonicalMotionStage(const pxr::UsdStagePtr& stage, const pxr::SdfPath& path
         return false;
     }
     result.skeleton = std::move(skeleton.skeleton);
+    result.descriptor = std::move(typed.skeleton);
+    result.sourceRest = std::move(typed.sourceRest);
     *read = std::move(result);
     if (diagnostic)
         *diagnostic = {};

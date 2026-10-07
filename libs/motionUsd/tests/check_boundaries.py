@@ -3,7 +3,7 @@
 """Enforce motionUsd's boundary (docs/architecture/WORKSPACE.md §2.1-§2.4).
 
 motionUsd converts between motion values and a stage. It may depend on
-motionCore and on OpenUSD's usd, sdf, usdGeom and usdSkel, and it is not a
+motionCore, motionRetarget and OpenUSD's usd, sdf, usdGeom and usdSkel, and it is not a
 plugin (USD_MAPPING.md §1). Four checks: no plugin registration, file format,
 imaging or OpenExec API in the sources; no include from a repository library
 outside its declared edges, and no transport; a link line and a binary that
@@ -23,7 +23,7 @@ import sys
 
 LIBRARY = "motionUsd"
 # WORKSPACE.md §2.1: the repository libraries this one may include.
-ALLOWED_LIBRARIES = {"motionCore", "motionUsd"}
+ALLOWED_LIBRARIES = {"motionCore", "motionRetarget", "motionUsd"}
 
 
 def _find_dumpbin() -> str | None:
@@ -158,7 +158,7 @@ def main() -> int:
     names = {name.split("::")[-1] for call in linked for name in call.split()}
     allowed_pxr = {"usd", "sdf", "usdGeom", "usdSkel"}
     for name in sorted(names):
-        if name in {"PUBLIC", "PRIVATE", "INTERFACE", LIBRARY, "motionCore"}:
+        if name in {"PUBLIC", "PRIVATE", "INTERFACE"} | ALLOWED_LIBRARIES:
             continue
         if name.startswith("${") or name in allowed_pxr:
             continue

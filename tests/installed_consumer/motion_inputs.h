@@ -62,6 +62,19 @@ CheckMotionInputs()
             stage, pxr::SdfPath(read.skeleton.path), options, &strict, &diagnostic) ||
         strict.clip != read.clip || !diagnostic.code.empty())
         return false;
+    if (!strict.descriptor || !strict.sourceRest || read.descriptor || read.sourceRest)
+        return false;
+    MotionSkeletonRead skeleton;
+    if (!ReadMotionSkeleton(stage,
+                            pxr::SdfPath(read.skeleton.path),
+                            SkeletonReadRole::SemanticSource,
+                            &skeleton,
+                            &diagnostic) ||
+        skeleton.skeleton != *strict.descriptor || !skeleton.sourceRest ||
+        skeleton.sourceRest->localRotations != strict.sourceRest->localRotations ||
+        skeleton.sourceRest->localTranslations != strict.sourceRest->localTranslations ||
+        skeleton.sourceRest->parents != strict.sourceRest->parents)
+        return false;
     const auto& samples = read.clip.samples;
     const float* zero = samples[1].channels.Find("vrm:custom.face");
     const float* outside = samples[3].channels.Find("vrm:custom.face");

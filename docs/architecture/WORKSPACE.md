@@ -79,16 +79,14 @@ workspace discipline (WS-O1, decided 2026-09-19;
 
 ### 2.1 Inside the repository
 
-Implemented graph. The accepted WS-O4 reader extension adds the public
-`motionUsd` → `motionRetarget` edge specified in §2.5; that edge is not yet
-implemented.
+Implemented graph, including WS-O4's public typed-reader edge (§2.5).
 
 ```text
 motionCore ──────→ OpenUSD foundation types only (gf, tf, vt)
 motionSampling ──→ motionCore
 motionRecording ─→ motionCore, motionSampling
 motionRetarget ──→ motionCore
-motionUsd ───────→ motionCore, OpenUSD (usd, sdf, usdGeom, usdSkel)
+motionUsd ───────→ motionCore, motionRetarget, OpenUSD (usd, sdf, usdGeom, usdSkel)
 motionSource ────→ motionCore
 motionBvh ───────→ motionSource
 execMotion ──────→ motionCore, motionSampling, motionRecording, motionUsd,
@@ -175,7 +173,7 @@ existing graph without adding a retarget or runtime dependency.
 
 The accepted [motion/runtime ownership policy](../design/DESIGN_POLICY.md#43-motion-and-avatar-runtime-boundary)
 requires `motionUsd` to return motion-domain skeleton/rest values as well as
-clips. The current §2.1 graph and §1 identities remain the implemented graph;
+clips. The §2.1 graph and §1 identities describe the implemented components;
 the new reader contract is
 [USD_MAPPING.md §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results).
 
@@ -188,7 +186,7 @@ dependency for the typed reader extension.** `SkeletonDescriptor`,
 decomposition, hierarchy or rest-construction algorithm. A generic skeleton
 descriptor does not require humanoid source-rest extraction.
 
-The accepted target graph is:
+The accepted reader graph, implemented locally and unreleased, is:
 
 ```text
 motionUsd ───────→ motionCore, motionRetarget,
@@ -210,23 +208,18 @@ that surface would require a separate public-type and package migration
 without evidence that the typed reader needs one. This decision reuses the
 existing owner and leaves neutral-value migration to WS-O5.
 
-This structural decision precedes implementation in its own pull request
-(the rule at the top of this document). Before adding typed reader code, the
-implementation change must:
+The structural decision preceded implementation. The manifest, public CMake
+links, installed `find_dependency` and include/link gates now declare this
+edge. `ReadMotionSkeleton` returns owner-built values with explicit generic
+or semantic-source interpretation; `ReadCanonicalMotionStage` fills the
+additive descriptor/source-rest fields. Owner tests, graph validation,
+standalone builds and clean installed consumption cover the boundary.
+The installed-consumer configure resolves `motionUsd` before explicitly
+finding `motionRetarget`, verifying transitive package discovery.
 
-- declare `motionRetarget` in `motionUsd`'s library manifest and public CMake
-  links, and resolve it with `find_dependency` in the installed package config;
-- allow exactly this new owner edge in `motionUsd`'s include/link boundary
-  checks, retaining the stage/consumer prohibition on `motionRetarget` and
-  the processing-layer prohibition on `motionCore`;
-- verify the graph, standalone `motionUsd` build and clean installed-package
-  consumption, including discovery of the public retarget dependency;
-- add owner reader tests before claiming typed descriptor/source-rest results
-  or removing consumer assembly.
-
-The current manifests, package config, gates and installed API still implement
-§2.1. This decision alone does not close Runtime Boundary Phases 2-3 or change
-the permissive reader's raw-array/fallback contract.
+Runtime adoption and duplicate-removal evidence remain required to close
+Runtime Boundary Phases 2-3. The permissive reader's raw-array/fallback
+contract is unchanged.
 
 OpenUSD stage/schema APIs stay in `motionUsd`. Full OpenUSD dependency
 isolation is the target, but `motionCore` and the processing APIs currently
@@ -348,5 +341,5 @@ WS-O1, the names, was decided on 2026-09-19 (§1.2).
 | --- | --- | --- |
 | ~~WS-O2~~ | **Decided 2026-09-19: `motionCore` alone**, as design policy §24 draws it (§2.1). Was: whether `motionRetarget` depends on `motionSampling`, as `vrmRetarget` depended on its runtime library for one resample option | the import of `vrmRetarget`'s generic half |
 | WS-O3 | Design policy §26 sketches `plugins/motion-bvh/`; the imported BVH reader is a plain library and registers nothing. A BVH `SdfFileFormat` would be a separate, thin bundle, created only if opening `.bvh` directly is wanted | a consumer that wants it |
-| ~~WS-O4~~ | **Decided 2026-10-07: public `motionUsd` → `motionRetarget` edge**, reusing the existing types/builders without moving them (§2.5); dependency wiring and typed readers remain unimplemented | Runtime Boundary Phase 2 implementation |
+| ~~WS-O4~~ | **Decided 2026-10-07: public `motionUsd` → `motionRetarget` edge**, reusing the existing types/builders without moving them (§2.5); edge and typed readers implemented locally, unreleased | runtime adoption remains Runtime Boundary Phases 2-3 |
 | WS-O5 | Neutral math/value types and migration of the public foundation-type APIs to achieve full OpenUSD isolation (§2.5) | Runtime Boundary Phase 5, before ABI freeze |

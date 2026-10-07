@@ -23,7 +23,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 | `motionUsd/ClipWriter.h` | `AuthorMotionStage` (into a stage a caller holds), `WriteMotionStage` (into a file), `MotionStageOptions` (with a producer's `MotionStageRest` and provenance), `MotionStageReport` |
 | `motionUsd/ClipReader.h` | `ReadMotionStage` (from a stage a caller holds), `OpenMotionStage` (from a file), `MotionStageReadOptions` (explicit owner-selected scalar/gaze inputs), `PoseFromStageSample` (joint values only, no stage), `MotionStageRead` with its `MotionStageSkeleton` and `MotionStageMetadata` |
 | `motionUsd/SkeletonAnimationWriter.h` | `AuthorSkeletonAnimation`, `SkeletonAnimationSample`: target-local arrays into a new animation and a skeleton binding override |
-| `motionUsd/SkeletonReader.h` | `ReadSkeleton`: strict default-time owned metre rest/parent/rigid-placement values; `ReadCanonicalMotionStage`: the existing clip read with authored rest and canonical source-space checks; owner code/subject/detail refusals |
+| `motionUsd/SkeletonReader.h` | `ReadSkeleton`: strict owned metre rest/parent/placement arrays; `ReadMotionSkeleton`: owner-built descriptor and explicitly selected semantic source rest with metadata; `ReadCanonicalMotionStage`: coherent clip/descriptor/source-rest result with canonical source-space checks; owner code/subject/detail refusals |
 
 ```text
 /Animation            Scope, the default prim; customData.motion, customData.source
@@ -76,10 +76,11 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 
 - **A semantic skeleton reads; any other is a retarget.** A skeleton no joint
   token of which names the vocabulary is refused, not guessed at (USD §7).
-- **The skeleton comes back as values.** `jointTokens` and `restTransforms`
-  are what `motionRetarget`'s `BuildSkeletonDescriptor` takes, and its
-  descriptor is what `BuildSourceRestPose` takes after it, so reading a stage
-  links no retargeter.
+- **The strict reader builds the rest.** `ReadMotionSkeleton` explicitly
+  selects generic or semantic-source interpretation and invokes the existing
+  `motionRetarget` builders/validators. `ReadCanonicalMotionStage` fills the
+  additive descriptor/source-rest fields together; the permissive reader keeps
+  compatible raw arrays and leaves those fields unset.
 - **The producer's rate is not the stage's.** `timeCodesPerSecond` says where
   the samples were written (the writer uses 30); `customData.motion.nominalFrameRate`
   says what they were taken at, and that is what the clip comes back with.
@@ -109,15 +110,16 @@ scalar/gaze inputs through that same strict profile. Metadata and warnings are
 preserved. Refusals leave
 the destination unchanged and retain a motion-owned code/subject/detail.
 
-Callers invoke the existing `motionRetarget` descriptor/source-rest builders on
-the returned arrays. WS-O4 selects a public `motionUsd` → `motionRetarget`
-dependency for typed results
+WS-O4's public `motionUsd` → `motionRetarget` dependency provides typed results
 ([WORKSPACE §2.5](../../docs/architecture/WORKSPACE.md#25-runtime-boundary-target));
-that dependency and the typed API are not yet implemented. The current
-extension keeps the declared `motionUsd` → `motionCore` dependency.
-`motionUsd_skeletonReader` covers numeric/profile/ownership/refusal behavior,
-and `motionUsd_boundaries` keeps the library graph unchanged. Installed runtime
-adapters supply separate invocation/mapping/lifetime evidence.
+the manifest, public links, installed config and boundary gates implement this
+edge. `ReadMotionSkeleton` returns a descriptor with optional semantic source
+rest, source units and separate rigid placement. Unsupported semantic sources
+are refused rather than assigned identity rests; generic rigs require no human
+roles. `motionUsd_skeletonReader` covers referenced stages, hierarchy/rest parity,
+numeric/profile/ownership/refusal behavior. Installed consumers verify discovery
+and linking of the public retarget dependency. Runtime adoption remains in
+[Runtime Boundary Phases 2-3](../../docs/roadmap/runtime-boundary.md).
 
 ## Rules the target animation writer keeps
 
@@ -146,7 +148,7 @@ It builds as part of the repository root `CMakeLists.txt`. Standalone:
 
 ```sh
 cmake -S libs/motionUsd -B build/motion-usd \
-      -DCMAKE_PREFIX_PATH="<usd-install>;<motionCore-install>"
+      -DCMAKE_PREFIX_PATH="<usd-install>;<motionCore-install>;<motionRetarget-install>"
 cmake --build build/motion-usd --config Release
 ctest --test-dir build/motion-usd -C Release --output-on-failure
 ```

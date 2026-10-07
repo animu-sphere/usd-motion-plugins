@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "motionUsd/SkeletonReader.h"
+#include "motionRetarget/Validation.h"
 #include "pxr/base/gf/rotation.h"
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
@@ -7,6 +8,7 @@
 #include "pxr/usd/usdSkel/animation.h"
 #include "pxr/usd/usdSkel/bindingAPI.h"
 #include "pxr/usd/usdSkel/skeleton.h"
+#include "pxr/usd/usd/references.h"
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -171,9 +173,19 @@ CanonicalClip()
     assert(ReadMotionStage(stage, path.GetString(), &permissive, &error));
     assert(ReadCanonicalMotionStage(stage, path, &read, &diagnostic));
     assert(read.clip == permissive.clip && read.warnings == permissive.warnings);
+    assert(!permissive.descriptor && !permissive.sourceRest);
+    assert(read.descriptor && read.sourceRest);
+    assert(
+        *read.descriptor ==
+        *BuildSkeletonDescriptor(read.skeleton.jointTokens, read.skeleton.restTransforms).skeleton);
+    assert(read.sourceRest->parents[static_cast<size_t>(HumanJoint::Head)] ==
+           static_cast<size_t>(HumanJoint::Hips));
     assert(read.animationPath == permissive.animationPath && read.timeCodesPerSecond == 60);
     assert(!read.metadata.contractVersion && read.skeleton.restTransformsAuthored);
     assert(read.clip.samples.size() == 2 && read.clip.samples[1].timestamp == 1);
+    auto reused = read;
+    assert(ReadMotionStage(stage, path.GetString(), &reused, &error));
+    assert(!reused.descriptor && !reused.sourceRest && reused.clip == read.clip);
     auto reject = [&](const pxr::UsdStagePtr& s, const char* code) {
         read.animationPath = "retained";
         assert(!ReadCanonicalMotionStage(s, path, &read, &diagnostic));
@@ -227,13 +239,145 @@ CanonicalInputs()
     assert(*read.clip.samples[2].channels.Find("vrm:happy") == 1.5f);
     assert(!read.clip.samples[2].lookAtTarget);
     const auto retained = read.clip;
+    const auto retainedDescriptor = *read.descriptor;
+    const auto retainedRest = *read.sourceRest;
     assert(weight.Set(std::numeric_limits<float>::infinity(), 30));
     assert(!ReadCanonicalMotionStage(stage, path, options, &read, &diagnostic));
     assert(diagnostic.code == "MOTION_USD_READ" && read.clip == retained);
+    assert(*read.descriptor == retainedDescriptor &&
+           read.sourceRest->localRotations == retainedRest.localRotations &&
+           read.sourceRest->localTranslations == retainedRest.localTranslations &&
+           read.sourceRest->parents == retainedRest.parents);
     assert(weight.Set(0.5f, 30));
     assert(pxr::UsdGeomSetStageMetersPerUnit(stage, 0.01));
     assert(!ReadCanonicalMotionStage(stage, path, options, &read, &diagnostic));
     assert(diagnostic.code == "MOTION_USD_UNITS" && read.clip == retained);
+}
+
+void
+TypedSkeleton()
+{
+    auto source = Stage();
+    auto sk = pxr::UsdSkelSkeleton(source->GetPrimAtPath(path));
+    const pxr::VtTokenArray tokens{pxr::TfToken("hips"),
+                                   pxr::TfToken("hips/spine"),
+                                   pxr::TfToken("hips/spine/head"),
+                                   pxr::TfToken("aux")};
+    pxr::GfMatrix4d hip(1), spine(1), head(1), aux(1);
+    hip.SetRotate(pxr::GfRotation(pxr::GfVec3d(0, 1, 0), 20));
+    hip.SetTranslateOnly(pxr::GfVec3d(0, 80, 0));
+    spine.SetRotate(pxr::GfRotation(pxr::GfVec3d(1, 0, 0), 30));
+    spine.SetTranslateOnly(pxr::GfVec3d(0, 25, 0));
+    head.SetRotate(pxr::GfRotation(pxr::GfVec3d(0, 0, 1), 10));
+    head.SetTranslateOnly(pxr::GfVec3d(0, 50, 0));
+    aux.SetScale(pxr::GfVec3d(0.5, 1, 2));
+    assert(sk.GetJointsAttr().Set(tokens));
+    assert(sk.GetRestTransformsAttr().Set(pxr::VtMatrix4dArray{hip, spine, head, aux}));
+    std::string original;
+    assert(source->GetRootLayer()->ExportToString(&original));
+
+    // Resolve an explicitly selected referenced skeleton, rather than choosing
+    // the first skeleton or keeping the source layer alive in the result.
+    auto stage = pxr::UsdStage::CreateInMemory();
+    assert(pxr::UsdGeomSetStageUpAxis(stage, pxr::UsdGeomTokens->y));
+    assert(pxr::UsdGeomSetStageMetersPerUnit(stage, 0.01));
+    auto rig = pxr::UsdGeomXform::Define(stage, pxr::SdfPath("/Selected"));
+    assert(rig.GetPrim().GetReferences().AddReference(source->GetRootLayer()->GetIdentifier(),
+                                                      pxr::SdfPath("/Rig")));
+    pxr::GfMatrix4d placement(1);
+    placement.SetRotate(pxr::GfRotation(pxr::GfVec3d(0, 1, 0), 90));
+    placement.SetTranslateOnly(pxr::GfVec3d(300, 0, 500));
+    assert(rig.AddTransformOp().Set(placement));
+    const pxr::SdfPath selected("/Selected/Skeleton");
+    SkeletonStageRead raw;
+    SkeletonReadDiagnostic diagnostic;
+    assert(ReadSkeleton(stage, selected, &raw, &diagnostic));
+    const auto expected =
+        BuildSkeletonDescriptor(raw.skeleton.jointTokens, raw.skeleton.restTransforms);
+    const auto expectedRest = BuildSourceRestPose(*expected.skeleton);
+    MotionSkeletonRead generic, semantic;
+    assert(ReadMotionSkeleton(stage, selected, SkeletonReadRole::Generic, &generic, &diagnostic));
+    assert(generic.skeleton == *expected.skeleton && !generic.sourceRest);
+    assert(ReadMotionSkeleton(
+        stage, selected, SkeletonReadRole::SemanticSource, &semantic, &diagnostic));
+    assert(diagnostic.code.empty() && semantic.skeleton == generic.skeleton);
+    assert(semantic.sourceRest && ValidateSourceRestPose(*semantic.sourceRest).IsValid());
+    assert(semantic.sourceRest->localRotations == expectedRest.rest->localRotations);
+    assert(semantic.sourceRest->localTranslations == expectedRest.rest->localTranslations);
+    assert(semantic.sourceRest->parents == expectedRest.rest->parents);
+    const auto headSlot = static_cast<size_t>(HumanJoint::Head);
+    const auto spineSlot = static_cast<size_t>(HumanJoint::Spine);
+    assert(semantic.sourceRest->parents[headSlot] == spineSlot);
+    assert(semantic.sourceRest->localTranslations[headSlot] == pxr::GfVec3f(0, 0.5, 0));
+    assert(semantic.skeleton.GetJoints()[3].restScale == pxr::GfVec3f(0.5, 1, 2));
+    assert(semantic.metadata.skeletonPath == selected.GetString());
+    assert(semantic.metadata.metersPerUnit == 0.01 &&
+           semantic.metadata.worldTranslation == pxr::GfVec3d(3, 0, 5));
+    assert(semantic.metadata.worldRotation == raw.worldRotation);
+    std::string after;
+    assert(source->GetRootLayer()->ExportToString(&after) && original == after);
+    const auto retained = semantic;
+    assert(stage->RemovePrim(pxr::SdfPath("/Selected")));
+    assert(!ReadMotionSkeleton(
+        stage, selected, SkeletonReadRole::SemanticSource, &semantic, &diagnostic));
+    assert(diagnostic.code == "MOTION_USD_SKELETON" && diagnostic.subject == selected.GetString());
+    assert(semantic.skeleton == retained.skeleton &&
+           semantic.sourceRest->localRotations == retained.sourceRest->localRotations &&
+           semantic.metadata.worldTranslation == retained.metadata.worldTranslation);
+    stage.Reset();
+    source.Reset();
+    assert(semantic.skeleton.GetSize() == 4 && semantic.sourceRest->parents[headSlot] == spineSlot);
+}
+
+void
+TypedRefusals()
+{
+    MotionSkeletonRead read;
+    read.metadata.skeletonPath = "retained";
+    SkeletonReadDiagnostic diagnostic;
+    auto reject = [&](const pxr::UsdStagePtr& stage,
+                      SkeletonReadRole role,
+                      const char* code,
+                      const std::string& subject) {
+        assert(!ReadMotionSkeleton(stage, path, role, &read, &diagnostic));
+        assert(diagnostic.code == code && diagnostic.subject == subject &&
+               !diagnostic.detail.empty());
+        assert(read.skeleton.IsEmpty() && !read.sourceRest &&
+               read.metadata.skeletonPath == "retained");
+    };
+    reject({}, SkeletonReadRole::Generic, "MOTION_USD_STAGE", path.GetString());
+    reject(
+        Stage(), static_cast<SkeletonReadRole>(99), "MOTION_USD_SKELETON_ROLE", path.GetString());
+    assert(!ReadMotionSkeleton(Stage(), path, SkeletonReadRole::Generic, nullptr, &diagnostic));
+    assert(diagnostic.code == "MOTION_USD_OUTPUT");
+    auto stage = Stage();
+    auto sk = pxr::UsdSkelSkeleton(stage->GetPrimAtPath(path));
+    assert(sk.GetJointsAttr().Set(pxr::VtTokenArray{
+        pxr::TfToken("Root"), pxr::TfToken("Root/Joint"), pxr::TfToken("Extra")}));
+    reject(stage,
+           SkeletonReadRole::SemanticSource,
+           "MOTION_USD_SOURCE_REST_NO_HUMAN_BONE",
+           path.GetString());
+    assert(ReadMotionSkeleton(stage, path, SkeletonReadRole::Generic, &read, nullptr));
+    assert(!read.sourceRest && read.skeleton.GetSize() == 3);
+    read = {};
+    read.metadata.skeletonPath = "retained";
+    assert(sk.GetJointsAttr().Set(
+        pxr::VtTokenArray{pxr::TfToken("hips"), pxr::TfToken("hips/head"), pxr::TfToken("head")}));
+    reject(stage,
+           SkeletonReadRole::SemanticSource,
+           "MOTION_USD_SOURCE_REST_DUPLICATE_BONE",
+           "hips/head");
+    // Generic interpretation never guesses semantic roles, even on this rig.
+    MotionSkeletonRead generic;
+    assert(ReadMotionSkeleton(stage, path, SkeletonReadRole::Generic, &generic, nullptr));
+    MotionStageRead clip;
+    clip.animationPath = "retained";
+    assert(!ReadCanonicalMotionStage(stage, path, &clip, &diagnostic));
+    assert(diagnostic.code == "MOTION_USD_SOURCE_REST_DUPLICATE_BONE" &&
+           clip.animationPath == "retained" && !clip.descriptor && !clip.sourceRest);
+    sk.GetRestTransformsAttr().Block();
+    reject(stage, SkeletonReadRole::Generic, "MOTION_USD_REST_COUNT", path.GetString());
 }
 } // namespace
 int
@@ -243,4 +387,6 @@ main()
     OwnedValues();
     CanonicalClip();
     CanonicalInputs();
+    TypedSkeleton();
+    TypedRefusals();
 }

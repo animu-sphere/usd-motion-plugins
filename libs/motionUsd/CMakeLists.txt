@@ -18,6 +18,7 @@ usdmotion_component_project(TESTS_OPTION MOTIONUSD_BUILD_TESTS)
 usdmotion_require_openusd()
 
 usdmotion_require_dependency(motionCore)
+usdmotion_require_dependency(motionRetarget)
 
 add_library(motionUsd STATIC
     src/ClipReader.cpp
@@ -37,6 +38,7 @@ target_include_directories(motionUsd
 target_link_libraries(motionUsd
     PUBLIC
         motionCore::motionCore
+        motionRetarget::motionRetarget
         usdmotion::pxr::usd
         usdmotion::pxr::sdf
         usdmotion::pxr::usdGeom
