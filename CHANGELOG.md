@@ -9,6 +9,12 @@ separate from the package version
 
 ## [Unreleased]
 
+- Reconcile the tracking ownership review: acquisition observations, regions
+  and assignment stay connector-owned; semantic pose generation belongs to
+  motion processing. Narrow MC-O8 to motion-owned inputs, component placement
+  and parity prerequisites before the direct solve leaves its compatibility
+  location. No motion API or production dependency changes.
+
 ## [0.5.4] - 2026-10-07
 
 ### Fixed

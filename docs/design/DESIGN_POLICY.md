@@ -791,13 +791,14 @@ repository must remain unaware of the connector package.
 
 ### 44.4 Conditional generic tracker solve
 
-`TrackerObservation` and the existing assignment/solve remain connector-owned
-for now. Reassess tracker assignment, body solve, pose reconstruction and
-confidence fusion only when the API can be explained without device/source
-names, reused across OpenXR, VRChat OSC and optical mocap, and justified as
-generic motion processing. Any accepted migration uses motion-owned input
-values and preserves the one-way dependency; it never imports the connector
-observation type. The contract and evaluation decision are
+The ownership review keeps acquisition observations, regions, operator
+assignment and identity applicability connector-owned. Semantic pose generation
+belongs here: the direct orientation solve, body reconstruction and confidence
+fusion operate on motion-owned inputs without device/source names. The existing
+direct solve remains at its compatibility location until its motion-owned input
+and component contract and parity prerequisites are adopted. Migration preserves
+the one-way dependency and never imports a connector observation or region type.
+The contract and ownership decision are
 [MOTION_CONTRACT.md §11.1](MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here).
 
 ### 44.5 Dependency invariants and enforcement

@@ -66,7 +66,7 @@ workspace discipline (WS-O1, decided 2026-09-19;
 | Not here | Where it lives | Why |
 | --- | --- | --- |
 | VMC, mocopi, VRChat OSC, OpenXR, WebXR, MediaPipe, transports, SDK/browser APIs, raw capture, connector sessions/endpoints/diagnostics and actor/source clock normalization | `motion-connectors` | acquisition (design policy §3.1, §44) |
-| `MotionFrame`, `IMotionConnector`, `TrackerObservation` and the current tracker assignment/solve | `motion-connectors` | acquisition envelope; generic solve is conditionally evaluated, not moved (§44.4) |
+| `MotionFrame`, `IMotionConnector`, `TrackerObservation`, regions and operator assignment | `motion-connectors` | acquisition envelope and observation organization; direct solve retained there pending the motion-owned input contract ([MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here)) |
 | connector-to-motion intake bridge, actor routing and restart/alignment policy selection | external composition, preferably `usd-avatar-runtime` | motion libraries never consume connector types (§44.3) |
 | VRMA reading, the VRM humanoid binding, expressions, look-at, `execVrm` | `usd-vrm-plugins` | VRM semantics (design policy §3.2, §26) |
 | VMD reading, MMD IK and append evaluation, the MMD role table | `usd-mmd-plugins` | MMD semantics (design policy §3.2, §42.4) |
@@ -266,7 +266,9 @@ finite motion timelines, with explicit reset/alignment operations and no new
 dependency edge ([MOTION §9.1.1](../design/MOTION_CONTRACT.md#911-existing-temporal-primitives)).
 
 The current graph remains §2.1, including its existing OpenUSD foundation
-types. MC-O7 settles intake metadata; MC-O8 evaluates a possible generic solve.
+types. MC-O7 settles intake metadata; MC-O8 defines the generic solve's
+motion-owned input and component contract following the ownership review in
+[MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here).
 Any future solve must consume motion-owned values and first update component
 placement, graph declarations and tests here. `TrackerObservation` is not
 moved as part of that evaluation. The ordered API, bridge-consumption, solve
