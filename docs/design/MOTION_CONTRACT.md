@@ -490,11 +490,11 @@ the comparison and the OpenExec nodes. A tracker sample here would have no
 reader and three standing obligations: equality, comparison and a place in the
 trace format (§10). **`motionCore` begins at the canonical pose.**
 
-For now the observation type, region vocabulary, operator assignment and solve
-remain together in `motion-connectors`' tracking library, which depends on this
-repository and never the reverse. A solve inside a runtime adapter would be a
-second motion pipeline. A tracker-driven pose is an ordinary `MotionPose`,
-sparse by construction, and its hips follow §5.3, not a second rule.
+Acquisition observations live in `motion-connectors`' core; its tracking
+library owns regions and operator assignment and retains a legacy observation
+projection for the direct solve. It depends on this repository and never the
+reverse. A tracker-driven pose is an ordinary `MotionPose`, sparse by
+construction, and its hips follow §5.3, not a second rule.
 
 **Accepted evaluation direction, 2026-10-06 (MC-O8).** Tracker assignment,
 generic body solve, pose reconstruction and confidence fusion may move here
@@ -506,6 +506,18 @@ comparison and recording implications, plus parity evidence, before moving
 code. It never creates a dependency on the connector observation type.
 This is [Connector Boundary Phase C](../roadmap/connector-boundary.md#connector-boundary-phase-c--generic-tracker-solve-evaluation),
 not a claim that a generic tracker solver is implemented here.
+
+**Ownership review, 2026-10-08 (MC-O8).** Observation organization stays
+connector-owned: opaque source identities, regions, operator assignment and
+identity-order applicability have no motion-semantic input or output. The
+direct region-to-joint solve, anatomical reconstruction, confidence fusion and
+multi-tracker semantic generation belong to this repository. The existing
+direct solve remains in its compatibility placement until the prerequisites
+above are adopted. MC-O8's remaining decision is the motion-owned input and
+component contract, not a move of connector types. Consumer composition maps
+assigned observations into that input by value; no tracker ID, region alias or
+copied connector observation contract enters a motion API. See the owning
+[connector decision](https://github.com/animu-sphere/motion-connectors/blob/main/docs/design/DESIGN_POLICY.md#4751-tracking-ownership-review).
 
 ## 12. Constraints
 
@@ -526,7 +538,7 @@ narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 | MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |
 | MC-O7 | Motion-owned intake metadata for restart, discontinuity, missing/stale state and explicit time/status values; preserve the current pose API and distinguish input state from sampling status (§9.1) | Connector Boundary Phases A-B, before extending intake |
-| MC-O8 | Whether tracker assignment/body solve/reconstruction/confidence fusion meet the source-independent migration conditions, and which motion-owned input contract/component would host them (§11.1) | Connector Boundary Phase C; a decision to retain current placement is valid |
+| MC-O8 | Motion-owned semantic solve input and component contract, validation/comparison/recording obligations and parity for the ownership decision in §11.1 | Connector Boundary Phase C, before code moves; observations/regions/assignment stay connector-owned |
 
 ## 14. Generic validation ownership
 

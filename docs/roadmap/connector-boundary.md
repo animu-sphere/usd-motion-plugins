@@ -63,11 +63,12 @@ actor-routing/restart acceptance gate.
 
 ## Connector Boundary Phase C — Generic tracker solve evaluation
 
-- ⬜ Resolve [MC-O8](../design/MOTION_CONTRACT.md#13-open-questions) by evaluating
-  tracker assignment, body solve, pose reconstruction and confidence fusion.
-- ⬜ Require an API explainable without device/source names, reusable across
-  OpenXR, VRChat OSC and optical mocap, and justified as generic motion
-  processing. Retain current connector placement if those conditions fail.
+- ⬜ Resolve the remaining [MC-O8](../design/MOTION_CONTRACT.md#13-open-questions)
+  motion-owned semantic solve input and component contract. Keep observation
+  identity, regions, operator assignment and identity applicability upstream.
+- ⬜ Specify an API without device/source names, reusable across observation
+  providers, with sparse position/orientation and explicit confidence behavior.
+  Retain the direct solve's compatibility placement until the contract exists.
 - ⬜ Before any accepted move, define motion-owned input values, component
   placement, dependency edges, validation/comparison/recording obligations and
   parity fixtures. Keep `TrackerObservation` connector-owned and adapt outside
