@@ -19,16 +19,17 @@ USD skeleton/rest APIs, StageClip absorption, recording, then API/ABI
 stabilization. Reuse implemented motion APIs and remove consumer duplication
 after parity evidence. This track does not depend on the `Bindings` decision.
 
-### Motion/connector boundary consolidation ⬜
+### Motion/connector boundary consolidation 🚧
 
 The accepted [ownership policy](../design/DESIGN_POLICY.md#44-motion-and-connector-boundary)
 keeps acquisition envelopes and source/device/protocol interpretation in
 `motion-connectors`, canonical processing/semantic recording here, and their
 bridge in external composition, preferably `usd-avatar-runtime`.
 [connector-boundary.md](connector-boundary.md) orders Connector Boundary
-Phase A-D: clarify motion-owned intake, prepare external live bridge
-consumption, evaluate source-independent tracker solve, and audit/enforce
-forbidden dependencies. `MotionFrame` and `TrackerObservation` remain
+Phase A-C: clarify motion-owned intake, prepare external live bridge
+consumption and evaluate source-independent tracker solve. Dependency gates
+are recorded in [WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement).
+`MotionFrame` and `TrackerObservation` remain
 connector-owned. No generic solver migration is claimed.
 
 ### A composed motion binding ⬜

@@ -46,6 +46,20 @@ test configures a second project, and it fails without them.
 | Test | Checks |
 | --- | --- |
 | `workspace_docs`, `workspace_docs_selftest` | every relative link and anchor resolves; every version and OpenUSD pin mirror agrees (`scripts/check_docs.py`) |
-| `workspace_installed_consumer` | the tree installs into a clean prefix that names no source or build path, and a project copied outside the repository consumes every package `tests/installed_consumer/packages.json` lists (none yet) |
+| `workspace_connector_boundaries`, `workspace_connector_boundaries_selftest` | production source/manifest acquisition boundaries and configured direct/transitive CMake dependencies; SDK/include/type/branch refusal fixtures and compiler-free real CMake graphs |
+| `workspace_installed_consumer` | the tree installs into a clean prefix that names no source or build path, and a project copied outside the repository consumes every package `tests/installed_consumer/packages.json` lists, including canonical intake with provider/protocol provenance |
 
 `ctest -LE installed-consumer` leaves the second project out.
+
+The connector source/manifest lane and its refusal fixtures can also run without
+an OpenUSD SDK:
+
+```powershell
+python scripts/check_connector_boundaries.py
+python scripts/test_connector_boundaries.py
+```
+
+The configured link closure runs through `workspace_connector_boundaries`;
+the source-only command does not claim link coverage. See
+[WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement) for the guard's
+scope and the inherited Windows OpenUSD foundation edge.

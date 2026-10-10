@@ -146,6 +146,9 @@ def main() -> int:
 
         source = work / "consumer-src"
         shutil.copytree(CONSUMER, source)
+        # Copy only test infrastructure, not motion source/build targets. The
+        # resulting graph contains the installed packages' own dependency edges.
+        shutil.copy2(REPO / "cmake" / "UsdMotionBoundaryGraph.cmake", source)
         build = work / "consumer-build"
         configure = ["cmake", "-S", source, "-B", build,
                      f"-DCMAKE_PREFIX_PATH={prefix.as_posix()};"
@@ -164,6 +167,8 @@ def main() -> int:
             ("Python3_INCLUDE_DIR", args.python_include_dir),
         ) if value]
         run(configure)
+        run([sys.executable, REPO / "scripts" / "check_connector_boundaries.py",
+             "--link-graph", build / "motion-boundary-graph.json"])
         run(["cmake", "--build", build, "--config", args.config])
 
         probes = sorted(build.rglob(executable("installed_consumer")))

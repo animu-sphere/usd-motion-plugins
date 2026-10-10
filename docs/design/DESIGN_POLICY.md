@@ -815,5 +815,7 @@ Library graph, include and link checks must guard these rules, including
 OpenXR, MediaPipe, OSC, WebSocket implementations, device SDKs and socket APIs.
 The enforcement surface is owned by
 [WORKSPACE.md §2.6](../architecture/WORKSPACE.md#26-connector-boundary-target);
-remaining coverage is Connector Boundary Phase D. Source/protocol strings
-stored as provenance do not authorize behavior branches or dependencies.
+the concrete guard scope and inherited foundation allowance are in
+[WORKSPACE.md §2.4](../architecture/WORKSPACE.md#24-enforcement).
+Source/protocol strings stored as provenance do not authorize behavior
+branches or dependencies.

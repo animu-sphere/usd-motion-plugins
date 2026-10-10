@@ -9,6 +9,13 @@ separate from the package version
 
 ## [Unreleased]
 
+- Add connector boundary gates for production source/includes, manifest
+  dependencies and configured direct/transitive CMake link properties, with
+  SDK/transport/type/source-comparison refusal fixtures and CI registration.
+  Provenance strings remain values; installed canonical intake preserves them.
+  Scope the pre-existing Windows OpenUSD `arch` → `Ws2_32` allowance to that
+  imported foundation edge ([workspace enforcement](docs/architecture/WORKSPACE.md#24-enforcement)).
+
 - Reconcile the tracking ownership review: acquisition observations, regions
   and assignment stay connector-owned; semantic pose generation belongs to
   motion processing. Narrow MC-O8 to motion-owned inputs, component placement

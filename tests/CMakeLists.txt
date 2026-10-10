@@ -18,6 +18,27 @@ add_test(NAME workspace_docs_selftest
     COMMAND "${USDMOTION_TEST_PYTHON}" "${PROJECT_SOURCE_DIR}/scripts/check_docs.py"
         --selftest)
 
+# Inspect all production components, then the configured dependency closure.
+# This includes imported/interface edges that a source link-line scan misses.
+include("${PROJECT_SOURCE_DIR}/cmake/UsdMotionBoundaryGraph.cmake")
+set(_boundary_roots motionCore motionSampling motionRecording motionRetarget
+    motionUsd motionSource motionBvh motion_convert motion_record motion_bvh_inspect)
+if(USDMOTION_BUILD_EXEC_MOTION)
+    list(APPEND _boundary_roots ExecMotion)
+endif()
+set(_boundary_graph "${PROJECT_BINARY_DIR}/motion-boundary-graph.json")
+usdmotion_write_boundary_graph("${_boundary_graph}" ${_boundary_roots})
+add_test(NAME workspace_connector_boundaries
+    COMMAND "${USDMOTION_TEST_PYTHON}"
+        "${PROJECT_SOURCE_DIR}/scripts/check_connector_boundaries.py"
+        --link-graph "${_boundary_graph}")
+add_test(NAME workspace_connector_boundaries_selftest
+    COMMAND "${USDMOTION_TEST_PYTHON}"
+        "${PROJECT_SOURCE_DIR}/scripts/test_connector_boundaries.py"
+        --cmake "${CMAKE_COMMAND}")
+set_tests_properties(workspace_connector_boundaries workspace_connector_boundaries_selftest
+    PROPERTIES LABELS "motion.boundary")
+
 # A shipped profile still describes the file it claims to: a question about the
 # data, answerable with no build. The first run holds the profiles against a
 # producer's recorded export. The pair after it holds an invented rig with no

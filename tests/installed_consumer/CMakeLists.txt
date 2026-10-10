@@ -42,6 +42,12 @@ if(_count GREATER 0)
     endforeach()
 endif()
 
+# Inspect every installed library's closure, including the retarget package
+# whose direct executable edge is deliberately removed below. The runner copies
+# this test-only helper beside the consumer; it is not an installed motion API.
+include("${CMAKE_CURRENT_SOURCE_DIR}/UsdMotionBoundaryGraph.cmake")
+usdmotion_write_boundary_graph("${CMAKE_BINARY_DIR}/motion-boundary-graph.json" ${_targets})
+
 # Retarget symbols in main.cpp must link through motionUsd's public edge.
 # The inventory above still independently verifies the package and header.
 list(REMOVE_ITEM _targets motionRetarget::motionRetarget)
