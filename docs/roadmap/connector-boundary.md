@@ -81,27 +81,6 @@ solver here. No evaluation or migration permits a reverse dependency.
 The owning contract is
 [MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here).
 
-## Connector Boundary Phase D — CI enforcement
-
-- ⬜ Audit existing boundary checks and add missing manifest/library-graph,
-  include and direct/transitive link coverage for `motion-connectors`, OpenXR,
-  MediaPipe, OSC, WebSocket implementations, device SDKs, browser APIs and
-  network sockets.
-- ⬜ Guard public APIs against connector-owned types and generic processing
-  against source-name branches. Allow source/protocol names as value
-  provenance rather than interpreting them as dependency violations.
-- ⬜ Keep `motionCore` independent of stage APIs, OpenExec and filtering,
-  recording/retarget implementations; retain the documented foundation-type
-  allowance until the separate WS-O5 migration.
-- ⬜ Verify the guards reject representative forbidden includes/edges and
-  allow installed canonical consumers, and run the relevant gates in CI.
-
-Gate: automated checks detect each forbidden dependency class at its
-appropriate layer, without mistaking provenance data for an SDK dependency.
-The structural contract is
-[WORKSPACE §2.6](../architecture/WORKSPACE.md#26-connector-boundary-target).
-This audit can proceed alongside the API phases.
-
 ## Completion criteria
 
 - Motion libraries depend on no connector type/package, device, protocol,

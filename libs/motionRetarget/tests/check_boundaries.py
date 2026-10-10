@@ -8,8 +8,8 @@ draws for it and OpenUSD's Gf value types, and on nothing else. Five checks: no 
 plugin, registration or OpenExec API in the sources; no include from a
 repository library outside its declared edges, and no transport; a link line
 and a binary that import nothing from OpenUSD beyond its foundation value
-types; no product, device or avatar-format name in the code or its string
-literals; and no caller-raised retarget code outside the table that defines
+types; no product, device or avatar-format name in processing code/includes
+(provenance strings are values); and no caller-raised retarget code outside the table that defines
 it. Comments may cite where a rule came from, so they are stripped before
 scanning.
 """
@@ -22,6 +22,9 @@ import re
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "scripts"))
+from check_connector_boundaries import product_check_text
 
 LIBRARY = "motionRetarget"
 # WORKSPACE.md §2.1: the repository libraries this one may include.
@@ -147,18 +150,20 @@ def main() -> int:
             if not path.is_file():
                 continue
             code = _strip_comments(path.read_text(encoding="utf-8"))
+            product_code, findings = product_check_text(path.read_text(encoding="utf-8"), LIBRARY, str(path))
+            errors.extend(findings)
             if forbidden_source.search(code):
                 errors.append(f"stage/plugin/exec API is forbidden: {path}")
             if path.name not in code_table and caller_raised.search(code):
                 errors.append(f"a caller-raised retarget code is raised by the "
                               f"library: {path}")
-            if forbidden_transport.search(code):
+            if forbidden_transport.search(product_code):
                 errors.append(f"a transport is forbidden: {path}")
             for match in repository_include.finditer(code):
                 if match.group(1) not in ALLOWED_LIBRARIES:
                     errors.append(f"{path}: includes {match.group(1)}, an edge "
                                   f"{LIBRARY} does not have")
-            for number, line in enumerate(code.splitlines(), 1):
+            for number, line in enumerate(product_code.splitlines(), 1):
                 match = product_names.search(line)
                 if match:
                     errors.append(f"{path}:{number}: product name '{match.group(0)}' "

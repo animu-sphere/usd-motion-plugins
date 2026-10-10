@@ -151,10 +151,32 @@ edge declared in the component's manifest and validated by
 (`motionCore` links no OpenUSD beyond its foundation types); and an include
 scan refusing forbidden headers and product names.
 
-Connector-specific graph/include/link coverage still to add or audit is
-[Connector Boundary Phase D](../roadmap/connector-boundary.md#connector-boundary-phase-d--ci-enforcement).
-The accepted forbidden surface is §2.6; this policy update does not claim new
-CI checks have landed.
+`workspace_connector_boundaries` adds the §2.6 source/include and manifest
+scan and a configured direct/transitive link-property closure for all libraries,
+tools and the optional bundle. `cmake/UsdMotionBoundaryGraph.cmake` follows
+aliases, private/interface links, imported configurations and dependency
+properties, retaining every generator-expression alternative. The companion
+`workspace_connector_boundaries_selftest` uses refusal fixtures and real
+compiler-free CMake graphs (aliases, cycles, conditional links and imported
+SDK locations). The hand-written docs-check workflow runs the source/manifest
+and fixture lanes without an OpenUSD runtime; workspace CTest CI runs the
+configured SDK closure and the installed canonical consumer. The installed
+lane also snapshots every exported motion library's closure from the copied
+consumer, using a copied test helper and no workspace motion targets.
+
+Windows OpenUSD 26.08's imported `arch` foundation target already links
+`Ws2_32`. Only that inherited edge is allowed, requiring an imported `arch`
+target with an `usd_arch` Windows library location. Motion-owned targets,
+other wrappers and socket calls/includes receive no exception. This retains
+the foundation allowance of §2.5; it does not establish full WS-O5 isolation.
+
+The shared source rules distinguish provenance strings from dependency names,
+connector-owned types and direct source-name comparisons. The core/processing
+component product scans reuse that distinction; the recorded-source/BVH gates
+retain their stricter no-producer assumptions. These are lexical structural
+guards over `include/` and `src/`, not C++ parsing, data-flow analysis or a
+replacement for the existing component binary audits. New SDK spellings and
+indirect source selectors require review and new refusal fixtures.
 
 ### 2.5 Runtime boundary target
 

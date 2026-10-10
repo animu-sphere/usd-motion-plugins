@@ -11,7 +11,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 | --- | --- |
 | [current.md](current.md) | Incomplete work after the imports: runtime and connector boundaries, scene-side motion bindings and later features. |
 | [runtime-boundary.md](runtime-boundary.md) | Runtime Boundary Phase 1-5: validation ownership, USD skeleton/rest readers, StageClip absorption, recording and API/ABI stabilization. |
-| [connector-boundary.md](connector-boundary.md) | Connector Boundary Phase A-D: canonical intake, external live bridge consumption, generic tracker solve evaluation and dependency enforcement. |
+| [connector-boundary.md](connector-boundary.md) | Connector Boundary Phase A-C: canonical intake, external live bridge consumption and generic tracker solve evaluation. Dependency enforcement is recorded in [WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement). |
 
 ## Status at a glance
 

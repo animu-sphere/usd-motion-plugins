@@ -29,6 +29,15 @@ main()
     using namespace openstrata::motion;
     LiveCaptureSource live;
     MotionPose observation;
+    // Acquisition names are provenance values, never processing selectors or
+    // a reason to depend on a connector/transport package.
+    observation.metadata.provider = "mocopi";
+    observation.metadata.protocol = "websocket";
+    observation.metadata.sourceId = "actor-1";
+    observation.metadata.kind = MotionSourceKind::LiveCapture;
+    live.SetSourceMetadata(observation.metadata);
+    observation.metadata.sourceTimestamp = 42.0;
+    observation.metadata.sequenceNumber = 7;
     observation.root.hasPosition = true;
     observation.timestamp = std::numeric_limits<double>::quiet_NaN();
     if (live.Push(observation) || !live.IsEmpty() ||
@@ -38,7 +47,8 @@ main()
     if (!live.Push(observation) || !live.AlignClock(0.0))
         return 8;
     if (live.AlignClock(std::numeric_limits<double>::infinity()) ||
-        live.GetClockOffset() != 100.0 || live.Sample(0.0).status != PoseSampleStatus::Sampled)
+        live.GetClockOffset() != 100.0 || live.Sample(0.0).status != PoseSampleStatus::Sampled ||
+        !live.Sample(0.0).pose || live.Sample(0.0).pose->metadata != observation.metadata)
         return 9;
     live.Reset();
     observation.timestamp = -1.0;

@@ -4,8 +4,8 @@
 
 Three checks: no stage, plugin or registration API in the sources; a link line
 and a binary that import nothing from OpenUSD beyond its foundation value
-types; and no product, device or avatar-format name in the code or its string
-literals. Comments may cite where a rule came from, so they are stripped before
+types; and no product, device or avatar-format name in processing code/includes.
+Provenance strings are values. Comments are stripped before
 the name scan -- the same scan usd-vrm-plugins ran over these headers before
 they left it (its workspace_motion_vocabulary).
 """
@@ -18,6 +18,9 @@ import re
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "scripts"))
+from check_connector_boundaries import product_check_text
 
 
 def _find_dumpbin() -> str | None:
@@ -120,7 +123,8 @@ def main() -> int:
 
     # Product, device and avatar-format names (WORKSPACE.md §5, invariant 3).
     # The joint and channel vocabularies are generic by contract; a name from a
-    # producer or a format is a boundary defect, however it got here.
+    # producer or a format cannot select processing behavior. Provenance strings
+    # are values; product_check_text retains includes and checks comparisons.
     product_names = re.compile(
         r"(?<![a-z0-9])(?:vrma?|vroid|mtoon|vmc|mocopi|vrchat|unity|mmd|pmx|vmd)"
         r"(?![a-z0-9])",
@@ -129,7 +133,8 @@ def main() -> int:
         for path in sorted(area.rglob("*")):
             if not path.is_file():
                 continue
-            code = _strip_comments(path.read_text(encoding="utf-8"))
+            code, findings = product_check_text(path.read_text(encoding="utf-8"), "motionCore", str(path))
+            errors.extend(findings)
             for number, line in enumerate(code.splitlines(), 1):
                 match = product_names.search(line)
                 if match:
