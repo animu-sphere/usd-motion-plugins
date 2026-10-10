@@ -10,10 +10,14 @@
 #include "motionCore/Validation.h"
 #include "motionRetarget/Validation.h"
 #include "motionRecording/LiveCaptureSource.h"
+#include "motionRecording/MotionRecorder.h"
+#include "motionRecording/CaptureTrace.h"
+#include "motionRecording/ReplaySender.h"
 #include "motion_inputs.h"
 
 #include <cstdio>
 #include <limits>
+#include <sstream>
 
 int
 main()
@@ -55,6 +59,51 @@ main()
     if (!live.Push(observation) || live.GetBuffer().GetNewest().root.hasLinearVelocity ||
         !live.AlignClock(5.0) || live.Sample(5.0).status != PoseSampleStatus::Sampled)
         return 10;
+    // Independent canonical actor sources and caller-selected availability,
+    // consumed entirely through installed packages without acquisition types.
+    LiveCaptureSource otherActor;
+    auto otherMetadata = observation.metadata;
+    otherMetadata.sourceId = "actor-2";
+    otherActor.SetSourceMetadata(otherMetadata);
+    if (!otherActor.Push(observation) || !otherActor.AlignClock(5.0))
+        return 11;
+    MotionRecorder recorder;
+    if (!recorder.Record(live.Sample(5.0)))
+        return 12;
+    for (const auto state : {MotionInputState::Missing, MotionInputState::Stale}) {
+        if (!live.SetInputState(state) || live.GetInputState() != state || live.Sample(5.0).pose ||
+            recorder.Record(live.Sample(5.0)) ||
+            otherActor.GetInputState() != MotionInputState::Available ||
+            otherActor.Sample(5.0).status != PoseSampleStatus::Sampled ||
+            otherActor.Sample(5.0).pose->metadata.sourceId != "actor-2")
+            return 13;
+    }
+    // Refusal must not accidentally re-enable unavailable input.
+    if (live.Push(observation) || live.GetInputState() != MotionInputState::Stale ||
+        live.SetInputState(static_cast<MotionInputState>(255)))
+        return 14;
+    live.Reset();
+    observation.timestamp = 0.0;
+    observation.metadata.sequenceNumber = 8;
+    if (!live.Push(observation) || live.GetInputState() != MotionInputState::Available ||
+        live.GetBuffer().GetNewest().root.hasLinearVelocity || !live.AlignClock(6.0) ||
+        !recorder.Record(live.Sample(6.0)) || recorder.GetReport().unavailable != 2)
+        return 15;
+    const auto recorded = recorder.Take();
+    std::ostringstream bytes;
+    if (recorded.samples.size() != 2 || !WriteCaptureTrace(bytes, recorded))
+        return 16;
+    std::istringstream traceInput(bytes.str());
+    MotionClip parsedTrace;
+    if (!ReadCaptureTrace(traceInput, &parsedTrace))
+        return 17;
+    LiveCaptureConfig replayConfig;
+    replayConfig.rootMotion = RootMotionIntake::Passthrough;
+    LiveCaptureSource replay(replayConfig);
+    replay.SetSourceMetadata(parsedTrace.source);
+    ReplaySender sender(parsedTrace, &replay);
+    if (sender.Flush() != 2 || replay.GetBuffer().GetNewest() != parsedTrace.samples.back())
+        return 18;
     SkeletonStageRead skeleton;
     SkeletonReadDiagnostic readingDiagnostic;
     const pxr::SdfPath skeletonPath("/Skeleton");

@@ -11,37 +11,22 @@ connector implementation remain with their owners.
 
 ## Connector Boundary Phase A — Canonical intake
 
-Finite timestamp/adjacent-span enforcement and installed canonical intake
-coverage are implemented; see [MOTION §9.1.1](../design/MOTION_CONTRACT.md#911-existing-temporal-primitives)
-and the [capability matrix](../reference/CAPABILITY_MATRIX.md). The metadata/input-state
-decision below remains open.
-
-- ⬜ Audit the public `LiveCaptureSource` intake and its installed consumption;
-  retain `Push(const MotionPose&)` wherever it suffices and document canonical
-  values as the only accepted inputs.
-- ⬜ Resolve [MC-O7](../design/MOTION_CONTRACT.md#13-open-questions): decide
-  whether a pose plus motion-owned timestamp/status/value metadata needs a
-  new overload or grouped sample value. Do not accept or reproduce
-  `MotionFrame`, `IMotionConnector` or connector session state.
-- ⬜ Specify time domain, provenance/sequence, ownership and compatibility;
-  keep input state distinct from sampling-result status. Update the motion
-  contract and implementation inventory when any API extension lands.
-
-Gate: a consumer builds against installed motion packages using canonical
-values only; motion headers have no connector dependency. Existing
-ordering, conditioning, sampling and trace/replay tests retain parity.
-The owning contract is
-[MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
+The canonical intake and MC-O7 decision are recorded in
+[MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes),
+with installed-package evidence in the
+[capability matrix](../reference/CAPABILITY_MATRIX.md). Remaining external
+bridge acceptance is Phase B below.
 
 ## Connector Boundary Phase B — Live bridge consumption
 
-- ⬜ Prepare intake APIs that external composition can use when
+- ⬜ Adopt the owner intake and availability/reset/alignment operations when
   `VmcLiveSource` / `MocopiLiveSource` are separated from acquisition. Keep
   source-specific bridges outside this repository; `usd-avatar-runtime` is
   the preferred composition owner.
-- ⬜ Specify generic restart/discontinuity/missing/stale input handling under
-  MC-O7. The connector observes restart, receive time and source state; the
-  runtime selects policy; motion APIs apply its generic temporal effects.
+- ⬜ Select external restart/discontinuity/missing/stale policy using
+  [MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
+  The connector observes restart, receive time and source state; the runtime
+  maps that evidence to explicit owner operations.
 - ⬜ Extend reset/alignment/buffering primitives if consumer evidence requires
   more than the existing explicit operations, without source-clock or
   protocol-specific logic.
@@ -55,11 +40,9 @@ reset or mistaking unavailable input for a zero pose. Motion libraries contain
 no connector bridge or raw packet/session capture. Generic motion semantics
 and replay tests stay here; acquisition and composition tests stay upstream.
 
-Owner tests now prove reset isolation of held joints, smoothing history and
-root-velocity derivation, plus finite alignment/conversion refusal. Installed
-consumption covers reset and realignment with a new epoch. This establishes the
-existing temporal primitives, not MC-O7's input-state decision or the external
-actor-routing/restart acceptance gate.
+Owner API correctness and canonical installed consumption are tracked in the
+[capability matrix](../reference/CAPABILITY_MATRIX.md). They do not establish
+the external acquisition-envelope actor-routing/restart acceptance gate.
 
 ## Connector Boundary Phase C — Generic tracker solve evaluation
 

@@ -11,7 +11,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started · ⛔ blocked
 | --- | --- |
 | [current.md](current.md) | Incomplete work after the imports: runtime and connector boundaries, scene-side motion bindings and later features. |
 | [runtime-boundary.md](runtime-boundary.md) | Runtime Boundary Phase 1-5: validation ownership, USD skeleton/rest readers, StageClip absorption, recording and API/ABI stabilization. |
-| [connector-boundary.md](connector-boundary.md) | Connector Boundary Phase A-C: canonical intake, external live bridge consumption and generic tracker solve evaluation. Dependency enforcement is recorded in [WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement). |
+| [connector-boundary.md](connector-boundary.md) | Connector Boundary Phase B-C: external live bridge consumption and generic tracker solve evaluation, using the owner intake contract. Dependency enforcement is recorded in [WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement). |
 
 ## Status at a glance
 
@@ -27,7 +27,6 @@ The owning document holds the question; this list only schedules it.
 
 | Id | Question | Owner | Blocks |
 | --- | --- | --- | --- |
-| MC-O7 | Motion-owned intake metadata and generic restart/discontinuity/missing/stale input state | [MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes) | Connector Boundary Phases A-B |
 | MC-O8 | Conditional generic tracker solve ownership and motion-owned input/component | [MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here) | Connector Boundary Phase C |
 | MC-O2 | Per-joint translations | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a producer |
 | MC-O3 | Two-channel root motion (VMC) | [MOTION §13](../design/MOTION_CONTRACT.md#13-open-questions) | a recorded session |

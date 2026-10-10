@@ -467,6 +467,132 @@ TestResetSeparatesEpochHistoryAndRetainsCallerPolicy()
     assert(source.GetBuffer().GetNewest() == newHead);
 }
 
+void
+TestInputAvailabilityDoesNotInventPosesOrChangeHistory()
+{
+    using namespace openstrata::motion;
+    for (const auto state : {MotionInputState::Missing, MotionInputState::Stale}) {
+        LiveCaptureConfig config;
+        config.smoothingCutoffHz = 1.0f;
+        config.staleFrameSeconds = 0.5;
+        LiveCaptureSource source(config);
+        LiveCaptureSource uninterrupted(config);
+        assert(source.GetInputState() == MotionInputState::Available);
+        const auto first = MakeFrame(10.0, 45.0f, pxr::GfVec3f(0));
+        const auto second = MakeFrame(11.0, 90.0f, pxr::GfVec3f(1));
+        assert(source.Push(first) && source.Push(second));
+        assert(uninterrupted.Push(first) && uninterrupted.Push(second));
+        assert(source.AlignClock(1.0));
+        MotionRecorder recorder;
+        assert(recorder.Record(source.Sample(1.0)));
+        const auto head = source.GetBuffer().GetNewest();
+        const auto observed = source.GetObservedJoints();
+        const auto before = source.GetStats();
+
+        assert(source.SetInputState(state));
+        assert(source.GetInputState() == state);
+        // Even an exact buffered tick is unavailable while the caller masks
+        // input. Neither held nor extrapolated poses reach the recorder.
+        for (const double t : {1.0, 1.05, 100.0}) {
+            const auto result = source.Sample(t);
+            assert(result.status == PoseSampleStatus::Unavailable && !result.pose);
+            assert(result.lag == 0.0 && !recorder.Record(result));
+        }
+        assert(source.GetBuffer().GetNewest() == head);
+        assert(source.GetObservedJoints() == observed);
+        assert(source.GetStats().framesAccepted == before.framesAccepted);
+        assert(source.GetStats().samplesSampled == before.samplesSampled);
+        assert(source.GetStats().samplesHeld == before.samplesHeld);
+        assert(source.GetStats().samplesExtrapolated == before.samplesExtrapolated);
+        assert(source.GetStats().samplesUnavailable == before.samplesUnavailable + 3);
+        assert(source.GetStats().peakLagSeconds == before.peakLagSeconds);
+        double start = 0.0, end = 0.0;
+        assert(source.GetTimeRange(&start, &end) && start == 0.0 && end == 1.0);
+        assert(!source.SetInputState(static_cast<MotionInputState>(255)));
+        assert(source.GetInputState() == state);
+
+        auto invalid = first;
+        invalid.timestamp = std::numeric_limits<double>::quiet_NaN();
+        assert(!source.Push(invalid));
+        assert(!source.Push(MotionPose{}));
+        assert(!source.Push(second)); // equal timestamp is out of order
+        assert(!source.Push(first));  // stale timestamp is a separate refusal
+        assert(source.GetInputState() == state);
+        assert(source.GetBuffer().GetNewest() == head);
+
+        // Explicitly enabling history retains the existing extrapolation/hold
+        // policy. It does not require a new frame or claim one arrived.
+        assert(source.SetInputState(MotionInputState::Available));
+        assert(source.Sample(1.0).status == PoseSampleStatus::Sampled);
+        assert(source.Sample(1.05).status == PoseSampleStatus::Extrapolated);
+        assert(source.SetInputState(state));
+        source.ResetStats();
+        assert(source.GetInputState() == state);
+
+        // An accepted observation restores availability and continues the
+        // exact conditioning history when the caller has selected continuity.
+        auto resumed = MakeFrame(12.0, -45.0f, pxr::GfVec3f(2));
+        resumed.validRotations.reset(kSpine);
+        assert(source.Push(resumed) && uninterrupted.Push(resumed));
+        assert(source.GetInputState() == MotionInputState::Available);
+        assert(source.GetBuffer().GetNewest() == uninterrupted.GetBuffer().GetNewest());
+        assert(recorder.Record(source.Sample(2.0)));
+        assert(recorder.GetReport().ticks == 5 && recorder.GetReport().unavailable == 3);
+        const auto recorded = recorder.Take();
+        assert(recorded.samples.size() == 2);
+        assert(recorded.samples[0].timestamp == 1.0 && recorded.samples[1].timestamp == 2.0);
+        // Semantic traces contain accepted poses and their gap, not input-state
+        // events. Ordinary trace replay still consumes the same canonical API.
+        std::ostringstream bytes;
+        assert(WriteCaptureTrace(bytes, recorded));
+        std::istringstream input(bytes.str());
+        MotionClip parsed;
+        assert(ReadCaptureTrace(input, &parsed));
+        LiveCaptureConfig replayConfig;
+        replayConfig.rootMotion = RootMotionIntake::Passthrough;
+        LiveCaptureSource replay(replayConfig);
+        replay.SetSourceMetadata(recorded.source);
+        ReplaySender sender(parsed, &replay);
+        assert(sender.Flush() == 2);
+        assert(replay.GetBuffer().GetNewest() == parsed.samples.back());
+        assert(SameOrientation(parsed.samples.back().localRotations[kHips],
+                               recorded.samples.back().localRotations[kHips]));
+        assert(NearlyEqual(parsed.samples.back().root.worldPosition,
+                           recorded.samples.back().root.worldPosition));
+    }
+}
+
+void
+TestInputAvailabilityAndRestartPolicyAreIndependent()
+{
+    using namespace openstrata::motion;
+    LiveCaptureConfig config;
+    config.smoothingCutoffHz = 1.0f;
+    LiveCaptureSource source(config);
+    auto old = MakeFrame(100.0, 90.0f, pxr::GfVec3f(1));
+    old.validRotations.set(kLeftHand);
+    old.localRotations[kLeftHand] = RotationX(90.0f);
+    assert(source.Push(old) && source.AlignClock(0.0));
+    assert(source.SetInputState(MotionInputState::Stale));
+    source.Reset();
+    assert(source.IsEmpty() && source.GetObservedJoints().none());
+    assert(source.GetInputState() == MotionInputState::Stale);
+    assert(source.GetClockOffset() == 100.0 && source.GetStats().framesAccepted == 1);
+    assert(source.Sample(0.0).status == PoseSampleStatus::Unavailable);
+    const auto restarted = MakeFrame(-1.0, -45.0f, pxr::GfVec3f(10));
+    assert(source.Push(restarted));
+    assert(source.GetInputState() == MotionInputState::Available);
+    const auto head = source.GetBuffer().GetNewest();
+    assert(!head.validRotations.test(kLeftHand) && !head.root.hasLinearVelocity);
+    assert(SameOrientation(head.localRotations[kHips], restarted.localRotations[kHips]));
+    assert(head.root.worldPosition == restarted.root.worldPosition);
+    assert(source.AlignClock(5.0) && source.Sample(5.0).IsValid());
+
+    LiveCaptureSource empty;
+    assert(empty.SetInputState(MotionInputState::Available));
+    assert(empty.Sample(0.0).status == PoseSampleStatus::Unavailable);
+}
+
 // A sample result compares exactly, and on every field: the status and the lag
 // are part of the answer (motion contract), so two results that carry the same
 // pose and disagree about how it was resolved are different values. This is the
@@ -1135,6 +1261,8 @@ main(int argc, char** argv)
     TestAnEmptySourceIsUnavailableRatherThanWrong();
     TestInvalidTimesDoNotConditionOrPoisonTheStream();
     TestResetSeparatesEpochHistoryAndRetainsCallerPolicy();
+    TestInputAvailabilityDoesNotInventPosesOrChangeHistory();
+    TestInputAvailabilityAndRestartPolicyAreIndependent();
     TestASampleResultComparesOnEveryField();
     TestCaptureTraceRoundTripsByteIdentically();
     TestCaptureTraceRejectsMalformedInput();

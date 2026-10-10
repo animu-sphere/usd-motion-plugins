@@ -17,7 +17,7 @@ for the edges, enforced by [`tests/check_boundaries.py`](tests/check_boundaries.
 
 | Header | Contents |
 | --- | --- |
-| `motionRecording/LiveCaptureSource.h` | `LiveCaptureSource` — timestamped intake, confidence gating, missing-joint policy, root-motion intake, statistics; `ConditionRootMotion`, the root intake rule as a pure function the session calls |
+| `motionRecording/LiveCaptureSource.h` | `LiveCaptureSource` — timestamped intake, explicit `MotionInputState` availability, confidence gating, missing-joint policy, root-motion intake, statistics; `ConditionRootMotion`, the root intake rule as a pure function the session calls |
 | `motionRecording/CaptureTrace.h` | The `motion-capture-trace` text format: reader, writer, error reporting |
 | `motionRecording/ReplaySender.h` | `ReplaySender` — pushes a recorded trace as a caller-driven clock advances |
 | `motionRecording/MotionRecorder.h` | `MotionRecorder` — accumulates evaluated poses back into a `MotionClip`, with the status of every tick |
@@ -32,8 +32,11 @@ VMC connector-to-intake test.
 The installed signature is `bool Push(const MotionPose&)`; it never accepts
 connector-owned `MotionFrame` or `IMotionConnector`. The connector-to-intake
 adapter belongs to external composition, preferably `usd-avatar-runtime`.
-Additional motion-owned sample metadata and generic discontinuity handling
-are design directions, not installed overloads; see
+Sample time/sequence/provenance stay on the pose. `SetInputState` explicitly
+marks input `Missing` or `Stale`, suppressing sampling without deleting history
+or inventing a pose; accepted intake restores `Available`. The caller separately
+selects reset/alignment on discontinuity. State events are not serialized in
+the semantic trace. See
 [MOTION §9.1](../../docs/design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes)
 and [Connector Boundary Phases A-B](../../docs/roadmap/connector-boundary.md).
 
