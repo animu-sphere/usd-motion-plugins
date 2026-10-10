@@ -286,9 +286,12 @@ retarget implementations, stage APIs and OpenExec above `motionCore`.
 The existing `motionRecording` intake and `motionSampling` buffer enforce
 finite motion timelines, with explicit reset/alignment operations and no new
 dependency edge ([MOTION §9.1.1](../design/MOTION_CONTRACT.md#911-existing-temporal-primitives)).
+`motionRecording` also owns explicit `MotionInputState` availability, retaining
+the pose intake and metadata; its contract is
+[MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
 
 The current graph remains §2.1, including its existing OpenUSD foundation
-types. MC-O7 settles intake metadata; MC-O8 defines the generic solve's
+types. MC-O8 defines the generic solve's
 motion-owned input and component contract following the ownership review in
 [MOTION §11.1](../design/MOTION_CONTRACT.md#111-a-tracker-observation-gets-no-type-here).
 Any future solve must consume motion-owned values and first update component

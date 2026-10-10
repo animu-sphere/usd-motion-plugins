@@ -759,11 +759,11 @@ No motion API accepts, includes or links `MotionFrame`, `IMotionConnector` or
 connector transport libraries. No reverse dependency on `motion-connectors`
 is permitted.
 
-The existing intake is `LiveCaptureSource::Push(const MotionPose&)`. Any
-additional timestamp/status/value metadata must use motion-owned types. A
-`MotionSampleInfo` paired with a pose, or a `MotionSample`, `MotionStreamInput`
-or `MotionInputFrame`, is a candidate, not an adoption of the connector frame.
-The detailed intake contract and open decision are
+The intake is `LiveCaptureSource::Push(const MotionPose&)`, retaining the
+pose's time and sample metadata. Explicit `MotionInputState` availability and
+separate reset/alignment operations resolve MC-O7 without a grouped sample or
+connector envelope. Any later timestamp/status/value additions must use
+motion-owned types. The detailed intake contract is
 [MOTION_CONTRACT.md §9.1](MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes).
 
 Source restart and receive timestamps are observed by the connector. The

@@ -184,7 +184,21 @@ LiveCaptureSource::Push(const MotionPose& pose)
 
     _lastAccepted = conditioned;
     ++_stats.framesAccepted;
+    _inputState = MotionInputState::Available;
     return true;
+}
+
+bool
+LiveCaptureSource::SetInputState(MotionInputState state) noexcept
+{
+    switch (state) {
+    case MotionInputState::Available:
+    case MotionInputState::Missing:
+    case MotionInputState::Stale:
+        _inputState = state;
+        return true;
+    }
+    return false;
 }
 
 bool
@@ -206,6 +220,11 @@ PoseSampleResult
 LiveCaptureSource::Sample(double evaluationTime)
 {
     PoseSampleResult result;
+
+    if (_inputState != MotionInputState::Available) {
+        ++_stats.samplesUnavailable;
+        return result;
+    }
 
     double oldest = 0.0;
     double newest = 0.0;

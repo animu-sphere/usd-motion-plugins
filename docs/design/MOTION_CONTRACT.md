@@ -380,27 +380,52 @@ and session state, endpoints and protocol evidence stay outside the intake.
 The connector's bounded frame queue buffers acquisition; `PoseBuffer` and
 `LiveCaptureSource` buffer canonical motion under the rules above.
 
-Additional timestamp/status/value metadata is an accepted design direction,
-with its exact shape open as MC-O7. For example, a future overload could be:
+**MC-O7 resolved, 2026-10-10; binding additive intake contract.** Retain
+`Push(const MotionPose&)`: the pose's seconds timestamp and existing
+`SourceMetadata` already carry sample time, sequence and provenance. No grouped
+sample or metadata overload is needed. Input availability is an explicit
+operation on the source, using motion-owned `MotionInputState` and
+`bool SetInputState(MotionInputState)` / `GetInputState()`.
 
-```cpp
-// Candidate only; MotionSampleInfo is not an installed type.
-LiveCaptureSource::Push(MotionPose pose, MotionSampleInfo info);
-```
+| Input state | Generic effect |
+| --- | --- |
+| `Available` (initial state) | Permit sampling of retained history under the configured hold/extrapolation policy; an empty source still returns `Unavailable`. |
+| `Missing` | The caller has no usable input; `Sample` returns `Unavailable` with no pose. |
+| `Stale` | The caller considers input too old; `Sample` returns `Unavailable` with no pose. |
 
-Alternatively a motion-owned `MotionSample`, `MotionStreamInput` or
-`MotionInputFrame` could group those values. These alternatives must preserve
-the current pose's timestamps, sequence/provenance and existing intake rules;
-they must not copy the connector envelope or imply an overload exists today.
-Reuse the present API where sufficient.
+The setter refuses unknown enum values without mutation. State changes do not
+read a clock, infer a timeout, create a pose, change provenance/sequence,
+condition history or increment counters. Each suppressed `Sample` call counts
+one `samplesUnavailable`, with zero lag and no peak-lag change. Buffered history,
+held joints, filtering, root-velocity history, observed coverage and offset are
+retained; `GetTimeRange` reports retained history, not input availability.
+Setting `Available` explicitly permits that history again. A successfully
+accepted `Push` restores `Available`; any refused push preserves the state.
+Inputs are copied into owned canonical history as before; no envelope or
+external state object is retained. The initial state and unchanged pose intake
+preserve callers that never use the new setter.
 
 The connector observes source restart, receive time and source/connection
 state. Runtime policy selects alignment/reset behavior; motion APIs apply the
-generic effect to history and temporal processing. MC-O7 must distinguish
-restart/discontinuity/missing/stale input state from `PoseSampleStatus`, which
-describes a sampling result (§8), and from the existing stale-timestamp
-rejection counter (§9). `motionSampling` does not interpret a source-specific
-clock. MC-O6's joint tracking-loss question remains separate.
+generic effect to history and temporal processing. For a restart/discontinuity
+that should break continuity, the caller uses `Reset()`, pushes the first pose
+of the new epoch, then sets/aligns the offset. To retain continuity, it omits
+the reset. Availability changes alone never select a new epoch or discard
+history. The runtime should push only observations it considers usable, and
+set `Missing`/`Stale` after routing when policy suppresses input.
+
+Input availability is distinct from `PoseSampleStatus`, which describes a
+sampling result (§8), and from the stale-timestamp rejection counter (§9).
+`Stale` is not inferred from a refused timestamp, and a malformed/empty pose
+is not a missing-input signal. `motionSampling` does not interpret a
+source-specific clock. MC-O6's joint tracking-loss question remains separate.
+
+`MotionRecorder` counts unavailable evaluations and appends no pose for them.
+The semantic trace still stores poses and their timestamps; it does not store
+availability or restart events. Reproducing an input-state schedule requires
+the external caller to supply those operations again. New-epoch recording
+also requires caller-selected recorder/session boundaries when timestamps
+would regress (§10); the source's reset does not reset an independent recorder.
 
 Implementation and consumer parity gates are in
 [Connector Boundary Phases A-B](../roadmap/connector-boundary.md).
@@ -423,13 +448,13 @@ either output. Finite operands whose arithmetic overflows are also refused.
 
 `Reset()` clears buffered poses, held joints, observed-joint coverage, smoothing
 and the prior used to derive root velocity. Configuration, stream provenance,
-counters and the selected clock offset survive. A runtime that chooses a new
-epoch resets history, pushes its first canonical observation, then sets or
-aligns the offset before sampling. The first accepted pose is not smoothed
+input availability, counters and the selected clock offset survive. A runtime
+that chooses a new epoch resets history, pushes its first canonical observation,
+then sets or aligns the offset before sampling. The first accepted pose is not smoothed
 against the old epoch and acquires no velocity from it; missing joints remain
 absent. `ResetStats()` separately clears counters and retains history/alignment.
-These primitives do not detect restart or decide input availability; MC-O7's
-input-state contract remains open.
+These primitives do not detect restart or decide input availability; the
+caller selects those policies through §9.1's explicit operations.
 
 ## 10. Recording and the trace format
 
@@ -530,6 +555,8 @@ constraint.
 
 MC-O1, the joint vocabulary, was decided on 2026-09-19 (§2.1); MC-O4 was
 narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
+MC-O7 was resolved on 2026-10-10 (§9.1): existing sample metadata, explicit
+availability and separate reset/alignment operations.
 
 | Id | Question | Resolve by |
 | --- | --- | --- |
@@ -537,7 +564,6 @@ narrowed the same day (§6). MC-O5 was resolved on 2026-09-24 (§9).
 | MC-O3 | Root motion for producers with two translation channels (VMC root position vs hips offset) | one recorded session from each of two VMC senders — operator work in `motion-connectors` |
 | MC-O4 | A non-scalar channel's value: `VtValue`, or a closed variant of scalar, vector and point. The scalar case is decided (§6: `float`) | the first non-scalar channel — gaze, when it leaves the pose |
 | MC-O6 | Tracking state: a way to say *tracking lost* that is neither an absent joint nor low confidence | a live producer that can report it |
-| MC-O7 | Motion-owned intake metadata for restart, discontinuity, missing/stale state and explicit time/status values; preserve the current pose API and distinguish input state from sampling status (§9.1) | Connector Boundary Phases A-B, before extending intake |
 | MC-O8 | Motion-owned semantic solve input and component contract, validation/comparison/recording obligations and parity for the ownership decision in §11.1 | Connector Boundary Phase C, before code moves; observations/regions/assignment stay connector-owned |
 
 ## 14. Generic validation ownership

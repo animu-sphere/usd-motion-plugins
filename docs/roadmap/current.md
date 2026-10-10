@@ -26,7 +26,7 @@ keeps acquisition envelopes and source/device/protocol interpretation in
 `motion-connectors`, canonical processing/semantic recording here, and their
 bridge in external composition, preferably `usd-avatar-runtime`.
 [connector-boundary.md](connector-boundary.md) orders Connector Boundary
-Phase A-C: clarify motion-owned intake, prepare external live bridge
+Phase B-C: adopt motion-owned intake in external live bridge
 consumption and evaluate source-independent tracker solve. Dependency gates
 are recorded in [WORKSPACE §2.4](../architecture/WORKSPACE.md#24-enforcement).
 `MotionFrame` and `TrackerObservation` remain
@@ -55,7 +55,8 @@ They are listed, in the order they block work, in
 need runtime adoption of the implemented typed skeleton and clip/rest reader API
 ([USD §7.2](../design/USD_MAPPING.md#72-motion-domain-reader-results));
 the next composition decision remains **USD-O5** (the `Bindings` prim).
-Connector Boundary Phases A-B need **MC-O7** (intake metadata/state), and
+Connector Boundary Phase B needs external adoption of the intake availability
+and reset/alignment contract ([MOTION §9.1](../design/MOTION_CONTRACT.md#91-canonical-intake-and-acquisition-envelopes));
 Phase C decides **MC-O8** (conditional generic tracker solve ownership).
 MC-O5 was resolved with `motion-connectors`' first shared connector-to-intake
 test; [MOTION §9](../design/MOTION_CONTRACT.md#9-motionstream-intake) records

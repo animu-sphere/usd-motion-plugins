@@ -9,6 +9,14 @@ separate from the package version
 
 ## [Unreleased]
 
+- Add explicit `MotionInputState` availability to `LiveCaptureSource`, resolving
+  MC-O7 while retaining `Push(const MotionPose&)` and its sample metadata.
+  Missing/stale input suppresses sampling and recording without clearing
+  conditioning history; accepted poses restore availability. Caller-selected
+  reset/alignment still controls restart continuity. Owner and installed
+  consumer tests cover state/refusal isolation, conditioning, separate actor
+  sources, recording gaps and semantic trace replay.
+
 - Add connector boundary gates for production source/includes, manifest
   dependencies and configured direct/transitive CMake link properties, with
   SDK/transport/type/source-comparison refusal fixtures and CI registration.

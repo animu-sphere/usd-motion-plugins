@@ -143,6 +143,14 @@ struct LiveCaptureStats {
     std::uint64_t framesRejectedInvalidTimestamp = 0;
 };
 
+// Caller-selected availability of canonical input, independent of the status
+// of a sampling result. No clock, timeout or connection state is inferred.
+enum class MotionInputState : std::uint8_t {
+    Available, // Buffered history may be sampled under the configured policy.
+    Missing,   // The caller has no usable input; sampling is unavailable.
+    Stale,     // The caller considers input too old; sampling is unavailable.
+};
+
 class MOTIONRECORDING_API LiveCaptureSource final : public IMotionSource {
 public:
     explicit LiveCaptureSource(const LiveCaptureConfig& config = {});
@@ -160,7 +168,16 @@ public:
     // Returns false when the frame was refused — out of order, stale, or
     // carrying neither a valid joint nor root data, or an invalid timestamp —
     // and the stats record why. Times and adjacent spans must be finite.
+    // Acceptance restores Available input; refusal preserves the input state.
     bool Push(const MotionPose& pose);
+
+    // Missing/Stale suppress sampling without discarding or conditioning
+    // history. Available permits it again, including hold/extrapolation under
+    // the existing policy. Unknown enum values are refused without mutation.
+    // To break continuity on restart/discontinuity, call Reset() separately,
+    // then push and explicitly set/align the new epoch's clock.
+    bool SetInputState(MotionInputState state) noexcept;
+    MotionInputState GetInputState() const noexcept { return _inputState; }
 
     // captureTime = evaluationTime + clockOffset. A connector that knows its
     // stream's epoch sets this directly; one that does not calls AlignClock().
@@ -174,10 +191,11 @@ public:
     // preserves the previous offset in those cases.
     bool AlignClock(double evaluationTime) noexcept;
 
-    // Nonfinite evaluation/capture time or lag returns Unavailable, counted
-    // once, without sampling history or changing the peak lag.
+    // Missing/Stale input or nonfinite evaluation/capture time or lag returns
+    // Unavailable with no pose, counted once without changing the peak lag.
     PoseSampleResult Sample(double evaluationTime) override;
-    // Refuses nonfinite converted bounds without writing either output.
+    // Reports retained history even with Missing/Stale input. Refuses
+    // nonfinite converted bounds without writing either output.
     bool GetTimeRange(double* startTime, double* endTime) const override;
 
     const PoseBuffer& GetBuffer() const noexcept { return _buffer; }
@@ -195,9 +213,9 @@ public:
     void ResetStats() noexcept { _stats = LiveCaptureStats(); }
 
     // Drops buffered history, the held-joint state, and the smoothing state.
-    // Observed-joint coverage also clears. Config, provenance, stats and clock
-    // offset survive. Use ResetStats() for counters; set/align the clock
-    // explicitly when the caller selects a new epoch.
+    // Observed-joint coverage also clears. Config, provenance, input state,
+    // stats and clock offset survive. Use ResetStats() for counters; set/align
+    // the clock explicitly when the caller selects a new epoch.
     void Reset();
 
 private:
@@ -212,6 +230,7 @@ private:
     std::bitset<HumanJointCount> _observedJoints;
     double _clockOffset = 0.0;
     LiveCaptureStats _stats;
+    MotionInputState _inputState = MotionInputState::Available;
 };
 
 } // namespace openstrata::motion
